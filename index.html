@@ -1491,11 +1491,12 @@ server("getBoot").then(b => {
     if (b.needsTimesheetBrand || !done) server("applyBrandToTimesheet", S.brand.logo || DEFAULT_LOGO)
       .then(() => kvSet("timesheetLogoV2", true)).catch(() => {});
   });
-  kvGet("ladPhotosImported").then(done => done ? null : server("importLadPhotos").then(() => kvSet("ladPhotosImported", true)))
-    .catch(() => {})
-    .then(() => server("getPhotos"))
-    .then(p => { S.ladPhotos = p || {}; render(); }).catch(() => {});
-}).catch(e => setStatus("Couldn't load. Check your signal and reload"));
+  // faces: load them from Drive; if they're not there yet, copy the starting set in, then load again
+  server("getPhotos")
+    .then(p => (p && Object.keys(p).length >= 5) ? p : server("importLadPhotos").then(() => server("getPhotos")))
+    .then(p => { S.ladPhotos = p || {}; render(); })
+    .catch(e => setStatus(errText(e, "Couldn't load the lads' photos")));
+}).catch(e => setStatus(e && e.code === "PIN" ? "Enter the PIN" : "Couldn't load. Check your signal and reload"));
 </script>
 </body>
 </html>
