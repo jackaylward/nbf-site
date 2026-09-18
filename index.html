@@ -283,6 +283,7 @@ input[readonly],textarea[readonly]{background:var(--soft);color:var(--muted);cur
 .logrow b{white-space:nowrap}
 .dwthumbs{display:flex;gap:5px;margin-top:8px}
 .dwthumbs img,.dwthumbs .skel{width:56px;height:56px;border-radius:8px;object-fit:cover;display:block;border:1px solid var(--line)}
+@media (max-width:620px){ .tool.dw{flex-wrap:wrap} .tool.dw .info{flex:1 1 60%} .dwthumbs{order:3;width:100%;margin-top:6px} }
 
 /* dialog */
 .modal{position:fixed;inset:0;background:rgba(0,0,0,.5);display:grid;place-items:center;z-index:20;padding:16px}
@@ -306,7 +307,7 @@ input[readonly],textarea[readonly]{background:var(--soft);color:var(--muted);cur
   <button data-view="home"><svg viewBox="0 0 24 24"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Home</button>
   <button data-view="attendance"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M8 13l3 3 5-6M3 9h18M8 2v4M16 2v4"/></svg>Attendance</button>
   <button data-view="timesheet"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Timesheet</button>
-  <button data-view="dayworks"><svg viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/></svg>Dayworks</button>
+  <button data-view="dayworks"><svg viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/></svg>Variations</button>
   <button data-view="works"><svg viewBox="0 0 24 24"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9"/></svg><span>Works<span class="lg"> Done</span></span></button>
   <button data-view="tools"><svg viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 0 0 5 5L21 13l-8 8-3-3 5.3-5.3a4 4 0 0 0-5-5L9 6l2-2z"/><path d="M3 21l6-6"/></svg>Tools</button>
   <div class="navcredit">Designed and built by Aylward Solutions</div>
@@ -326,7 +327,7 @@ const DAYS = ["mon","tue","wed","thu","fri","sat"];
 const DAY_LABEL = ["Mon","Tue","Wed","Thu","Fri","Sat"];
 const STATUSES = ["In store","On site","With a lad","In repair","Off hired","Missing"];
 const TICK_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
-const VIEW_TITLES = {home:"Home", attendance:"Attendance", timesheet:"Timesheet", dayworks:"Dayworks", works:"Works Done", tools:"Tools"};
+const VIEW_TITLES = {home:"Home", attendance:"Attendance", timesheet:"Timesheet", dayworks:"Variations", works:"Works Done", tools:"Tools"};
 
 // ================= helpers =================
 const $ = id => document.getElementById(id);
@@ -464,7 +465,7 @@ function shrinkImage(file, size, square){
         c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
       }
       URL.revokeObjectURL(url);
-      resolve(c.toDataURL("image/jpeg", 0.82));
+      resolve(c.toDataURL("image/jpeg", square ? 0.82 : 0.72));
     };
     img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("That file isn't a photo.")); };
     img.src = url;
@@ -721,7 +722,7 @@ function homeHtml(){
     ${pdfResult("home")}
   </section>
   <div class="cards">
-    <button class="card" data-go="dayworks"><h3>Dayworks this week</h3>
+    <button class="card" data-go="dayworks"><h3>Variations this week</h3>
       <div class="big">${dwWeek ? dwWeek.length : skelNum()}</div>
       <p>${dwWeek ? `${fmtH(dwWeek.reduce((a,r)=>a+(r.manHours||0),0))} man-hours` : skelLine(60)}${waitingDw ? `, <span class="pill amber">${waitingDw} waiting to send</span>` : ""}</p></button>
     <button class="card" data-go="works"><h3>Works done this week</h3>
@@ -1209,15 +1210,16 @@ const niceYmd = s => { const d = fromIso(s); return d ? d.toLocaleDateString("en
 const shortYmd = s => { const d = fromIso(s); return d ? d.toLocaleDateString("en-IE",{day:"numeric", month:"short"}) : s; };
 
 // ---- the two kinds of record ----
+const REC_TYPES = ["Variation", "Crane delay"];
 const KINDS = {
   dayworks: {
-    kind: "dayworks", prefix: "dw", one: "daywork", many: "dayworks", One: "Daywork", Many: "Dayworks",
-    newLabel: "New daywork", textFields: ["id","date","start","end","location","description","other"],
+    kind: "dayworks", prefix: "dw", one: "variation", many: "variations", One: "Variation", Many: "Variations",
+    newLabel: "New variation", textFields: ["id","date","start","end","location","description","other","type"],
     sortKey: r => (r.date||"") + (r.start||""), groupKey: r => r.date,
     blank(){
       const now = new Date();
       const hh = String(now.getHours()).padStart(2,"0"), mm = String(Math.floor(now.getMinutes()/15)*15).padStart(2,"0");
-      return {date: iso(now), start: `${hh}:${mm}`, end: "", location: "", description: "", chippies: 0, fixers: 0, operatives: 0, other: ""};
+      return {type: REC_TYPES[0], date: iso(now), start: `${hh}:${mm}`, end: "", location: "", description: "", chippies: 0, fixers: 0, operatives: 0, other: ""};
     },
     missing(r){
       const miss = [];
@@ -1234,20 +1236,22 @@ const KINDS = {
     inRange: (r, a, b) => r.date >= a && r.date <= b,
     calc(r){ const h = dwHours(r), men = recMen(r); return h ? `${fmtH(h)} hrs × ${men} men = <b>${fmtH(h*men)} man-hours</b>` : "Enter start and end times"; },
     dateFields: r => `
+      <label class="field">Type<select data-rf="type">${REC_TYPES.map(x => `<option${x === (r.type || REC_TYPES[0]) ? " selected" : ""}>${x}</option>`).join("")}</select></label>
       <label class="field">Date<input type="date" data-rf="date" value="${esc(r.date)}"></label>
       <label class="field">Start time<input type="time" data-rf="start" value="${esc(r.start)}"></label>
       <label class="field">End time<input type="time" data-rf="end" value="${esc(r.end)}"></label>`,
     locationLabel: "Location", locationRequired: true,
     rowTitle: r => r.location,
-    rowSub: r => `${r.start} – ${r.end}, ${menText(r)}`,
+    rowSub: r => `${r.type || "Variation"}, ${r.start} – ${r.end}, ${menText(r)}`,
     rowSide: r => `<b>${fmtH(r.manHours || 0)}</b><span class="small muted">man-hrs</span>`,
     detailRows: r => `
+      <tr><th>Type</th><td>${esc(r.type || "Variation")}</td></tr>
       <tr><th>Date / time</th><td>${esc(niceYmd(r.date))}, ${esc(r.start)} – ${esc(r.end)} (${fmtH(r.hours||0)} hrs)</td></tr>
       <tr><th>Location</th><td>${esc(r.location)}</td></tr>
       <tr><th>Men</th><td>${esc(menText(r))}</td></tr>
       <tr><th>Man-hours</th><td>${fmtH(r.manHours||0)}</td></tr>`,
     weekSummary: list => `${fmtH(list.reduce((a,r)=>a+(r.manHours||0),0))} man-hours this week`,
-    pdfNote: "Includes every daywork between the dates, with photos.",
+    pdfNote: "Includes every variation and crane delay between the dates, with photos.",
   },
   works: {
     kind: "works", prefix: "wd", one: "works entry", many: "works entries", One: "Works done", Many: "Works Done",
@@ -1319,7 +1323,9 @@ function queueHtml(K){
   const n = jobs.length;
   if (!n) return `<div id="recQueue" class="qbar ok">All ${K.many} saved to Google</div>`;
   const photos = jobs.reduce((a,j) => a + (j.newPhotos||[]).filter(p=>!p.sent).length, 0);
-  return `<div id="recQueue" class="qbar wait"><span>${n} ${n===1?K.one:K.many} waiting to send${photos ? `, ${photos} photo${photos===1?"":"s"}` : ""}. They're safe on this device.${DWQ.failed ? `<br><span class="small">Last try: ${esc(DWQ.failed)}</span>` : ""}</span>
+  const done = jobs.reduce((a,j) => a + (j.newPhotos||[]).filter(p=>p.sent).length, 0);
+  const sending = DWQ.busy ? `<span class="spin sm"></span>Sending${photos ? ` photo ${done + 1} of ${done + photos}` : ""}… ` : "";
+  return `<div id="recQueue" class="qbar wait"><span>${sending}${n} ${n===1?K.one:K.many} waiting to send${photos ? `, ${photos} photo${photos===1?"":"s"} left` : ""}. They're safe on this device.${DWQ.failed ? `<br><span class="small">Last try: ${esc(DWQ.failed)}</span>` : ""}</span>
     <button class="btn ghost" data-act="retry">${DWQ.busy ? "Sending…" : "Send now"}</button></div>`;
 }
 
@@ -1366,11 +1372,13 @@ async function processQueue(){
       const saved = await server("saveRecord", kind, job.rec);
       if (!sameRec(K, saved, job.rec)) throw new Error("Google saved something different. Retrying.");
       for (const name of job.removed) await server("removeRecordPhoto", kind, job.id, name);
-      for (const p of job.newPhotos){
-        if (p.sent) continue;
-        await server("saveRecordPhoto", kind, job.id, p.name, p.data);
-        p.sent = true;
+      // two photos at a time: quicker on site, still safe
+      const toSend = job.newPhotos.filter(p => !p.sent);
+      for (let i = 0; i < toSend.length; i += 2){
+        const pair = toSend.slice(i, i + 2);
+        await Promise.all(pair.map(p => server("saveRecordPhoto", kind, job.id, p.name, p.data).then(() => { p.sent = true; })));
         await jobPut(job);
+        await refreshJobs();
       }
       const fin = await server("finalizeRecord", kind, job.id);
       const missing = job.newPhotos.filter(p => !fin.names.includes(p.name));
@@ -1665,7 +1673,7 @@ $("view").addEventListener("change", async ev => {
   $("recMsg").textContent = `Getting ${files.length} photo${files.length===1?"":"s"} ready…`;
   for (const file of files){
     try{
-      const data = await shrinkImage(file, 1600, false);
+      const data = await shrinkImage(file, 1280, false);
       f.added.push({name: `${f.rec.id}-${Date.now().toString(36)}${Math.random().toString(36).slice(2,5)}`, data});
     }catch(e){ $("recMsg").textContent = errText(e, "One file wasn't a photo."); }
   }
@@ -1682,6 +1690,7 @@ $("view").addEventListener("submit", async ev => {
   const miss = K.missing(f.rec);
   if (miss.length){ render(); const m = document.querySelector(".dwmiss"); if (m) m.scrollIntoView({block:"center"}); return; }
   const rec = {...f.rec, chippies: +f.rec.chippies||0, fixers: +f.rec.fixers||0, operatives: +f.rec.operatives||0};
+  if (K.kind === "dayworks" && !REC_TYPES.includes(rec.type)) rec.type = REC_TYPES[0];
   $("recSave").disabled = true; $("recMsg").textContent = "Saving on this device…";
   try{
     await queueRecordSave(K.kind, rec, f.added, f.removed);
