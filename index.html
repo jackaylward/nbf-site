@@ -285,6 +285,12 @@ input[readonly],textarea[readonly]{background:var(--soft);color:var(--muted);cur
 .dwthumbs img,.dwthumbs .skel{width:56px;height:56px;border-radius:8px;object-fit:cover;display:block;border:1px solid var(--line)}
 @media (max-width:620px){ .tool.dw{flex-wrap:wrap} .tool.dw .info{flex:1 1 60%} .dwthumbs{order:3;width:100%;margin-top:6px} }
 
+.tag{display:inline-block;margin:0 0 4px;padding:2px 9px;border-radius:6px;font-size:.68rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.tag.var{background:#dce6f2;color:#012060}
+.tag.crane{background:#ffe8cc;color:#8a4b0f}
+.tag.big{font-size:.8rem;padding:4px 12px;margin-bottom:8px}
+.tool .info .tag{display:inline-block;width:auto}
+
 /* dialog */
 .modal{position:fixed;inset:0;background:rgba(0,0,0,.5);display:grid;place-items:center;z-index:20;padding:16px}
 .modal .box{background:#fff;border-radius:16px;padding:22px;max-width:440px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.3)}
@@ -1242,7 +1248,8 @@ const KINDS = {
       <label class="field">End time<input type="time" data-rf="end" value="${esc(r.end)}"></label>`,
     locationLabel: "Location", locationRequired: true,
     rowTitle: r => r.location,
-    rowSub: r => `${r.type || "Variation"}, ${r.start} – ${r.end}, ${menText(r)}`,
+    rowSub: r => `${r.start} – ${r.end}, ${menText(r)}`,
+    rowTag: r => (r.type || "Variation"),
     rowSide: r => `<b>${fmtH(r.manHours || 0)}</b><span class="small muted">man-hrs</span>`,
     detailRows: r => `
       <tr><th>Type</th><td>${esc(r.type || "Variation")}</td></tr>
@@ -1481,7 +1488,7 @@ function recordsHtml(kind){
     const head = g !== last ? `<h3 class="dwdate">${esc(niceYmd(g))}</h3>` : "";
     last = g;
     return `${head}<button class="tool dw" data-act="open" data-id="${esc(r.id)}">
-      <div class="info"><strong>${esc(K.rowTitle(r))}</strong>
+      <div class="info">${K.rowTag ? `<span class="tag ${K.rowTag(r) === "Crane delay" ? "crane" : "var"}">${esc(K.rowTag(r))}</span>` : ""}<strong>${esc(K.rowTitle(r))}</strong>
         <span>${esc(K.rowSub(r))}</span>
         ${K.rowTitle(r) === String(r.description||"").split("\n")[0] ? "" : `<span>${esc(r.description)}</span>`}</div>
       ${(S.recThumbs[r.id] && S.recThumbs[r.id].length) ? `<div class="dwthumbs">${S.recThumbs[r.id].map(p => `<img src="${p}" alt="" loading="lazy" decoding="async">`).join("")}</div>` : (r.photos > 0 && !S.thumbsDone[r.id] ? `<div class="dwthumbs">${Array.from({length: Math.min(3, r.photos)}, () => '<span class="skel"></span>').join("")}</div>` : "")}
@@ -1587,6 +1594,7 @@ function recDetailHtml(K){
   ${pdfResult("record")}
   <div class="panel">
     <h2>${esc(K.rowTitle(r))}</h2>
+    ${K.rowTag ? `<p><span class="tag big ${K.rowTag(r) === "Crane delay" ? "crane" : "var"}">${esc(K.rowTag(r))}</span></p>` : ""}
     <p>${r.pending ? `<span class="pill amber">Waiting to send</span>` : `<span class="pill ok">Saved to Google</span>`}</p>
     <table class="dwtable">
       ${K.detailRows(r)}
