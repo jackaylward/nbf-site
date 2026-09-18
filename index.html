@@ -272,6 +272,20 @@ nav.tabs .navcredit{display:none}
   .credit{display:none}
 }
 
+/* view and edit mode, log, list photos */
+.modebar{display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid var(--line);background:var(--card);border-radius:12px;padding:10px 14px;margin-bottom:14px;font-size:.78rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.modebar.editing{background:var(--brand);border-color:var(--brand);color:#fff}
+.modebar.editing .btn{background:#fff;color:var(--brand);border-color:#fff}
+.modebar .btn{padding:8px 14px;font-size:.85rem}
+input[readonly],textarea[readonly]{background:var(--soft);color:var(--muted);cursor:pointer}
+.tick.locked{opacity:.5}
+.logrow{display:flex;gap:12px;padding:8px 0;border-bottom:1px solid var(--line);font-size:.9rem}
+.logrow:last-child{border-bottom:0}
+.logrow .when{flex:0 0 104px;color:var(--muted);font-size:.78rem}
+.logrow b{white-space:nowrap}
+.dwthumbs{display:flex;gap:5px;margin-top:8px}
+.dwthumbs img,.dwthumbs .skel{width:56px;height:56px;border-radius:8px;object-fit:cover;display:block;border:1px solid var(--line)}
+
 /* dialog */
 .modal{position:fixed;inset:0;background:rgba(0,0,0,.5);display:grid;place-items:center;z-index:20;padding:16px}
 .modal .box{background:#fff;border-radius:16px;padding:22px;max-width:440px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.3)}
@@ -335,6 +349,25 @@ function setStatus(t, ok){
 const HAS_GAS = !!(window.google && google.script && google.script.run);
 const API_URL = String(window.SITE_APP_API || "").trim();
 function getPin(){ try{ return localStorage.getItem("siteAppPin") || ""; }catch(e){ return ""; } }
+function getWho(){ try{ return localStorage.getItem("siteAppWho") || ""; }catch(e){ return ""; } }
+function askWho(){
+  if (getWho() || document.getElementById("whoForm")) return;
+  const m = document.createElement("div");
+  m.className = "modal";
+  m.innerHTML = `<form class="box" id="whoForm"><h2 style="text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Who's using this?</h2>
+    <p class="muted">Your name goes on the change log, so everyone can see who changed what.</p>
+    <input id="whoBox" autocomplete="name" placeholder="e.g. Jack" style="width:100%;font-size:1.1rem;padding:12px;border:1px solid var(--line);border-radius:10px;margin-bottom:12px">
+    <button class="btn" style="width:100%">Start</button></form>`;
+  document.body.appendChild(m);
+  $("whoBox").focus();
+  $("whoForm").onsubmit = ev => {
+    ev.preventDefault();
+    const v = $("whoBox").value.trim().slice(0, 40);
+    if (!v) return;
+    try{ localStorage.setItem("siteAppWho", v); }catch(e){}
+    m.remove();
+  };
+}
 let pinAsked = false;
 function askPin(message){
   if (pinAsked) return;
@@ -374,7 +407,7 @@ function rawServer(fn, ...args){
   return fetch(API_URL, {
     method: "POST",
     headers: {"Content-Type": "text/plain;charset=utf-8"},
-    body: JSON.stringify({fn, args, pin: getPin()}),
+    body: JSON.stringify({fn, args, pin: getPin(), who: getWho()}),
     redirect: "follow",
   }).then(r => {
     if (!r.ok) throw new Error("No connection to Google right now.");
@@ -494,6 +527,39 @@ function clearCache(){
 }
 function hideSplash(){ const s = $("splash"); if (s && !s.classList.contains("gone")){ s.classList.add("gone"); setTimeout(() => s.remove(), 400); } }
 
+// ================= view and edit mode =================
+S.edit = false;
+let editTimer = null;
+function touchEdit(){
+  clearTimeout(editTimer);
+  editTimer = setTimeout(() => { if (S.edit){ S.edit = false; render(); setStatus("Back in view mode"); } }, 10 * 60 * 1000);
+}
+function setEdit(on){
+  S.edit = !!on;
+  if (S.edit) touchEdit(); else clearTimeout(editTimer);
+  render();
+}
+async function canEdit(){
+  if (S.edit){ touchEdit(); return true; }
+  const ok = await ask("You're in view mode, so nothing can be changed by accident. Turn on edit mode?", "Turn on edit mode");
+  if (ok){ setEdit(true); setStatus("Edit mode on", true); }
+  return false;
+}
+function modeBar(){
+  return `<div class="modebar ${S.edit ? "editing" : ""}">
+    <span>${S.edit ? "Edit mode: changes save as you go" : "View only: nothing can be changed"}</span>
+    <button class="btn ${S.edit ? "" : "ghost"}" data-mode="${S.edit ? "off" : "on"}">${S.edit ? "Done editing" : "Edit"}</button>
+  </div>`;
+}
+$("view").addEventListener("click", ev => {
+  const b = ev.target.closest("[data-mode]");
+  if (b) setEdit(b.dataset.mode === "on");
+});
+$("view").addEventListener("click", ev => {
+  if (S.edit) return;
+  if (ev.target.closest("input[readonly], textarea[readonly]")) canEdit();
+});
+
 // ================= navigation =================
 function go(view){
   if (S.view !== view) S.pdfOut = null;
@@ -523,6 +589,7 @@ $("view").addEventListener("click", async ev => {
   const b = ev.target.closest("[data-photo]");
   if (!b) return;
   const lad = S.lads.find(l => l.id === b.dataset.photo);
+  if (!(await canEdit())) return;
   const file = await pickImage();
   if (!file || !lad) return;
   try{
@@ -654,14 +721,28 @@ function homeHtml(){
       <p>${S.tools ? `${repair} in repair, ${missing} missing, ${checks} serial${checks === 1 ? "" : "s"} to check` : skelLine(80)}</p></button>
   </div>
   <div class="panel" style="margin-top:16px"><h2>Lads on the books: ${S.booted ? S.lads.length : ""}</h2><div class="row-actions">${S.booted ? agencyCards : skelLine(50)}</div></div>
+  <div class="panel" style="margin-top:16px"><h2>Recent changes</h2>
+    ${S.log ? (S.log.length ? S.log.slice(0, 8).map(l => `<div class="logrow"><span class="when">${esc(l.when)}</span><span><b>${esc(l.who)}</b> ${esc(l.what)}</span></div>`).join("") : `<p class="muted">Nothing changed yet.</p>`) : loadingBox("Loading the log…")}
+  </div>
   <p class="credit">Designed and built by Aylward Solutions</p>`;
 }
 $("view").addEventListener("click", ev => { const c = ev.target.closest("[data-go]"); if (c) go(c.dataset.go); });
+async function loadLog(){
+  try{
+    const cached = await cacheGet("log");
+    if (cached && !S.log){ S.log = cached; if (S.view === "home") render(); }
+    const log = await bgServer("getLog", 25);
+    S.log = log || [];
+    cacheSet("log", S.log);
+    if (S.view === "home") render();
+  }catch(e){ if (!S.log) S.log = []; if (S.view === "home") render(); }
+}
 async function loadHome(){
   const dayIdx = (new Date().getDay()+6)%7;
   if (!S.booted) return;
   loadTools(true);
   for (const k of Object.keys(KINDS)) loadRecords(k, true);
+  loadLog();
   if (dayIdx > 5) return;
   try{
     const wk = iso(mondayOf(new Date()));
@@ -690,8 +771,8 @@ function attendanceHtml(){
     const rows = lads.map(l => {
       let right;
       if (A.edit) right = `<button class="btn danger rm" data-remove="${esc(l.id)}">Remove</button>`;
-      else if (weekMode) right = `<div class="weekrow">${DAYS.map((d,i) => `<button class="tick${A.ready ? "" : " wait"}" data-tick="${esc(l.id)}|${d}" aria-pressed="${ticked(l.id,d)}" aria-label="${esc(l.name)} ${DAY_LABEL[i]}">${TICK_SVG}</button>`).join("")}</div>`;
-      else right = `<button class="tick${A.ready ? "" : " wait"}" data-tick="${esc(l.id)}|${dayKey}" aria-pressed="${ticked(l.id,dayKey)}" aria-label="${esc(l.name)} ${DAY_LABEL[A.day]}">${TICK_SVG}</button>`;
+      else if (weekMode) right = `<div class="weekrow">${DAYS.map((d,i) => `<button class="tick${A.ready ? "" : " wait"}${S.edit ? "" : " locked"}" data-tick="${esc(l.id)}|${d}" aria-pressed="${ticked(l.id,d)}" aria-label="${esc(l.name)} ${DAY_LABEL[i]}">${TICK_SVG}</button>`).join("")}</div>`;
+      else right = `<button class="tick${A.ready ? "" : " wait"}${S.edit ? "" : " locked"}" data-tick="${esc(l.id)}|${dayKey}" aria-pressed="${ticked(l.id,dayKey)}" aria-label="${esc(l.name)} ${DAY_LABEL[A.day]}">${TICK_SVG}</button>`;
       return `<div class="lad">${avatar(l)}<div class="who"><strong>${esc(l.name)}</strong><em>${esc(l.trade) || "&nbsp;"}</em></div>${right}</div>`;
     }).join("");
     const head = (weekMode && !A.edit) ? `<div class="dayhead">${DAY_LABEL.map(x=>`<span>${x}</span>`).join("")}</div>` : "";
@@ -701,9 +782,10 @@ function attendanceHtml(){
   <div class="controls">
     <div class="seg"><button class="arrow" data-week="-1" aria-label="Previous week">‹</button><span>${nice(A.week)} – ${nice(end)}</span><button class="arrow" data-week="1" aria-label="Next week">›</button></div>
     <div class="seg">${DAY_LABEL.map((d,i) => `<button data-day="${i}" aria-pressed="${!weekMode && A.day===i}">${d}</button>`).join("")}<button data-day="week" aria-pressed="${weekMode}">Week</button></div>
-    <button class="btn ghost" data-edit>${A.edit ? "Done" : "Edit lads"}</button>
+    ${S.edit ? `<button class="btn ghost" data-edit>${A.edit ? "Done" : "Edit lads"}</button>` : ""}
     ${pdfBtn("attendance", "Save week as PDF")}
   </div>
+  ${modeBar()}
   ${pdfResult("attendance")}
   <div class="count"><b>${A.ready ? count : '<span class="spin" style="width:30px;height:30px"></span>'}</b><span class="muted">of ${S.lads.length} lads ${weekMode ? "in at least one day this week" : "in on " + DAY_LABEL[A.day]}</span></div>
   <p class="muted small" style="margin:-6px 2px 12px">Tap a photo circle to add or change that lad's photo.</p>
@@ -750,6 +832,7 @@ $("view").addEventListener("click", async ev => {
     const [id, day] = t.dataset.tick.split("|");
     const lad = S.lads.find(l => l.id === id);
     if (!A.ready) return;
+    if (!(await canEdit())) return;
     const val = !ticked(id, day);
     A.ticks = {...A.ticks, [id]: {...(A.ticks[id]||{}), [day]: val}};
     cacheSet("week:" + iso(A.week), A.ticks);
@@ -759,8 +842,9 @@ $("view").addEventListener("click", async ev => {
   }
   if (w){ A.week = new Date(A.week); A.week.setDate(A.week.getDate() + 7*Number(w.dataset.week)); loadAttendance(); }
   if (d){ if (d.dataset.day === "week") A.mode = "week"; else { A.mode = "day"; A.day = Number(d.dataset.day); } render(); }
-  if (e){ A.edit = !A.edit; render(); }
+  if (e){ if (!(await canEdit())) return; A.edit = !A.edit; render(); }
   if (r){
+    if (!(await canEdit())) return;
     const lad = S.lads.find(l => l.id === r.dataset.remove);
     if (!lad) return;
     const ok = await ask(`Remove ${lad.name}? They'll come off the attendance list and the timesheet, and their hours and photo will be deleted. Past attendance is kept.`, "Remove", true);
@@ -816,18 +900,19 @@ function timesheetHtml(){
         <div class="ts-top">${avatar(l)}<div class="who"><strong>${esc(l.name)}</strong><em>${esc(l.trade) || "&nbsp;"}</em></div>
           <div class="tot"><b data-sum>${fmtH(lt.sum)}</b> hrs<span class="ot" data-ot ${lt.ot > 0 ? "" : "hidden"}>${fmtH(lt.ot)} OT</span></div></div>
         <div class="hours">${DAYS.map((d,i) => { const v = l.hours[i]; const over = typeof v === "number" && v > S.paidHours;
-          return `<label>${DAY_LABEL[i]}<input inputmode="decimal" data-h="${i}" value="${v === "" || v == null ? "" : v}" class="${over ? "over" : ""}" aria-label="${esc(l.name)} ${DAY_LABEL[i]} hours"></label>`; }).join("")}</div>
-        <input class="notes" data-notes placeholder="Notes" value="${esc(l.notes)}" aria-label="${esc(l.name)} notes">
+          return `<label>${DAY_LABEL[i]}<input inputmode="decimal" data-h="${i}" value="${v === "" || v == null ? "" : v}" ${S.edit ? "" : "readonly"} class="${over ? "over" : ""}" aria-label="${esc(l.name)} ${DAY_LABEL[i]} hours"></label>`; }).join("")}</div>
+        <input class="notes" data-notes placeholder="Notes" value="${esc(l.notes)}" ${S.edit ? "" : "readonly"} aria-label="${esc(l.name)} notes">
       </div>`;
     }).join("");
     return `<section class="group" style="--c:${color}"><h2><span class="gname">${esc(agency)}</span><span data-agsum="${esc(agency)}">${fmtH(aSum)} hrs${aOt > 0 ? `, ${fmtH(aOt)} OT` : ""}</span></h2>${rows}</section>`;
   }).join("");
   return `
+  ${modeBar()}
   <div class="panel tsbar">
     <div class="controls" style="margin:0">
-      <label class="field">Week starting<input type="date" id="tsWeek" value="${esc(S.tsWeek)}"></label>
-      <label class="field">Paid hours a day<input id="paidHours" inputmode="decimal" value="${esc(S.paidHours)}" style="width:110px"></label>
-      <button class="btn ghost" id="newWeek">Start new week</button>
+      <label class="field">Week starting<input type="date" id="tsWeek" value="${esc(S.tsWeek)}" ${S.edit ? "" : "readonly"}></label>
+      <label class="field">Paid hours a day<input id="paidHours" inputmode="decimal" value="${esc(S.paidHours)}" style="width:110px" ${S.edit ? "" : "readonly"}></label>
+      ${S.edit ? `<button class="btn ghost" id="newWeek">Start new week</button>` : ""}
       ${S.sheetUrl ? `<a class="btn ghost" href="${esc(S.sheetUrl)}" target="_blank" rel="noopener">Open in Google Sheets</a>` : ""}
       <span class="grow"></span>
       <label class="field">PDF of<select id="tsTab">${(S.tsTabs && S.tsTabs.length ? S.tsTabs : ["Timesheet"]).map(n => `<option value="${esc(n)}">${n === "Timesheet" ? "Whole timesheet" : esc(n) + " only"}</option>`).join("")}</select></label>
@@ -948,9 +1033,10 @@ function toolsHtml(){
   <div class="toolbar">
     <input id="toolQ" type="search" placeholder="Search tools, serials, makes" value="${esc(S.toolFilter.q)}" aria-label="Search tools">
     <select id="toolSt" aria-label="Filter by status"><option value="">All statuses</option>${STATUSES.map(s=>`<option${s===st?" selected":""}>${s}</option>`).join("")}<option value="check"${st==="check"?" selected":""}>Serial to check</option></select>
-    <button class="btn" data-newtool>Add tool</button>
+    ${S.edit ? `<button class="btn" data-newtool>Add tool</button>` : ""}
     ${pdfBtn("tools", "Save list as PDF")}
   </div>
+  ${modeBar()}
   ${pdfResult("tools")}
   <p class="muted small" style="margin:0 2px 10px">${list.length} of ${S.tools.length} tools</p>
   <div class="list">${list.map(t => `<button class="tool" data-tool="${esc(t.id)}">
@@ -962,7 +1048,7 @@ function toolsHtml(){
 function toolDetailHtml(){
   const t = S.openTool;
   const isNew = !t.id;
-  const f = (k, label, type) => `<label class="field">${label}<input data-f="${k}" type="${type||"text"}" value="${esc(t[k])}"></label>`;
+  const f = (k, label, type) => `<label class="field">${label}<input data-f="${k}" type="${type||"text"}" value="${esc(t[k])}" ${S.edit ? "" : "readonly"}></label>`;
   const photo = (kind, label) => `<div class="photo"><div class="pic">${toolPic(t.id, kind) || t["_" + kind] ? `<img src="${t["_" + kind] || toolPic(t.id, kind)}" alt="${label}">` : "No photo yet"}</div>
       <button data-toolphoto="${kind}">${toolPic(t.id, kind) || t["_" + kind] ? "Change" : "Add"} ${label.toLowerCase()}</button></div>`;
   return `
@@ -970,6 +1056,7 @@ function toolDetailHtml(){
   <div class="panel">
     <h2>${isNew ? "Add a tool" : esc(t.make + " " + t.model)}</h2>
     ${t.check ? `<p><span class="pill amber">Serial needs checking on the tool</span></p>` : ""}
+    ${modeBar()}
     <div class="photos">${photo("full", "Tool photo")}${photo("tag", "Tag photo")}</div>
     <div class="formgrid">
       ${f("tool","What it is")}${f("make","Make")}${f("model","Model")}${f("serial","Serial No.")}
@@ -979,8 +1066,8 @@ function toolDetailHtml(){
     </div>
     <label class="field">Notes<textarea data-f="notes" rows="3">${esc(t.notes)}</textarea></label>
     <div class="row-actions" style="margin-top:12px">
-      <button class="btn" data-savetool>${isNew ? "Add tool" : "Save changes"}</button>
-      ${isNew ? "" : `<button class="btn danger" data-removetool>Remove tool</button>`}
+      ${S.edit ? `<button class="btn" data-savetool>${isNew ? "Add tool" : "Save changes"}</button>` : `<button class="btn ghost" data-mode="on">Edit this tool</button>`}
+      ${isNew || !S.edit ? "" : `<button class="btn danger" data-removetool>Remove tool</button>`}
       ${isNew ? "" : pdfBtn("tool", "Save as PDF", `data-id="${esc(t.id)}"`)}
     </div>
     <p class="msg" id="toolMsg"></p>
@@ -1184,6 +1271,20 @@ const KINDS = {
   },
 };
 S.rec = {jobs: []};
+S.recThumbs = {}; S.thumbsDone = {};
+async function loadThumbs(kind){
+  const ids = mergedRecords(kind).filter(r => !r.pending && (r.photos || 0) > 0 && !S.thumbsDone[r.id]).slice(0, 12).map(r => r.id);
+  if (!ids.length) return;
+  ids.forEach(id => S.thumbsDone[id] = true);
+  try{
+    const cached = await cacheGet("thumbs");
+    if (cached){ S.recThumbs = {...cached, ...S.recThumbs}; if (S.view === kind) render(); }
+    const got = await bgServer("getRecordThumbs", kind, ids);
+    S.recThumbs = {...S.recThumbs, ...(got || {})};
+    cacheSet("thumbs", S.recThumbs);
+    if (S.view === kind) render();
+  }catch(e){}
+}
 for (const k of Object.keys(KINDS)) S.rec[k] = {list: null, loadFailed: false, view: "list", form: null, detail: null, photos: {}, q: "", pdf: null};
 const RS = kind => S.rec[kind];
 const newRecId = K => `${K.prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
@@ -1325,6 +1426,7 @@ async function loadRecords(kind, quiet){
   }
   recLoading[kind] = false;
   if ((S.view === kind && st.view === "list") || S.view === "home") render();
+  if (S.view === kind) loadThumbs(kind);
 }
 function mergedRecords(kind){
   const K = KINDS[kind], st = RS(kind);
@@ -1362,6 +1464,7 @@ function recordsHtml(kind){
       <div class="info"><strong>${esc(K.rowTitle(r))}</strong>
         <span>${esc(K.rowSub(r))}</span>
         ${K.rowTitle(r) === String(r.description||"").split("\n")[0] ? "" : `<span>${esc(r.description)}</span>`}</div>
+      ${(S.recThumbs[r.id] && S.recThumbs[r.id].length) ? `<div class="dwthumbs">${S.recThumbs[r.id].map(p => `<img src="${p}" alt="" loading="lazy" decoding="async">`).join("")}</div>` : (r.photos > 0 && !S.thumbsDone[r.id] ? `<div class="dwthumbs">${Array.from({length: Math.min(3, r.photos)}, () => '<span class="skel"></span>').join("")}</div>` : "")}
       <div class="dwside">${K.rowSide(r)}
         <span class="small muted">${r.photos || 0} photo${r.photos==1?"":"s"}</span>
         ${r.pending ? `<span class="pill amber">Sending</span>` : `<span class="pill ok">Saved</span>`}</div></button>`;
@@ -1369,8 +1472,9 @@ function recordsHtml(kind){
   return `
   ${queueHtml(K)}
   ${offline}
+  ${modeBar()}
   <div class="toolbar">
-    <button class="btn" data-act="new">${K.newLabel}</button>
+    ${S.edit ? `<button class="btn" data-act="new">${K.newLabel}</button>` : ""}
     <input id="recQ" type="search" placeholder="Search location or work" value="${esc(st.q)}" aria-label="Search ${K.many}">
   </div>
   <p class="muted small" style="margin:0 2px 10px">${all.length} ${all.length===1?K.one:K.many}, ${K.weekSummary(weekRecords(kind))}</p>
@@ -1458,7 +1562,7 @@ function recDetailHtml(K){
   const names = Object.keys(pics).sort();
   return `
   <div class="row-actions" style="margin-bottom:10px"><button class="btn ghost" data-act="back">‹ ${K.Many}</button>
-    <button class="btn" data-act="edit" data-id="${esc(r.id)}">Edit</button>
+    ${S.edit ? `<button class="btn" data-act="edit" data-id="${esc(r.id)}">Edit</button>` : `<button class="btn ghost" data-mode="on">Edit</button>`}
     ${r.pending ? "" : pdfBtn("record", "Save as PDF", `data-kind="${K.kind}" data-id="${esc(r.id)}"`)}</div>
   ${pdfResult("record")}
   <div class="panel">
@@ -1483,6 +1587,7 @@ $("view").addEventListener("click", async ev => {
   if (!a) return;
   const act = a.dataset.act;
   if (act === "retry"){ processQueue(); return; }
+  if ((act === "new" || act === "edit") && !(await canEdit())) return;
   if (act === "new"){
     const draft = await kvGet("draft:" + K.kind) || (K.kind === "dayworks" ? await kvGet("dwDraft") : null);
     const rec = draft && draft.rec ? {...draft.rec} : {...K.blank(), id: newRecId(K)};
@@ -1609,6 +1714,8 @@ function startApp(b, fromCache){
 async function warmFromCache(){
   const [tools, dw, wd] = await Promise.all([cacheGet("tools"), cacheGet("records:dayworks"), cacheGet("records:works")]);
   if (tools && !S.tools) S.tools = tools;
+  const log = await cacheGet("log");
+  if (log && !S.log) S.log = log;
   if (dw && !RS("dayworks").list) RS("dayworks").list = dw;
   if (wd && !RS("works").list) RS("works").list = wd;
   const dayIdx = (new Date().getDay()+6)%7;
@@ -1630,7 +1737,12 @@ go("home");
     startApp(b, false);
     cacheSet("boot", b);
     setStatus("Up to date", true);
+    askWho();
     refreshJobs().then(() => { if (S.rec.jobs.length) processQueue(); });
+    kvGet("toolsImport2").then(done => {
+      if (done) return;
+      bgServer("importNewTools").then(n => { kvSet("toolsImport2", true); if (n) loadTools(true); }).catch(() => {});
+    });
     // put the (fixed) logo on the timesheet once; safe to repeat
     kvGet("timesheetLogoV2").then(done => {
       if (b.needsTimesheetBrand || !done) bgServer("applyBrandToTimesheet", S.brand.logo || DEFAULT_LOGO)
