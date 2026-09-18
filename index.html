@@ -582,6 +582,7 @@ $("view").addEventListener("click", ev => {
 function go(view){
   if (S.view !== view) S.pdfOut = null;
   S.view = view;
+  try{ localStorage.setItem("siteAppView", view); }catch(e){}
   $("viewTitle").textContent = VIEW_TITLES[view];
   document.querySelectorAll("#tabs button").forEach(b => b.setAttribute("aria-current", b.dataset.view === view ? "page" : "false"));
   render();
@@ -1744,7 +1745,12 @@ async function warmFromCache(){
   }
   if (!(document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName))) render();
 }
-go("home");
+go((() => {
+  try{
+    const v = localStorage.getItem("siteAppView");
+    return (v && VIEW_TITLES[v]) ? v : "home";
+  }catch(e){ return "home"; }
+})());
 (async () => {
   const cached = await cacheGet("boot");
   const cachedPhotos = await cacheGet("ladPhotos");
@@ -1758,10 +1764,9 @@ go("home");
     setStatus("Up to date", true);
     askWho();
     refreshJobs().then(() => { if (S.rec.jobs.length) processQueue(); });
-    kvGet("toolsImport2").then(done => {
-      if (done) return;
-      bgServer("importNewTools").then(n => { kvSet("toolsImport2", true); if (n) loadTools(true); }).catch(() => {});
-    });
+    bgServer("importNewTools").then(n => {
+      if (n > 0){ setStatus(n + " new tool" + (n === 1 ? "" : "s") + " added", true); loadTools(true); }
+    }).catch(() => {});
     // put the (fixed) logo on the timesheet once; safe to repeat
     kvGet("timesheetLogoV2").then(done => {
       if (b.needsTimesheetBrand || !done) bgServer("applyBrandToTimesheet", S.brand.logo || DEFAULT_LOGO)
