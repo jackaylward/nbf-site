@@ -9,8 +9,9 @@
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
 <meta name="theme-color" content="#012060">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="icon" href="icon-192.png">
-<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" sizes="32x32" href="icon-32.png">
+<link rel="icon" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-180.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <script src="config.js"></script>
 <style>
@@ -392,11 +393,28 @@ function busy(delta){
   const b = document.getElementById("topbar");
   if (b) b.classList.toggle("on", inflight > 0);
 }
+let lastOk = 0, failStreak = 0;
+const isNetworkError = e => /signal|connection|network|fetch|unavailable/i.test((e && e.message) || "");
+function tracked(p){
+  return p.then(r => { lastOk = Date.now(); failStreak = 0; return r; },
+    e => { if (e && e.code !== "PIN") failStreak++; throw e; });
+}
+// one quiet retry: site signal drops for a second all the time
+function withRetry(fn, args){
+  return rawServer(fn, ...args).catch(e => {
+    if (e && (e.code === "PIN" || !isNetworkError(e))) throw e;
+    return new Promise(r => setTimeout(r, 1200)).then(() => rawServer(fn, ...args));
+  });
+}
 function server(fn, ...args){
   busy(1);
-  return rawServer(fn, ...args).finally(() => busy(-1));
+  return tracked(withRetry(fn, args)).finally(() => busy(-1));
 }
-function bgServer(fn, ...args){ return rawServer(fn, ...args); }
+function bgServer(fn, ...args){ return tracked(withRetry(fn, args)); }
+// only worth telling them about if nothing has worked for a while
+function connectionTrouble(msg){
+  if (failStreak >= 2 && Date.now() - lastOk > 15000) setStatus(msg || "No signal. Using the saved copy");
+}
 function rawServer(fn, ...args){
   if (HAS_GAS){
     return new Promise((resolve, reject) => {
@@ -821,7 +839,7 @@ async function loadAttendance(){
     }
   }catch(e){
     if (A.loaded === ws){ A.ready = true; if (S.view === "attendance") render(); }
-    setStatus("Couldn't load attendance. Check your signal");
+    connectionTrouble("Couldn't load this week. Using the saved copy");
   }
 }
 $("view").addEventListener("click", async ev => {
@@ -1001,7 +1019,7 @@ async function loadTools(quiet){
     cacheSet("tools", tools);
     if (S.view === "tools" || S.view === "home") render();
     if (!quiet) setStatus("Up to date", true);
-  }catch(e){ if (!quiet) setStatus("Couldn't load tools. Check your signal"); }
+  }catch(e){ if (!quiet) connectionTrouble(); }
   toolsLoading = false;
   if (!quiet) loadToolPhotos();
 }
@@ -1393,11 +1411,12 @@ async function processQueue(){
     for (const kind of Object.keys(KINDS)) if (!RS(kind).list) loadRecords(kind);
   }catch(e){
     DWQ.failed = errText(e, "No signal");
+    connectionTrouble();
   }finally{
     DWQ.busy = false;
     await refreshJobs();
     if (!S.rec.jobs.length && !DWQ.failed && !pending) setStatus("All saved", true);
-    else if (DWQ.failed) setStatus("Not sent yet. It's safe on this device");
+    else if (DWQ.failed && failStreak >= 2) setStatus("Not sent yet. It's safe on this device");
     if (KINDS[S.view] && RS(S.view).view !== "form") render();
   }
 }
@@ -1421,8 +1440,8 @@ async function loadRecords(kind, quiet){
     st.loadFailed = false;
     cacheSet("records:" + kind, st.list);
   }catch(e){
-    st.loadFailed = true;
-    setStatus("Couldn't reach Google. Showing what's saved on this device");
+    st.loadFailed = !st.list;
+    if (!quiet) connectionTrouble();
   }
   recLoading[kind] = false;
   if ((S.view === kind && st.view === "list") || S.view === "home") render();
@@ -1749,10 +1768,10 @@ go("home");
         .then(() => kvSet("timesheetLogoV2", true)).catch(() => {});
     });
     // faces: load them from Drive; if they're not there yet, copy the starting set in, then load again
-    bgServer("getPhotos")
-      .then(p => (p && Object.keys(p).length >= 5) ? p : bgServer("importLadPhotos").then(() => bgServer("getPhotos")))
+    bgServer("getPhotosSmall").catch(() => bgServer("getPhotos"))
+      .then(p => (p && Object.keys(p).length >= 5) ? p : bgServer("importLadPhotos").then(() => bgServer("getPhotosSmall").catch(() => bgServer("getPhotos"))))
       .then(p => { S.ladPhotos = p || {}; S.photosLoaded = true; cacheSet("ladPhotos", S.ladPhotos); render(); })
-      .catch(e => { S.photosLoaded = true; render(); setStatus(errText(e, "Couldn't load the lads' photos")); });
+      .catch(e => { S.photosLoaded = true; render(); });
   }catch(e){
     hideSplash();
     if (!S.booted){ S.booted = false; }
