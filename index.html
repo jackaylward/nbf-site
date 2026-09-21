@@ -315,6 +315,7 @@ input[readonly],textarea[readonly]{background:var(--soft);color:var(--muted);cur
   <button data-view="timesheet"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Timesheet</button>
   <button data-view="dayworks"><svg viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/></svg>Variations</button>
   <button data-view="works"><svg viewBox="0 0 24 24"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9"/></svg><span>Works<span class="lg"> Done</span></span></button>
+  <button data-view="talks"><svg viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><path d="M13 3v6h6M8 14h8M8 17h5"/></svg>Talks</button>
   <button data-view="tools"><svg viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 0 0 5 5L21 13l-8 8-3-3 5.3-5.3a4 4 0 0 0-5-5L9 6l2-2z"/><path d="M3 21l6-6"/></svg>Tools</button>
   <div class="navcredit">Designed and built by Aylward Solutions</div>
 </nav>
@@ -333,7 +334,7 @@ const DAYS = ["mon","tue","wed","thu","fri","sat"];
 const DAY_LABEL = ["Mon","Tue","Wed","Thu","Fri","Sat"];
 const STATUSES = ["In store","On site","With a lad","In repair","Off hired","Missing"];
 const TICK_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
-const VIEW_TITLES = {home:"Home", attendance:"Attendance", timesheet:"Timesheet", dayworks:"Variations", works:"Works Done", tools:"Tools"};
+const VIEW_TITLES = {home:"Home", attendance:"Attendance", timesheet:"Timesheet", dayworks:"Variations", works:"Works Done", talks:"Toolbox Talks", tools:"Tools"};
 
 // ================= helpers =================
 const $ = id => document.getElementById(id);
@@ -588,6 +589,7 @@ function go(view){
   window.scrollTo(0, 0);
   if (view === "attendance" && S.att.loaded !== iso(S.att.week)) loadAttendance();
   if (view === "tools"){ loadTools(!!S.tools); loadToolPhotos(); }
+  if (view === "talks") loadTalks();
   if (view === "home") loadHome();
   if (view === "timesheet" && !S.tsTabs) server("timesheetTabs").then(tabs => { S.tsTabs = tabs || []; if (S.view === "timesheet" && !(document.activeElement && /INPUT|TEXTAREA/.test(document.activeElement.tagName))) render(); }).catch(() => {});
   if (view === "dayworks" || view === "works"){ loadRecords(view); refreshJobs().then(() => { if (S.view === view && RS(view).view === "list") render(); }); }
@@ -599,6 +601,7 @@ function render(){
   if (S.view === "attendance") v.innerHTML = attendanceHtml();
   if (S.view === "timesheet") v.innerHTML = timesheetHtml();
   if (S.view === "dayworks" || S.view === "works") v.innerHTML = recordsHtml(S.view);
+  if (S.view === "talks") v.innerHTML = talksHtml();
   if (S.view === "tools") v.innerHTML = S.openTool ? toolDetailHtml() : toolsHtml();
 }
 
@@ -1710,6 +1713,185 @@ $("view").addEventListener("submit", async ev => {
   }catch(e){
     $("recMsg").textContent = "Couldn't store it on this device (storage may be full). Don't close the app. " + errText(e, "");
     $("recSave").disabled = false;
+  }
+});
+
+// ================= toolbox talks =================
+S.talks = {list: null, view: "list", q: "", form: null, open: null, pdfOut: null};
+const newTalkId = () => "tb-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 7);
+
+async function loadTalks(){
+  const st = S.talks;
+  if (!st.list){
+    const cached = await cacheGet("talks");
+    if (cached && !st.list){ st.list = cached; if (S.view === "talks") render(); }
+  }
+  try{
+    st.list = await server("getTalks");
+    cacheSet("talks", st.list);
+  }catch(e){ connectionTrouble(); }
+  if (S.view === "talks" && st.view === "list") render();
+}
+
+function talksHtml(){
+  const st = S.talks;
+  if (st.view === "form") return talkFormHtml();
+  if (st.view === "detail") return talkDetailHtml();
+  if (!st.list) return loadingBox("Loading toolbox talks…");
+  const q = st.q.toLowerCase();
+  const list = st.list.filter(t => !q || [t.title, t.ref, t.date, t.deliveredBy, t.notes, (t.points||[]).join(" ")].join(" ").toLowerCase().includes(q));
+  return `
+  ${modeBar()}
+  <div class="toolbar">
+    ${S.edit ? `<button class="btn" data-talk="new">Add a talk</button>` : ""}
+    <input id="talkQ" type="search" placeholder="Search talks, e.g. ladders" value="${esc(st.q)}" aria-label="Search toolbox talks">
+  </div>
+  <p class="muted small" style="margin:0 2px 10px">${list.length} of ${st.list.length} talks</p>
+  <div class="list">${list.map(t => `<button class="tool dw" data-talk="open" data-id="${esc(t.id)}">
+      <div class="info"><span class="tag var">${esc(niceYmd(t.date))}</span><strong>${esc(t.title)}</strong>
+        <span>${esc(t.ref || "No reference")}${t.deliveredBy ? ", by " + esc(t.deliveredBy) : ""}</span>
+        <span>${esc((t.points || []).slice(0, 2).join(" • "))}</span></div>
+      <div class="dwside">${t.pdf ? `<span class="pill ok">PDF</span>` : `<span class="pill">No PDF</span>`}
+        <span class="small muted">${(t.points || []).length} points</span></div></button>`).join("")
+      || `<p class="muted">No talks yet. Tap Add a talk and upload the PDF.</p>`}</div>`;
+}
+
+function talkFormHtml(){
+  const f = S.talks.form, r = f.rec;
+  return `
+  <div class="row-actions" style="margin-bottom:10px"><button class="btn ghost" data-talk="back">‹ Toolbox talks</button></div>
+  <form class="panel" id="talkForm">
+    <h2>${f.isNew ? "Add a toolbox talk" : "Edit talk"}</h2>
+    <label class="field">Toolbox talk PDF<input type="file" id="talkPdf" accept="application/pdf"></label>
+    ${r.pdf ? `<p class="msg"><a href="${esc(r.pdf)}" target="_blank" rel="noopener">PDF saved: ${esc(r.pdfName || "open it")}</a></p>` : ""}
+    <p class="msg" id="talkRead">${f.reading ? `<span class="spin sm"></span>Reading the PDF…` : (f.readMsg || "Upload the PDF and the app fills in the details below.")}</p>
+    <div class="formgrid">
+      <label class="field">Date given<input type="date" data-tf="date" value="${esc(r.date)}"></label>
+      <label class="field">Reference<input data-tf="ref" maxlength="60" value="${esc(r.ref)}" placeholder="e.g. NBF-TBT-001"></label>
+      <label class="field">Delivered by<input data-tf="deliveredBy" maxlength="60" value="${esc(r.deliveredBy)}" placeholder="Who gave the talk"></label>
+    </div>
+    <label class="field">Title<input data-tf="title" maxlength="150" value="${esc(r.title)}" placeholder="e.g. Step Ladders"></label>
+    <label class="field" style="margin-top:10px">Key points (one per line)<textarea data-tf="points" rows="7" placeholder="Filled in from the PDF, edit as you like">${esc((r.points || []).join("\n"))}</textarea></label>
+    <label class="field" style="margin-top:10px">Notes<textarea data-tf="notes" rows="2" placeholder="Anything worth noting">${esc(r.notes)}</textarea></label>
+    ${f.miss ? `<p class="dwmiss">${esc(f.miss)}</p>` : ""}
+    <div class="row-actions" style="margin-top:14px">
+      <button class="btn" id="talkSave">${f.isNew ? "Save talk" : "Save changes"}</button>
+      ${f.isNew ? "" : `<button type="button" class="btn danger" data-talk="delete">Delete</button>`}
+    </div>
+    <p class="msg" id="talkMsg"></p>
+  </form>`;
+}
+
+function talkDetailHtml(){
+  const t = (S.talks.list || []).find(x => x.id === S.talks.open);
+  if (!t) return `<button class="btn ghost" data-talk="back">‹ Toolbox talks</button><p class="muted">That talk has been deleted.</p>`;
+  return `
+  <div class="row-actions" style="margin-bottom:10px"><button class="btn ghost" data-talk="back">‹ Toolbox talks</button>
+    ${S.edit ? `<button class="btn" data-talk="edit" data-id="${esc(t.id)}">Edit</button>` : `<button class="btn ghost" data-mode="on">Edit</button>`}</div>
+  <div class="panel">
+    <span class="tag var big">${esc(niceYmd(t.date))}</span>
+    <h2>${esc(t.title)}</h2>
+    <table class="dwtable">
+      <tr><th>Reference</th><td>${esc(t.ref || "-")}</td></tr>
+      <tr><th>Delivered by</th><td>${esc(t.deliveredBy || "-")}</td></tr>
+      ${t.notes ? `<tr><th>Notes</th><td>${esc(t.notes)}</td></tr>` : ""}
+    </table>
+    ${(t.points || []).length ? `<h3 style="margin:14px 0 6px">Key points</h3><ul style="margin:0;padding-left:20px;line-height:1.6">${t.points.map(p => `<li>${esc(p)}</li>`).join("")}</ul>` : ""}
+    <div class="row-actions" style="margin-top:16px">
+      ${t.pdf ? `<a class="btn ghost" href="${esc(t.pdf)}" target="_blank" rel="noopener">Open the talk PDF</a>` : ""}
+      <button class="btn" data-talk="signoff" data-id="${esc(t.id)}">Sign-off sheet PDF</button>
+    </div>
+    ${pdfResult("talk")}
+  </div>`;
+}
+
+$("view").addEventListener("input", ev => {
+  if (S.view !== "talks") return;
+  if (ev.target.id === "talkQ"){
+    S.talks.q = ev.target.value; const pos = ev.target.selectionStart; render();
+    const q = $("talkQ"); q.focus(); try{ q.setSelectionRange(pos, pos); }catch(e){}
+  }
+  if (ev.target.dataset && ev.target.dataset.tf && S.talks.form){
+    const k = ev.target.dataset.tf;
+    S.talks.form.rec[k] = k === "points" ? ev.target.value.split("\n") : ev.target.value;
+  }
+});
+$("view").addEventListener("change", async ev => {
+  if (S.view !== "talks" || ev.target.id !== "talkPdf") return;
+  const file = ev.target.files && ev.target.files[0];
+  const f = S.talks.form;
+  if (!file || !f) return;
+  if (file.size > 15 * 1024 * 1024){ f.readMsg = "That PDF is bigger than 15 MB."; render(); return; }
+  f.reading = true; render();
+  try{
+    const data = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(file); });
+    const got = await server("uploadTalkPdf", f.rec.id, data, file.name);
+    f.rec.pdf = got.url; f.rec.pdfName = got.name;
+    if (!f.rec.ref) f.rec.ref = got.ref || "";
+    if (!f.rec.title) f.rec.title = got.title || "";
+    if (!f.rec.points || !f.rec.points.filter(String).length) f.rec.points = got.points || [];
+    f.readMsg = (got.title || got.points.length)
+      ? "PDF saved and read. Check the details below and change anything that's off."
+      : "PDF saved. It couldn't be read automatically, so type the details in.";
+  }catch(e){
+    f.readMsg = errText(e, "Couldn't upload that PDF. Try again.");
+  }
+  f.reading = false; render();
+});
+$("view").addEventListener("click", async ev => {
+  if (S.view !== "talks") return;
+  const b = ev.target.closest("[data-talk]");
+  if (!b) return;
+  const act = b.dataset.talk, st = S.talks;
+  if (act === "back"){ st.view = "list"; st.form = null; render(); return; }
+  if ((act === "new" || act === "edit") && !(await canEdit())) return;
+  if (act === "new"){
+    st.form = {isNew: true, rec: {id: newTalkId(), date: iso(new Date()), ref: "", title: "", deliveredBy: getWho(), points: [], notes: ""}};
+    st.view = "form"; render(); return;
+  }
+  if (act === "open"){ st.open = b.dataset.id; st.view = "detail"; render(); window.scrollTo(0, 0); return; }
+  if (act === "edit"){
+    const t = (st.list || []).find(x => x.id === b.dataset.id);
+    if (t){ st.form = {isNew: false, rec: {...t, points: [...(t.points || [])]}}; st.view = "form"; render(); }
+    return;
+  }
+  if (act === "delete"){
+    const f = st.form;
+    if (!(await ask("Delete this toolbox talk and its PDF? This can't be undone.", "Delete", true))) return;
+    try{
+      await server("deleteTalk", f.rec.id);
+      st.list = (st.list || []).filter(x => x.id !== f.rec.id);
+      cacheSet("talks", st.list);
+      st.view = "list"; st.form = null; render(); setStatus("Talk deleted", true);
+    }catch(e){ $("talkMsg").textContent = errText(e, "Couldn't delete it."); }
+    return;
+  }
+  if (act === "signoff"){
+    const id = b.dataset.id;
+    return runPdf("talk", () => server("makeTalkSignoffPdf", id, S.brand.logo || DEFAULT_LOGO, 5));
+  }
+});
+$("view").addEventListener("submit", async ev => {
+  if (ev.target.id !== "talkForm") return;
+  ev.preventDefault();
+  const st = S.talks, f = st.form;
+  document.querySelectorAll("[data-tf]").forEach(el => {
+    f.rec[el.dataset.tf] = el.dataset.tf === "points" ? el.value.split("\n") : el.value;
+  });
+  if (!f.rec.title.trim() || !f.rec.date){ f.miss = "A title and a date are needed."; render(); return; }
+  f.miss = "";
+  $("talkSave").disabled = true;
+  $("talkMsg").textContent = "Saving…";
+  try{
+    const saved = await server("saveTalk", f.rec);
+    st.list = [saved].concat((st.list || []).filter(x => x.id !== saved.id))
+      .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+    cacheSet("talks", st.list);
+    st.open = saved.id; st.view = "detail"; st.form = null;
+    render(); setStatus("Talk saved", true);
+  }catch(e){
+    $("talkMsg").textContent = errText(e, "Couldn't save that talk.");
+    $("talkSave").disabled = false;
   }
 });
 
