@@ -327,9 +327,16 @@ const WHITE_LOGO = document.getElementById("logo").src;
 const BUILTIN_PHOTOS = {};
 const AG_COLORS = {"DCOR Construction":"#012060","Talcon Group":"#1F6FB2","Adebura":"#2E7D4F","Dragos":"#7B3FA0","Petru Pirtac":"#B03A5B","Aitken":"#2F6F7A"};
 const AG_ORDER = Object.keys(AG_COLORS);
-const TRADES = [["SM","Site Manager"],["SR","Safety Rep"],["FFM","Fixing Foreman"],["C","Chippy"],["SF","Steel Fixer"],["CF","Concrete Finisher"],["GO","General Operative"],["BM","Banksman"]];
-const TRADE_LABEL = Object.fromEntries(TRADES);
-const TRADE_RANK = Object.fromEntries(TRADES.map(([c],i)=>[c,i]));
+// trades: these are the defaults; the real list comes from the Settings tab of the timesheet
+let TRADES = [["SM","Site Manager"],["SR","Safety Rep"],["FFM","Fixing Foreman"],["C","Chippy"],["SF","Steel Fixer"],["CF","Concrete Finisher"],["GO","General Operative"],["BM","Banksman"]];
+let TRADE_LABEL = Object.fromEntries(TRADES);
+let TRADE_RANK = Object.fromEntries(TRADES.map(([c],i)=>[c,i]));
+function setTrades(list){
+  if (!Array.isArray(list) || !list.length) return;
+  TRADES = list.map(([c, n]) => [String(c), String(n || c)]);
+  TRADE_LABEL = Object.fromEntries(TRADES);
+  TRADE_RANK = Object.fromEntries(TRADES.map(([c],i)=>[c,i]));
+}
 const DAYS = ["mon","tue","wed","thu","fri","sat"];
 const DAY_LABEL = ["Mon","Tue","Wed","Thu","Fri","Sat"];
 const STATUSES = ["In store","On site","With a lad","In repair","Off hired","Missing"];
@@ -499,6 +506,7 @@ const S = {
 };
 
 function setLadData(d){
+  if (d && d.trades) setTrades(d.trades);
   const seen = new Set();
   S.hasHours = !!d.hasHours; S.paidHours = d.paidHours || 9.5; S.tsWeek = d.weekStart || ""; S.sheetUrl = d.sheetUrl || "";
   S.agencyList = d.agencies || [];
