@@ -507,18 +507,22 @@ const S = {
 
 function setLadData(d){
   if (d && d.trades) setTrades(d.trades);
-  const seen = new Set();
   S.hasHours = !!d.hasHours; S.paidHours = d.paidHours || 9.5; S.tsWeek = d.weekStart || ""; S.sheetUrl = d.sheetUrl || "";
   S.agencyList = d.agencies || [];
-  S.lads = (d.lads || []).map((l, i) => {
+  const b = buildLads(d);
+  S.lads = b.lads; S.agencies = b.agencies;
+}
+function buildLads(d){
+  const seen = new Set();
+  const lads = (d.lads || []).map((l, i) => {
     const code = String(l.trade||"").trim();
     return {id: slug(l.name), name: l.name, code, trade: TRADE_LABEL[code] || code, rank: code in TRADE_RANK ? TRADE_RANK[code] : 99,
       agency: l.agency || "No agency", color: AG_COLORS[l.agency] || "#5F6B7A",
       hours: (l.hours || []).slice(0,6), notes: l.notes || "", order: i};
   }).filter(l => l.name && !seen.has(l.id) && seen.add(l.id));
   const rank = a => { const i = AG_ORDER.indexOf(a); return i < 0 ? 50 : i; };
-  S.lads.sort((x,y) => rank(x.agency)-rank(y.agency) || x.agency.localeCompare(y.agency) || x.rank-y.rank || x.order-y.order);
-  S.agencies = [...new Set(S.lads.map(l => l.agency))].map(a => [a, AG_COLORS[a] || "#5F6B7A"]);
+  lads.sort((x,y) => rank(x.agency)-rank(y.agency) || x.agency.localeCompare(y.agency) || x.rank-y.rank || x.order-y.order);
+  return {lads, agencies: [...new Set(lads.map(l => l.agency))].map(a => [a, AG_COLORS[a] || "#5F6B7A"])};
 }
 function applyBrand(b){
   S.brand = b || S.brand;
@@ -599,6 +603,7 @@ function go(view){
   if (view === "tools"){ loadTools(!!S.tools); loadToolPhotos(); }
   if (view === "talks") loadTalks();
   if (view === "home") loadHome();
+  if (view === "timesheet"){ S.past = null; loadPastWeeks(); }
   if (view === "timesheet" && !S.tsTabs) server("timesheetTabs").then(tabs => { S.tsTabs = tabs || []; if (S.view === "timesheet" && !(document.activeElement && /INPUT|TEXTAREA/.test(document.activeElement.tagName))) render(); }).catch(() => {});
   if (view === "dayworks" || view === "works"){ loadRecords(view); refreshJobs().then(() => { if (S.view === view && RS(view).view === "list") render(); }); }
 }
@@ -683,6 +688,10 @@ $("view").addEventListener("click", async ev => {
   if (key === "timesheet"){
     const tab = $("tsTab") ? $("tsTab").value : "Timesheet";
     return runPdf(key, () => server("makeTimesheetPdf", tab));
+  }
+  if (key === "pastts" && S.past){
+    const week = S.past.week, tab = $("pastTab") ? $("pastTab").value : "Timesheet";
+    return runPdf(key, () => server("makePastTimesheetPdf", week, tab));
   }
   if (key === "tools") return runPdf(key, () => server("makeToolsPdf", filteredTools().map(x => x.id), logo));
   if (key === "tool") return runPdf(key, () => server("makeToolsPdf", [b.dataset.id], logo));
@@ -916,8 +925,73 @@ function ladTotals(l){
   const h = l.hours.map(x => typeof x === "number" ? x : 0);
   return {sum: h.reduce((a,b)=>a+b,0), ot: h.reduce((a,x)=>a+Math.max(0,x-S.paidHours),0)};
 }
+function pastPicker(){
+  const list = S.pastWeeks || [];
+  return `<label class="field">Past weeks<select id="pastPick" aria-label="Open a past week">
+    <option value="">This week</option>${list.map(w => `<option value="${esc(w.week)}"${S.past && S.past.week === w.week ? " selected" : ""}>Week starting ${esc(w.label)}</option>`).join("")}
+  </select></label>`;
+}
+function pastHtml(){
+  const P = S.past;
+  if (P.loading) return `<div class="panel tsbar"><div class="controls" style="margin:0">${pastPicker()}</div></div>${loadingBox("Loading that week…")}`;
+  const d = P.data, paid = d.paidHours || S.paidHours;
+  const b = buildLads(d);
+  const tot = l => { const h = (l.hours||[]).map(x => typeof x === "number" ? x : 0); return {sum: h.reduce((a,x)=>a+x,0), ot: h.reduce((a,x)=>a+Math.max(0,x-paid),0)}; };
+  let gSum = 0, gOt = 0, working = 0;
+  const groups = b.agencies.map(([agency, color]) => {
+    const lads = b.lads.filter(l => l.agency === agency);
+    let aSum = 0, aOt = 0;
+    const rows = lads.map(l => {
+      const lt = tot(l); aSum += lt.sum; aOt += lt.ot; if (lt.sum > 0) working++;
+      return `<div class="ts-lad">
+        <div class="ts-top">${avatar(l)}<div class="who"><strong>${esc(l.name)}</strong><em>${esc(l.trade) || "&nbsp;"}</em></div>
+          <div class="tot"><b>${fmtH(lt.sum)}</b> hrs<span class="ot" ${lt.ot > 0 ? "" : "hidden"}>${fmtH(lt.ot)} OT</span></div></div>
+        <div class="hours">${DAYS.map((x,i) => { const v = l.hours[i]; const over = typeof v === "number" && v > paid;
+          return `<label>${DAY_LABEL[i]}<input value="${v === "" || v == null ? "" : v}" readonly class="${over ? "over" : ""}" aria-label="${esc(l.name)} ${DAY_LABEL[i]} hours"></label>`; }).join("")}</div>
+        ${l.notes ? `<input class="notes" value="${esc(l.notes)}" readonly aria-label="${esc(l.name)} notes">` : ""}
+      </div>`;
+    }).join("");
+    gSum += aSum; gOt += aOt;
+    return `<section class="group" style="--c:${color}"><h2><span class="gname">${esc(agency)}</span><span>${fmtH(aSum)} hrs${aOt > 0 ? `, ${fmtH(aOt)} OT` : ""}</span></h2>${rows}</section>`;
+  }).join("");
+  const tabs = d.tabs && d.tabs.length ? d.tabs : ["Timesheet"];
+  return `
+  <div class="panel tsbar">
+    <p style="margin:0 0 12px"><b>Week starting ${esc(P.label)}</b>. Saved copy, read only.</p>
+    <div class="controls" style="margin:0">
+      ${pastPicker()}
+      ${d.url ? `<a class="btn ghost" href="${esc(d.url)}" target="_blank" rel="noopener">Open in Google Sheets</a>` : ""}
+      <button class="btn ghost" id="pastBack">Back to this week</button>
+      <span class="grow"></span>
+      <label class="field">PDF of<select id="pastTab">${tabs.map(n => `<option value="${esc(n)}">${n === "Timesheet" ? "Whole timesheet" : esc(n) + " only"}</option>`).join("")}</select></label>
+      ${pdfBtn("pastts", "Save as PDF")}
+    </div>
+  </div>
+  ${pdfResult("pastts")}
+  <div class="ts-total" style="margin-bottom:14px"><span>Week total, ${working} lads</span><span><b>${fmtH(gSum)}</b> hrs <span class="ot" ${gOt > 0 ? "" : "hidden"}>${fmtH(gOt)} OT</span></span></div>
+  ${groups}`;
+}
+async function openPast(week){
+  S.pdfOut = null;
+  if (!week){ S.past = null; render(); return; }
+  const w = (S.pastWeeks || []).find(x => x.week === week);
+  S.past = {week, label: w ? w.label : week, loading: true}; render();
+  try{
+    const data = await server("getPastWeek", week);
+    if (!S.past || S.past.week !== week) return;
+    S.past = {week, label: S.past.label, data};
+  }catch(e){ S.past = null; setStatus(errText(e, "Couldn't open that week")); }
+  render(); window.scrollTo(0, 0);
+}
+function loadPastWeeks(){
+  return server("getPastWeeks").then(list => {
+    S.pastWeeks = list || [];
+    if (S.view === "timesheet" && !(document.activeElement && /INPUT|TEXTAREA/.test(document.activeElement.tagName))) render();
+  }).catch(() => {});
+}
 function timesheetHtml(){
   if (!S.booted) return loadingBox("Loading timesheet…");
+  if (S.past) return pastHtml();
   if (!S.hasHours) return `<div class="panel"><h2>Timesheet not connected</h2><p>Open <b>New_Bridge_Form_Weekly_Timesheet.xlsx</b> in Google Sheets, tap <b>Save as Google Sheets</b>, then reload the app.</p></div>`;
   const t = weekTotals();
   const groups = S.agencies.map(([agency, color]) => {
@@ -943,6 +1017,7 @@ function timesheetHtml(){
       <label class="field">Paid hours a day<input id="paidHours" inputmode="decimal" value="${esc(S.paidHours)}" style="width:110px" ${S.edit ? "" : "readonly"}></label>
       ${S.edit ? `<button class="btn ghost" id="newWeek">Start new week</button>` : ""}
       ${S.sheetUrl ? `<a class="btn ghost" href="${esc(S.sheetUrl)}" target="_blank" rel="noopener">Open in Google Sheets</a>` : ""}
+      ${S.pastWeeks && S.pastWeeks.length ? pastPicker() : ""}
       <span class="grow"></span>
       <label class="field">PDF of<select id="tsTab">${(S.tsTabs && S.tsTabs.length ? S.tsTabs : ["Timesheet"]).map(n => `<option value="${esc(n)}">${n === "Timesheet" ? "Whole timesheet" : esc(n) + " only"}</option>`).join("")}</select></label>
       ${pdfBtn("timesheet", "Save as PDF")}
@@ -968,6 +1043,7 @@ function refreshTotals(l, row){
 $("view").addEventListener("change", async ev => {
   if (S.view !== "timesheet") return;
   const el = ev.target;
+  if (el.id === "pastPick"){ openPast(el.value); return; }
   const row = el.closest("[data-lad]");
   if (el.id === "paidHours"){
     const v = Number(el.value.replace(",", "."));
@@ -1004,15 +1080,22 @@ $("view").addEventListener("change", async ev => {
     queueSave(() => server("setNotes", lad.name, el.value));
   }
 });
+$("view").addEventListener("click", ev => {
+  if (S.view === "timesheet" && ev.target.id === "pastBack") openPast("");
+});
 $("view").addEventListener("click", async ev => {
   if (S.view !== "timesheet" || ev.target.id !== "newWeek") return;
   const cur = fromIso(S.tsWeek) || mondayOf(new Date());
   const next = new Date(cur); next.setDate(next.getDate() + 7);
-  const ok = await ask(`Start a new week from ${nice(next)}? This clears everyone's hours and notes on the timesheet. Save or print this week first.`, "Clear and start new week", true);
+  const ok = await ask(`Start a new week from ${nice(next)}? This week is saved to Past weeks first, then everyone's hours and notes are cleared.`, "Save and start new week", true);
   if (!ok) return;
+  setStatus("Saving this week to Past weeks…");
+  try{ await server("archiveWeek"); }
+  catch(e){ setStatus(errText(e, "Couldn't save this week, so nothing was cleared. Try again")); return; }
   setStatus("Starting new week…");
-  try{ setLadData(await server("startNewWeek", iso(next))); render(); setStatus("New week started", true); }
-  catch(e){ setStatus(errText(e, "Couldn't start a new week")); }
+  try{ setLadData(await server("startNewWeek", iso(next))); render(); setStatus("Week saved. New week started", true); }
+  catch(e){ setStatus(errText(e, "This week is saved, but the new week didn't start. Try again")); }
+  loadPastWeeks();
 });
 
 // ================= tools =================
