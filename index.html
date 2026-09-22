@@ -1009,6 +1009,7 @@ function timesheetHtml(){
     }).join("");
     return `<section class="group" style="--c:${color}"><h2><span class="gname">${esc(agency)}</span><span data-agsum="${esc(agency)}">${fmtH(aSum)} hrs${aOt > 0 ? `, ${fmtH(aOt)} OT` : ""}</span></h2>${rows}</section>`;
   }).join("");
+  if (S.newWeekMsg) return `${modeBar()}<div class="panel">${loadingBox(S.newWeekMsg)}</div>`;
   return `
   ${modeBar()}
   <div class="panel tsbar">
@@ -1089,12 +1090,20 @@ $("view").addEventListener("click", async ev => {
   const next = new Date(cur); next.setDate(next.getDate() + 7);
   const ok = await ask(`Start a new week from ${nice(next)}? This week is saved to Past weeks first, then everyone's hours and notes are cleared.`, "Save and start new week", true);
   if (!ok) return;
-  setStatus("Saving this week to Past weeks…");
-  try{ await server("archiveWeek"); }
-  catch(e){ setStatus(errText(e, "Couldn't save this week, so nothing was cleared. Try again")); return; }
-  setStatus("Starting new week…");
-  try{ setLadData(await server("startNewWeek", iso(next))); render(); setStatus("Week saved. New week started", true); }
-  catch(e){ setStatus(errText(e, "This week is saved, but the new week didn't start. Try again")); }
+  S.newWeekMsg = "Saving this week to Past weeks. Keep the app open, this takes about 20 seconds…"; render();
+  let saved = false;
+  try{
+    busy(1);
+    await tracked(rawServer("archiveWeek")).finally(() => busy(-1));   // no auto retry, so it never runs twice
+    saved = true;
+    S.newWeekMsg = "Week saved. Clearing the timesheet for the new week…"; render();
+    setLadData(await server("startNewWeek", iso(next)));
+    S.newWeekMsg = null; render(); setStatus("Week saved. New week started", true);
+  }catch(e){
+    S.newWeekMsg = null; render();
+    setStatus(saved ? errText(e, "This week is saved, but the timesheet didn't clear. Tap Start new week again")
+                    : errText(e, "Couldn't save this week, so nothing was cleared. Try again"));
+  }
   loadPastWeeks();
 });
 
