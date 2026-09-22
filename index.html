@@ -296,6 +296,25 @@ input[readonly],textarea[readonly]{background:var(--soft);color:var(--muted);cur
 .modal .box{background:#fff;border-radius:16px;padding:22px;max-width:440px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.3)}
 .modal p{margin:0 0 16px;font-size:1.02rem}
 @media (prefers-reduced-motion: reduce){*{transition:none!important}}
+/* pours */
+.pourwrap{display:grid;gap:14px}
+@media (min-width:1000px){.pourwrap{grid-template-columns:minmax(0,1fr) 340px;align-items:start}}
+.plancard{position:relative;border:1px solid var(--line);border-radius:var(--radius);background:#fbfcfe;overflow:hidden;box-shadow:var(--shadow)}
+.plancard svg{display:block;width:100%;height:62vh;min-height:320px;touch-action:none;user-select:none;-webkit-user-select:none}
+.plantools{position:absolute;right:10px;top:10px;display:flex;flex-direction:column;gap:6px}
+.plantools button{width:40px;height:40px;border-radius:10px;border:1px solid var(--line);background:var(--card);font-size:1.2rem;font-weight:700;color:var(--brand);cursor:pointer}
+.plankey{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;margin:0 0 12px;font-size:.88rem}
+.plankey i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+.pourcount{font-family:"Barlow Condensed",sans-serif;font-size:1.6rem;font-weight:700;color:var(--brand)}
+.pourpanel{border:1px solid var(--line);border-radius:var(--radius);background:var(--card);padding:16px 18px;box-shadow:var(--shadow)}
+.pourpanel h2{font-size:1.7rem;color:var(--brand)}
+.pourpanel .grid2{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;margin:10px 0 14px;font-size:.95rem}
+.pourpanel .grid2 span:nth-child(odd){color:var(--muted)}
+.pourpanel .field{margin-bottom:12px}
+.pourphotos{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:6px 0 12px}
+.pourphotos img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;background:var(--soft);cursor:zoom-in}
+.pourbig{position:fixed;inset:0;z-index:20;background:rgba(0,0,0,.9);display:flex;align-items:center;justify-content:center}
+.pourbig img{max-width:96vw;max-height:90vh}
 </style>
 </head>
 <body>
@@ -314,6 +333,7 @@ input[readonly],textarea[readonly]{background:var(--soft);color:var(--muted);cur
   <button data-view="attendance"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M8 13l3 3 5-6M3 9h18M8 2v4M16 2v4"/></svg>Attendance</button>
   <button data-view="timesheet"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Timesheet</button>
   <button data-view="dayworks"><svg viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/></svg>Variations</button>
+  <button data-view="pours"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="1"/><path d="M3 10h8v11M11 10V3M15 14h6"/></svg>Pours</button>
   <button data-view="works"><svg viewBox="0 0 24 24"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9"/></svg><span>Works<span class="lg"> Done</span></span></button>
   <button data-view="talks"><svg viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><path d="M13 3v6h6M8 14h8M8 17h5"/></svg>Talks</button>
   <button data-view="tools"><svg viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 0 0 5 5L21 13l-8 8-3-3 5.3-5.3a4 4 0 0 0-5-5L9 6l2-2z"/><path d="M3 21l6-6"/></svg>Tools</button>
@@ -341,7 +361,7 @@ const DAYS = ["mon","tue","wed","thu","fri","sat"];
 const DAY_LABEL = ["Mon","Tue","Wed","Thu","Fri","Sat"];
 const STATUSES = ["In store","On site","With a lad","In repair","Off hired","Missing"];
 const TICK_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
-const VIEW_TITLES = {home:"Home", attendance:"Attendance", timesheet:"Timesheet", dayworks:"Variations", works:"Works Done", talks:"Toolbox Talks", tools:"Tools"};
+const VIEW_TITLES = {home:"Home", attendance:"Attendance", timesheet:"Timesheet", dayworks:"Variations", pours:"Pours", works:"Works Done", talks:"Toolbox Talks", tools:"Tools"};
 
 // ================= helpers =================
 const $ = id => document.getElementById(id);
@@ -602,6 +622,7 @@ function go(view){
   if (view === "attendance" && S.att.loaded !== iso(S.att.week)) loadAttendance();
   if (view === "tools"){ loadTools(!!S.tools); loadToolPhotos(); }
   if (view === "talks") loadTalks();
+  if (view === "pours") loadPours();
   if (view === "home") loadHome();
   if (view === "timesheet"){ S.past = null; loadPastWeeks(); }
   if (view === "timesheet" && !S.tsTabs) server("timesheetTabs").then(tabs => { S.tsTabs = tabs || []; if (S.view === "timesheet" && !(document.activeElement && /INPUT|TEXTAREA/.test(document.activeElement.tagName))) render(); }).catch(() => {});
@@ -615,6 +636,7 @@ function render(){
   if (S.view === "timesheet") v.innerHTML = timesheetHtml();
   if (S.view === "dayworks" || S.view === "works") v.innerHTML = recordsHtml(S.view);
   if (S.view === "talks") v.innerHTML = talksHtml();
+  if (S.view === "pours") v.innerHTML = poursHtml();
   if (S.view === "tools") v.innerHTML = S.openTool ? toolDetailHtml() : toolsHtml();
 }
 
@@ -2036,6 +2058,266 @@ async function warmFromCache(){
   }
   if (!(document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName))) render();
 }
+// ================= pours =================
+// Ground floor walls and columns, traced from OCSC drawing SE-10010. Sizes in mm, grid A to N and 1 to 16.
+const PLAN = {"gx":{"1":0,"2":7648,"3":10485,"4":18126,"5":25781,"6":28610,"7":36266,"8":43921,"9":46743,"10":54399,"11":62047,"12":64883,"13":72525,"14":80180,"15":83009,"16":90664},"gy":{"A":0,"B":7860,"C":12058,"D":17138,"E":20870,"F":25365,"G":30127,"H":32562,"I":40414,"J":44246,"K":62132,"L":66534,"M":78049,"N":82247},"els":[{"i":"W001","x":64886,"y":12143,"w":7654,"d":195,"r":"Grid C, 12 to 13"},{"i":"W002","x":64886,"y":4260,"w":7654,"d":203,"r":"12 to 13"},{"i":"W003","x":64886,"y":8206,"w":7654,"d":203,"r":"Grid B, 12 to 13"},{"i":"W004","x":72540,"y":-142,"w":195,"d":17145,"r":"Grid 13, A to D"},{"i":"W005","x":54210,"y":-142,"w":18330,"d":203,"r":"Grid A, 10 to 13"},{"i":"W006","x":54210,"y":61,"w":194,"d":7865,"r":"Grid 10, A to B"},{"i":"W007","x":36074,"y":7723,"w":7849,"d":203,"r":"Grid B, 7 to 8"},{"i":"W008","x":36074,"y":7926,"w":203,"d":17501,"r":"Grid 7, B to F"},{"i":"W009","x":18141,"y":25232,"w":17933,"d":195,"r":"Grid F, 4 to 7"},{"i":"W010","x":18141,"y":20728,"w":204,"d":4504,"r":"Grid 4, E to F"},{"i":"W011","x":6,"y":20728,"w":7857,"d":203,"r":"Grid E, 1 to 2"},{"i":"W012","x":-189,"y":20728,"w":195,"d":23775,"r":"Grid 1, E to J"},{"i":"W013","x":53990,"y":7926,"w":194,"d":11778,"r":"Grid 10, B to E"},{"i":"W014","x":44024,"y":19610,"w":11219,"d":195,"r":"8 to 11"},{"i":"W015","x":42576,"y":7926,"w":195,"d":2100,"r":"B to C"},{"i":"W016","x":46556,"y":7926,"w":203,"d":9161,"r":"Grid 9, B to D"},{"i":"W017","x":46759,"y":15572,"w":7231,"d":203,"r":"9 to 10"},{"i":"W018","x":36277,"y":12126,"w":7646,"d":203,"r":"Grid C, 7 to 8"},{"i":"W019","x":43923,"y":7723,"w":203,"d":17247,"r":"Grid 8, B to F"},{"i":"W020","x":36277,"y":20000,"w":7646,"d":195,"r":"7 to 8"},{"i":"W021","x":42771,"y":9823,"w":1152,"d":203,"r":"7 to 8"},{"i":"W022","x":36277,"y":24970,"w":7849,"d":203,"r":"Grid F, 7 to 8"},{"i":"W023","x":48097,"y":19805,"w":203,"d":6646,"r":"D to G"},{"i":"W024","x":51433,"y":19805,"w":203,"d":6646,"r":"D to G"},{"i":"W025","x":46556,"y":26655,"w":203,"d":13826,"r":"Grid 9, F to I"},{"i":"W026","x":46556,"y":26451,"w":8687,"d":204,"r":"9 to 11"},{"i":"W027","x":51704,"y":26655,"w":203,"d":2023,"r":"F to G"},{"i":"W028","x":51907,"y":28475,"w":2277,"d":203,"r":"9 to 10"},{"i":"W029","x":54184,"y":26655,"w":204,"d":13826,"r":"Grid 10, F to I"},{"i":"W030","x":46759,"y":31328,"w":7849,"d":195,"r":"9 to 10"},{"i":"W031","x":36277,"y":40481,"w":18331,"d":195,"r":"Grid I, 7 to 10"},{"i":"W032","x":49519,"y":35689,"w":195,"d":4792,"r":"H to I"},{"i":"W033","x":46759,"y":37729,"w":2760,"d":203,"r":"9 to 10"},{"i":"W034","x":47953,"y":35892,"w":203,"d":1837,"r":"H to I"},{"i":"W035","x":36277,"y":32624,"w":195,"d":8052,"r":"Grid 7, H to I"},{"i":"W036","x":43923,"y":32624,"w":203,"d":7857,"r":"Grid 8, H to I"},{"i":"W037","x":36277,"y":40676,"w":195,"d":41842,"r":"Grid 7, I to N"},{"i":"W038","x":17938,"y":44503,"w":203,"d":38015,"r":"Grid 4, J to N"},{"i":"W039","x":18141,"y":82323,"w":18136,"d":195,"r":"Grid N, 4 to 7"},{"i":"W040","x":25795,"y":74661,"w":195,"d":7662,"r":"Grid 5, L to N"},{"i":"W041","x":28420,"y":43842,"w":203,"d":34180,"r":"Grid 6, I to M"},{"i":"W042","x":18141,"y":71545,"w":7654,"d":203,"r":"4 to 5"},{"i":"W043","x":18141,"y":74661,"w":7654,"d":203,"r":"4 to 5"},{"i":"W044","x":23797,"y":71748,"w":203,"d":2913,"r":"L to M"},{"i":"W045","x":25795,"y":44308,"w":195,"d":27440,"r":"Grid 5, J to M"},{"i":"W046","x":18141,"y":52030,"w":7654,"d":203,"r":"4 to 5"},{"i":"W047","x":17938,"y":44308,"w":10584,"d":195,"r":"Grid J, 4 to 6"},{"i":"W048","x":28623,"y":43842,"w":7654,"d":203,"r":"Grid J, 6 to 7"},{"i":"W049","x":28623,"y":62198,"w":7654,"d":194,"r":"Grid K, 6 to 7"},{"i":"W050","x":28623,"y":56957,"w":7654,"d":195,"r":"6 to 7"},{"i":"W051","x":28623,"y":51716,"w":7654,"d":195,"r":"6 to 7"},{"i":"W052","x":28420,"y":78022,"w":203,"d":4301,"r":"Grid 6, M to N"},{"i":"W053","x":29775,"y":80223,"w":194,"d":2100,"r":"M to N"},{"i":"W054","x":28623,"y":80223,"w":1152,"d":195,"r":"6 to 7"},{"i":"W055","x":28623,"y":77920,"w":7654,"d":204,"r":"Grid M, 6 to 7"},{"i":"W056","x":6,"y":36459,"w":19659,"d":195,"r":"1 to 5"},{"i":"W057","x":7660,"y":26037,"w":203,"d":10422,"r":"Grid 2, F to I"},{"i":"W058","x":7660,"y":20931,"w":203,"d":3099,"r":"Grid 2, E to F"},{"i":"W059","x":18141,"y":25427,"w":204,"d":8602,"r":"Grid 4, F to I"},{"i":"W060","x":10293,"y":20728,"w":195,"d":9906,"r":"Grid 3, E to H"},{"i":"W061","x":10488,"y":27933,"w":3725,"d":203,"r":"3 to 4"},{"i":"W062","x":10488,"y":25232,"w":7653,"d":195,"r":"Grid F, 3 to 4"},{"i":"W063","x":11639,"y":20931,"w":203,"d":2100,"r":"E to F"},{"i":"W064","x":10488,"y":22828,"w":1151,"d":203,"r":"3 to 4"},{"i":"W065","x":14213,"y":25427,"w":195,"d":8602,"r":"F to I"},{"i":"W066","x":12215,"y":33826,"w":1998,"d":203,"r":"3 to 4"},{"i":"W067","x":14408,"y":30431,"w":1845,"d":195,"r":"Grid G, 3 to 4"},{"i":"W068","x":14408,"y":33132,"w":1845,"d":194,"r":"3 to 4"},{"i":"W069","x":10293,"y":30634,"w":3920,"d":195,"r":"3 to 4"},{"i":"W070","x":18345,"y":33826,"w":3488,"d":203,"r":"4 to 5"},{"i":"W071","x":16253,"y":30431,"w":195,"d":2895,"r":"G to I"},{"i":"W072","x":19462,"y":36654,"w":203,"d":7654,"r":"H to J"},{"i":"W073","x":28420,"y":40125,"w":203,"d":3717,"r":"Grid 6, I to J"},{"i":"W074","x":28623,"y":40125,"w":3776,"d":203,"r":"Grid I, 6 to 7"},{"i":"W075","x":28412,"y":37323,"w":6663,"d":203,"r":"6 to 7"},{"i":"W076","x":32399,"y":37526,"w":195,"d":6316,"r":"H to J"},{"i":"W077","x":30080,"y":37526,"w":194,"d":2599,"r":"H to I"},{"i":"W078","x":34457,"y":33809,"w":203,"d":3514,"r":"H to I"},{"i":"W079","x":31460,"y":33606,"w":3615,"d":203,"r":"6 to 7"},{"i":"W080","x":31256,"y":32725,"w":204,"d":4598,"r":"H to I"},{"i":"W081","x":31460,"y":32624,"w":1676,"d":203,"r":"Grid H, 6 to 7"},{"i":"W082","x":32933,"y":32827,"w":203,"d":779,"r":"H to I"},{"i":"W083","x":28420,"y":25427,"w":203,"d":4767,"r":"Grid 6, F to G"},{"i":"W084","x":36074,"y":25427,"w":203,"d":4767,"r":"Grid 7, F to G"},{"i":"W085","x":32332,"y":25427,"w":203,"d":4572,"r":"F to G"},{"i":"W086","x":28623,"y":29999,"w":7451,"d":195,"r":"Grid G, 6 to 7"},{"i":"W087","x":36472,"y":32624,"w":7451,"d":203,"r":"Grid H, 7 to 8"},{"i":"W088","x":21638,"y":25232,"w":195,"d":8594,"r":"F to I"},{"i":"W089","x":18345,"y":30007,"w":3293,"d":195,"r":"Grid G, 4 to 5"},{"i":"W090","x":46759,"y":35689,"w":2760,"d":203,"r":"9 to 10"},{"i":"W091","x":54210,"y":7926,"w":194,"d":11778,"r":"Grid 10, B to E"},{"i":"W092","x":54404,"y":26655,"w":204,"d":13826,"r":"Grid 10, F to I"},{"i":"W093","x":6,"y":44308,"w":17932,"d":195,"r":"Grid J, 1 to 4"},{"i":"W094","x":31256,"y":30101,"w":204,"d":2624,"r":"G to H"},{"i":"W095","x":13002,"y":33928,"w":203,"d":101,"r":"3 to 4"},{"i":"C01","x":25508,"y":36442,"w":499,"d":500,"r":"Grid 5"},{"i":"C02","x":41035,"y":24927,"w":508,"d":500,"r":"Grid F"},{"i":"C03","x":54117,"y":19805,"w":508,"d":305,"r":"Grid 10"},{"i":"C04","x":54117,"y":26655,"w":508,"d":296,"r":"Grid 10"},{"i":"C05","x":54108,"y":31726,"w":296,"d":500,"r":"Grid 10"},{"i":"C06","x":54108,"y":36857,"w":296,"d":500,"r":"Grid 10"},{"i":"C07","x":54108,"y":40176,"w":296,"d":305,"r":"I/10"},{"i":"W096","x":10488,"y":20728,"w":7653,"d":203,"r":"Grid E, 3 to 4"},{"i":"W097","x":46556,"y":7723,"w":7654,"d":203,"r":"Grid B, 9 to 10"},{"i":"W098","x":72540,"y":66600,"w":18331,"d":204,"r":"Grid L, 13 to 16"},{"i":"W099","x":90667,"y":17003,"w":204,"d":49598,"r":"Grid 16, D to L"},{"i":"W100","x":82328,"y":17003,"w":8339,"d":203,"r":"Grid D, 14 to 16"},{"i":"W101","x":72337,"y":36857,"w":203,"d":29947,"r":"Grid 13, H to L"},{"i":"W102","x":64683,"y":-41,"w":203,"d":17247,"r":"Grid 12, A to D"},{"i":"W103","x":62058,"y":61,"w":195,"d":17145,"r":"Grid 11, A to D"},{"i":"W104","x":58113,"y":61,"w":203,"d":17145,"r":"A to D"},{"i":"W105","x":64886,"y":2161,"w":1355,"d":194,"r":"12 to 13"},{"i":"W106","x":66038,"y":2355,"w":203,"d":1905,"r":"A to B"},{"i":"W107","x":58316,"y":4057,"w":3742,"d":203,"r":"10 to 11"},{"i":"W108","x":58316,"y":6868,"w":3742,"d":195,"r":"10 to 11"},{"i":"W109","x":64886,"y":5852,"w":2168,"d":195,"r":"12 to 13"},{"i":"W110","x":54404,"y":7723,"w":3709,"d":203,"r":"Grid B, 10 to 11"},{"i":"W111","x":58316,"y":8782,"w":3742,"d":194,"r":"10 to 11"},{"i":"W112","x":54404,"y":10026,"w":3709,"d":195,"r":"10 to 11"},{"i":"W113","x":58316,"y":13006,"w":3742,"d":204,"r":"10 to 11"},{"i":"W114","x":54404,"y":12973,"w":2024,"d":203,"r":"10 to 11"},{"i":"W115","x":58316,"y":15005,"w":3742,"d":203,"r":"10 to 11"},{"i":"W116","x":54404,"y":15690,"w":3709,"d":204,"r":"10 to 11"},{"i":"W117","x":58316,"y":17003,"w":3742,"d":203,"r":"Grid D, 10 to 11"},{"i":"W118","x":72540,"y":17003,"w":474,"d":203,"r":"Grid D, 13 to 14"},{"i":"W119","x":67054,"y":4463,"w":203,"d":3743,"r":"A to B"},{"i":"W120","x":56233,"y":13176,"w":195,"d":2514,"r":"C to D"},{"i":"W121","x":78839,"y":64297,"w":1347,"d":204,"r":"13 to 14"},{"i":"W122","x":72540,"y":62198,"w":7646,"d":203,"r":"Grid K, 13 to 14"},{"i":"W123","x":83022,"y":57228,"w":3700,"d":203,"r":"15 to 16"},{"i":"W124","x":82819,"y":53977,"w":7848,"d":203,"r":"15 to 16"},{"i":"W125","x":84021,"y":52681,"w":2498,"d":195,"r":"15 to 16"},{"i":"W126","x":76486,"y":52868,"w":3700,"d":203,"r":"13 to 14"},{"i":"W127","x":76689,"y":50870,"w":2498,"d":203,"r":"13 to 14"},{"i":"W128","x":82819,"y":50666,"w":3903,"d":204,"r":"15 to 16"},{"i":"W129","x":72540,"y":49574,"w":7646,"d":195,"r":"13 to 14"},{"i":"W130","x":83022,"y":41344,"w":7645,"d":204,"r":"15 to 16"},{"i":"W131","x":76486,"y":40193,"w":3700,"d":195,"r":"Grid I, 13 to 14"},{"i":"W132","x":72252,"y":36942,"w":18415,"d":194,"r":"13 to 16"},{"i":"W133","x":83022,"y":39126,"w":2701,"d":195,"r":"15 to 16"},{"i":"W134","x":82819,"y":34927,"w":2701,"d":194,"r":"15 to 16"},{"i":"W135","x":72252,"y":32023,"w":8154,"d":203,"r":"Grid H, 13 to 14"},{"i":"W136","x":85723,"y":32658,"w":4944,"d":203,"r":"Grid H, 15 to 16"},{"i":"W137","x":85723,"y":28018,"w":4944,"d":203,"r":"15 to 16"},{"i":"W138","x":82819,"y":25749,"w":2701,"d":203,"r":"15 to 16"},{"i":"W139","x":83022,"y":23751,"w":7645,"d":203,"r":"15 to 16"},{"i":"W140","x":82819,"y":54180,"w":203,"d":12421,"r":"Grid 15, J to L"},{"i":"W141","x":82819,"y":35121,"w":203,"d":15545,"r":"Grid 15, H to K"},{"i":"W142","x":82819,"y":17206,"w":203,"d":8543,"r":"Grid 15, D to F"},{"i":"W143","x":83818,"y":50870,"w":203,"d":3208,"r":"J to K"},{"i":"W144","x":85520,"y":23954,"w":203,"d":15172,"r":"E to I"},{"i":"W145","x":86519,"y":50870,"w":203,"d":6358,"r":"J to K"},{"i":"W146","x":80186,"y":29847,"w":203,"d":36855,"r":"Grid 14, G to L"},{"i":"W147","x":78839,"y":62401,"w":195,"d":1896,"r":"K to L"},{"i":"W148","x":77485,"y":32226,"w":203,"d":4716,"r":"H to I"},{"i":"W149","x":79187,"y":49769,"w":203,"d":3099,"r":"J to K"},{"i":"W150","x":76486,"y":49769,"w":203,"d":3099,"r":"J to K"},{"i":"W151","x":76486,"y":37136,"w":203,"d":3057,"r":"H to I"},{"i":"W152","x":72337,"y":17003,"w":203,"d":19854,"r":"Grid 13, D to I"},{"i":"C08","x":72252,"y":40193,"w":500,"d":499,"r":"I/13"},{"i":"C09","x":72252,"y":36857,"w":500,"d":500,"r":"Grid 13"},{"i":"C10","x":72252,"y":31726,"w":500,"d":297,"r":"Grid 13"},{"i":"C11","x":72252,"y":26468,"w":500,"d":500,"r":"Grid 13"},{"i":"C12","x":72252,"y":19610,"w":500,"d":500,"r":"Grid 13"},{"i":"C13","x":78357,"y":19610,"w":499,"d":500,"r":"Off grid"},{"i":"C14","x":66393,"y":19610,"w":500,"d":500,"r":"Off grid"},{"i":"C15","x":60052,"y":19610,"w":499,"d":500,"r":"Off grid"},{"i":"C16","x":79906,"y":31701,"w":500,"d":322,"r":"Grid 14"},{"i":"W153","x":54608,"y":38762,"w":17729,"d":195,"r":"10 to 13"}]};
+const POUR_STATUS = {"": "Not poured", today: "Being poured today", poured: "Poured"};
+S.pours = null; S.pourSel = null; S.pourPhotos = {}; S.pourView = null; S.pourFilter = "";
+const todayIso = () => iso(new Date());
+// "being poured today" turns into poured once the day has passed
+function pourState(p){ if (!p || !p.status) return ""; return (p.status === "today" && p.date === todayIso()) ? "today" : "poured"; }
+const POUR_FILL = {"": "#b9c2cf", today: "#f59e0b", poured: "#012060"};
+function planBounds(){
+  const xs = PLAN.els.flatMap(e => [e.x, e.x + e.w]), ys = PLAN.els.flatMap(e => [e.y, e.y + e.d]);
+  return {x0: Math.min(...xs) - 4500, x1: Math.max(...xs) + 2500, y0: Math.min(...ys) - 4500, y1: Math.max(...ys) + 2500};
+}
+const PB = planBounds();
+function fitView(){ S.pourView = {x: PB.x0, y: -PB.y1, w: PB.x1 - PB.x0, h: PB.y1 - PB.y0}; }
+function pourLen(e){ return Math.round(Math.max(e.w, e.d) / 5) * 5; }
+function variationLabel(id){
+  const r = (RS("dayworks").list ? mergedRecords("dayworks") : []).find(x => x.id === id);
+  if (!r) return id ? "Variation (not loaded)" : "";
+  const d = fromIso(r.date);
+  return `${d ? d.toLocaleDateString("en-IE", {day:"numeric", month:"short"}) : ""} · ${r.location || ""} · ${String(r.description || "").slice(0, 40)}`;
+}
+function planSvg(){
+  if (!S.pourView) fitView();
+  const v = S.pourView, P = S.pours || {};
+  const k = v.w / 1000; // mm per ~px, drives label size
+  let s = `<svg id="planSvg" viewBox="${v.x} ${v.y} ${v.w} ${v.h}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Ground floor plan. Tap a wall or column.">`;
+  // grid
+  const gy0 = -PB.y1 + 1200, gy1 = -PB.y0 - 1200, gx0 = PB.x0 + 1200, gx1 = PB.x1 - 1200;
+  for (const [n, x] of Object.entries(PLAN.gx)) s += `<line x1="${x}" y1="${gy0}" x2="${x}" y2="${gy1}" stroke="#9aa6b8" stroke-width="${k*0.8}" stroke-dasharray="${k*10} ${k*4}"/><circle cx="${x}" cy="${gy1 + 900}" r="700" fill="#fff" stroke="#012060" stroke-width="60"/><text x="${x}" y="${gy1 + 1150}" font-size="700" text-anchor="middle" fill="#012060" font-weight="700">${n}</text>`;
+  for (const [n, y] of Object.entries(PLAN.gy)) s += `<line x1="${gx0}" y1="${-y}" x2="${gx1}" y2="${-y}" stroke="#9aa6b8" stroke-width="${k*0.8}" stroke-dasharray="${k*10} ${k*4}"/><circle cx="${gx0 - 900}" cy="${-y}" r="700" fill="#fff" stroke="#012060" stroke-width="60"/><text x="${gx0 - 900}" y="${-y + 250}" font-size="700" text-anchor="middle" fill="#012060" font-weight="700">${n}</text>`;
+  // elements
+  for (const e of PLAN.els){
+    const st = pourState(P[e.i]);
+    const hide = S.pourFilter && (st || "none") !== S.pourFilter;
+    const sel = S.pourSel === e.i;
+    s += `<rect x="${e.x}" y="${-(e.y + e.d)}" width="${e.w}" height="${e.d}" fill="${sel ? "#e11d48" : POUR_FILL[st]}" opacity="${hide ? 0.18 : 1}" ${sel ? `stroke="#e11d48" stroke-width="${k*6}"` : ""}/>`;
+  }
+  // measurements, only once zoomed in enough to read them
+  if (v.w < 30000){
+    const fs = Math.max(160, Math.min(480, v.w / 45));
+    for (const e of PLAN.els){
+      const L = pourLen(e); if (L < 900) continue;
+      const cx = e.x + e.w/2, cy = -(e.y + e.d/2), vert = e.d > e.w;
+      s += `<text x="${vert ? cx - fs*0.7 : cx}" y="${vert ? cy : cy - fs*0.6}" font-size="${fs}" text-anchor="middle" fill="#374151" ${vert ? `transform="rotate(-90 ${cx - fs*0.7} ${cy})"` : ""}>${L}</text>`;
+    }
+  }
+  return s + `</svg>`;
+}
+function poursHtml(){
+  if (!S.pours) return `<div class="loading"><span class="spin"></span> Loading pours…</div>`;
+  const counts = {"": 0, today: 0, poured: 0};
+  PLAN.els.forEach(e => counts[pourState(S.pours[e.i])]++);
+  const chip = (st, label) => `<button class="btn ${S.pourFilter === (st || "none") ? "" : "ghost"}" data-pfilter="${st || "none"}" style="padding:6px 12px;font-size:.85rem"><i style="background:${POUR_FILL[st]}"></i>${label} (${counts[st]})</button>`;
+  return `${modeBar()}
+  <div class="plankey"><span class="pourcount">${counts.poured} of ${PLAN.els.length} poured</span>
+    ${chip("poured", "Poured")} ${chip("today", "Today")} ${chip("", "Not poured")}</div>
+  <div class="pourwrap">
+    <div class="plancard">${planSvg()}
+      <div class="plantools"><button data-pzoom="1.6" aria-label="Zoom in">+</button><button data-pzoom="0.625" aria-label="Zoom out">−</button><button data-pzoom="fit" aria-label="Fit whole floor" style="font-size:.7rem">FIT</button></div>
+    </div>
+    <div class="pourpanel" id="pourPanel">${pourPanelHtml()}</div>
+  </div>`;
+}
+function pourPanelHtml(){
+  const e = PLAN.els.find(x => x.i === S.pourSel);
+  if (!e) return `<h3>Tap a wall or column</h3><p class="muted">Pinch or use + to zoom in. Measurements show once you're zoomed in. Ground floor, traced from OCSC drawing SE-10010, so sizes are within about 20 mm. Check the drawing before setting anything out.</p>`;
+  const p = (S.pours || {})[e.i] || {}, st = p.status ? pourState(p) : "";
+  const kind = e.i[0] === "C" ? "Column" : "Wall";
+  const size = kind === "Column" ? `${e.w} × ${e.d} mm` : `about ${pourLen(e)} mm long, ${Math.round(Math.min(e.w, e.d)/5)*5} mm thick`;
+  const ro = S.edit ? "" : "disabled";
+  const vars = (RS("dayworks").list ? mergedRecords("dayworks") : []);
+  const photos = S.pourPhotos[e.i];
+  const nPh = (p.photos || []).length;
+  return `<div style="display:flex;justify-content:space-between;align-items:start"><div><h2>${e.i}</h2><div class="muted">${esc(e.r)}</div></div>
+      <span class="pill ${st === "poured" ? "ok" : st === "today" ? "amber" : ""}">${POUR_STATUS[st]}</span></div>
+    <div class="grid2"><span>Type</span><span>${kind}</span><span>Size</span><span>${size}</span>${p.by ? `<span>Updated by</span><span>${esc(p.by)}</span>` : ""}</div>
+    <label class="field">Status<select id="pStatus" ${ro}>${Object.entries(POUR_STATUS).map(([k, l]) => `<option value="${k}" ${k === st ? "selected" : ""}>${l}</option>`).join("")}</select></label>
+    ${p.status ? `<label class="field">Pour date<input type="date" id="pDate" value="${esc(p.date || "")}" ${ro}></label>
+    <label class="field">Variation<select id="pVar" ${ro}><option value="">None</option>${vars.map(r => `<option value="${esc(r.id)}" ${r.id === p.variation ? "selected" : ""}>${esc(variationLabel(r.id))}</option>`).join("")}</select></label>
+    <label class="field">Notes<textarea id="pNotes" rows="2" placeholder="Pour no., docket, concrete grade" ${S.edit ? "" : "readonly"}>${esc(p.notes || "")}</textarea></label>
+    <div class="field">Photos</div>
+    ${(photos && photos.length) ? `<div class="pourphotos">${photos.map(ph => `<img src="${ph.data}" alt="Pour photo ${e.i}" data-pbig>`).join("")}</div>` : nPh ? (photos ? `<div class="pourphotos">${photos.map(ph => `<img src="${ph.data}" alt="Pour photo ${e.i}" data-pbig>`).join("")}</div>` : `<p class="muted">Loading ${nPh} photo${nPh > 1 ? "s" : ""}…</p>`) : `<p class="muted">No photos yet.</p>`}
+    <button class="btn ghost" data-paddphoto style="width:100%">Take or add a photo</button>` : ""}`;
+}
+async function loadPours(){
+  if (!S.pours){ const c = await cacheGet("pours"); if (c && !S.pours){ S.pours = c; if (S.view === "pours") render(); } }
+  if (!RS("dayworks").list) loadRecords("dayworks", true);
+  try{
+    const p = await (S.pours ? bgServer : server)("getPours");
+    const pend = (await kvGet("pourPending")) || {};
+    S.pours = {...p};
+    for (const [id, j] of Object.entries(pend)) S.pours[id] = j.rec.status ? j.rec : undefined;
+    cacheSet("pours", S.pours);
+    if (Object.keys(pend).length) flushPours();
+  }catch(e){ if (!S.pours) S.pours = {}; connectionTrouble(); }
+  if (S.view === "pours") render();
+}
+// saved on the phone first, then sent to Google; retried until it gets through
+async function savePourLocal(id, rec, newPhoto){
+  const pend = (await kvGet("pourPending")) || {};
+  const j = pend[id] || {rec: {}, photos: []};
+  const keep = (j.rec && j.rec.photos) || [];
+  j.rec = {...rec, photos: [...new Set([...(rec.photos || []), ...keep])], by: getWho()};
+  if (newPhoto) j.photos.push(newPhoto);
+  pend[id] = j;
+  await kvSet("pourPending", pend);
+  S.pours[id] = rec.status ? j.rec : undefined;
+  cacheSet("pours", S.pours);
+  flushPours();
+}
+let pourFlushing = false;
+async function flushPours(){
+  if (pourFlushing) return; pourFlushing = true;
+  setStatus("Saving…");
+  try{
+    for (const id of Object.keys((await kvGet("pourPending")) || {})){
+      for (;;){
+        let pend = (await kvGet("pourPending")) || {}, j = pend[id];
+        if (!j) break;
+        if (j.photos.length){
+          const data = j.photos[0];
+          const fid = await bgServer("savePourPhoto", id, data);
+          pend = (await kvGet("pourPending")) || {}; j = pend[id];
+          j.photos.shift(); j.rec.photos = [...(j.rec.photos || []), fid];
+          await kvSet("pourPending", pend);
+          S.pourPhotos[id] = (S.pourPhotos[id] || []).map(p => p.data === data ? {id: fid, data} : p);
+          if (S.pours[id]) S.pours[id] = j.rec;
+          continue;
+        }
+        const snap = JSON.stringify(j.rec);
+        await bgServer("savePour", id, j.rec);
+        pend = (await kvGet("pourPending")) || {};
+        if (pend[id] && !pend[id].photos.length && JSON.stringify(pend[id].rec) === snap) delete pend[id];
+        await kvSet("pourPending", pend);
+        break;
+      }
+    }
+    cacheSet("pours", S.pours);
+    setStatus("Saved", true);
+    if (S.view === "pours" && $("pourPanel") && !(document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName))) $("pourPanel").innerHTML = pourPanelHtml();
+  }catch(e){
+    pourFlushing = false;
+    setStatus("Saved on this phone. It'll send when there's signal");
+    setTimeout(flushPours, 30000);
+    return;
+  }
+  pourFlushing = false;
+  if (Object.keys((await kvGet("pourPending")) || {}).length) flushPours();
+}
+async function loadPourPhotos(id){
+  const p = S.pours && S.pours[id];
+  if (!p || !(p.photos || []).length || S.pourPhotos[id]) return;
+  try{ S.pourPhotos[id] = await bgServer("getPourPhotos", id); }catch(e){ return; }
+  if (S.view === "pours" && S.pourSel === id) $("pourPanel").innerHTML = pourPanelHtml();
+}
+function pourSelect(id){
+  S.pourSel = id;
+  render();
+  if (id){ loadPourPhotos(id); if (innerWidth < 1000) $("pourPanel").scrollIntoView({behavior: "smooth", block: "start"}); }
+}
+function readPour(){
+  const cur = (S.pours || {})[S.pourSel] || {};
+  const status = $("pStatus").value;
+  const rec = {...cur, status};
+  if (!status) return {status: ""};
+  if ($("pDate")) rec.date = $("pDate").value; 
+  if (!rec.date || (status === "today" && cur.status !== "today")) rec.date = todayIso();
+  if ($("pVar")) rec.variation = $("pVar").value;
+  if ($("pNotes")) rec.notes = $("pNotes").value.trim();
+  rec.photos = cur.photos || [];
+  return rec;
+}
+$("view").addEventListener("change", async ev => {
+  if (S.view !== "pours" || !ev.target.closest("#pourPanel")) return;
+  if (!S.edit) return;
+  touchEdit();
+  const id = S.pourSel, rec = readPour();
+  const had = S.pours[id] && S.pours[id].status;
+  if (!rec.status && had && !(await ask(`Mark ${id} as not poured? Its date, variation, notes and photo links are removed.`, "Mark not poured", true))){ render(); return; }
+  await savePourLocal(id, rec);
+  render();
+});
+$("view").addEventListener("click", async ev => {
+  if (S.view !== "pours") return;
+  const f = ev.target.closest("[data-pfilter]");
+  if (f){ S.pourFilter = S.pourFilter === f.dataset.pfilter ? "" : f.dataset.pfilter; render(); return; }
+  const z = ev.target.closest("[data-pzoom]");
+  if (z){ if (z.dataset.pzoom === "fit") fitView(); else zoomPlan(+z.dataset.pzoom); render(); return; }
+  if (ev.target.closest("[data-pbig]")){ const m = document.createElement("div"); m.className = "pourbig"; m.innerHTML = `<img src="${ev.target.src}" alt="Pour photo">`; m.onclick = () => m.remove(); document.body.appendChild(m); return; }
+  if (ev.target.closest("[data-paddphoto]")){
+    if (!(await canEdit())) return;
+    const file = await pickImage(); if (!file) return;
+    try{
+      const data = await shrinkImage(file, 1600, false);
+      const id = S.pourSel, rec = readPour();
+      if (!rec.status) return;
+      S.pourPhotos[id] = [...(S.pourPhotos[id] || []), {id: "new", data}];
+      await savePourLocal(id, rec, data);
+      render();
+    }catch(e){ setStatus(errText(e, "Couldn't use that photo")); }
+  }
+});
+function zoomPlan(f, cx, cy){
+  const v = S.pourView;
+  cx = cx == null ? v.x + v.w/2 : cx; cy = cy == null ? v.y + v.h/2 : cy;
+  const w = Math.min(Math.max(v.w / f, 4000), (PB.x1 - PB.x0) * 1.5), h = v.h * w / v.w;
+  S.pourView = {x: cx - (cx - v.x) * w / v.w, y: cy - (cy - v.y) * h / v.h, w, h};
+}
+// drag to move, pinch or wheel to zoom, tap to pick the nearest wall or column
+(function(){
+  const pts = new Map(); let start = null, moved = false, pinch0 = 0;
+  const svgPt = (svg, x, y) => { const m = svg.getScreenCTM().inverse(); const p = new DOMPoint(x, y).matrixTransform(m); return {x: p.x, y: p.y}; };
+  const setVB = svg => svg.setAttribute("viewBox", `${S.pourView.x} ${S.pourView.y} ${S.pourView.w} ${S.pourView.h}`);
+  let redraw = null;
+  const later = () => { clearTimeout(redraw); redraw = setTimeout(() => { if (S.view === "pours"){ const sc = window.scrollY; render(); window.scrollTo(0, sc); } }, 180); };
+  document.addEventListener("pointerdown", ev => {
+    const svg = ev.target.closest && ev.target.closest("#planSvg"); if (!svg) return;
+    svg.setPointerCapture(ev.pointerId);
+    pts.set(ev.pointerId, {x: ev.clientX, y: ev.clientY});
+    if (pts.size === 1){ start = {x: ev.clientX, y: ev.clientY, v: {...S.pourView}}; moved = false; }
+    if (pts.size === 2){ const [a, b] = [...pts.values()]; pinch0 = Math.hypot(a.x-b.x, a.y-b.y); start = {v: {...S.pourView}}; moved = true; }
+  });
+  document.addEventListener("pointermove", ev => {
+    const svg = document.getElementById("planSvg"); if (!svg || !pts.has(ev.pointerId)) return;
+    pts.set(ev.pointerId, {x: ev.clientX, y: ev.clientY});
+    const r = svg.getBoundingClientRect(), scale = Math.max(start.v.w / r.width, start.v.h / r.height);
+    if (pts.size === 1 && start.x != null){
+      const dx = ev.clientX - start.x, dy = ev.clientY - start.y;
+      if (Math.hypot(dx, dy) > 6) moved = true;
+      if (moved){ S.pourView = {...start.v, x: start.v.x - dx*scale, y: start.v.y - dy*scale}; setVB(svg); later(); }
+    } else if (pts.size === 2){
+      const [a, b] = [...pts.values()], d = Math.hypot(a.x-b.x, a.y-b.y);
+      S.pourView = {...start.v}; const c = svgPt(svg, (a.x+b.x)/2, (a.y+b.y)/2);
+      zoomPlan(d / pinch0, c.x, c.y); setVB(svg); later();
+    }
+  });
+  const up = ev => {
+    const svg = document.getElementById("planSvg");
+    if (!pts.has(ev.pointerId)) return;
+    pts.delete(ev.pointerId);
+    if (pts.size === 1){ const [p] = [...pts.values()]; start = {x: p.x, y: p.y, v: {...S.pourView}}; return; }
+    if (pts.size || moved || !svg || ev.type === "pointercancel") return;
+    const p = svgPt(svg, ev.clientX, ev.clientY), r = svg.getBoundingClientRect();
+    const tol = 22 * Math.max(S.pourView.w / r.width, S.pourView.h / r.height);
+    let best = null, bd = tol;
+    for (const e of PLAN.els){
+      const dx = Math.max(e.x - p.x, 0, p.x - (e.x + e.w)), dy = Math.max(-(e.y + e.d) - p.y, 0, p.y + e.y);
+      const d = Math.hypot(dx, dy); if (d < bd){ bd = d; best = e.i; }
+    }
+    pourSelect(best);
+  };
+  document.addEventListener("pointerup", up); document.addEventListener("pointercancel", up);
+  document.addEventListener("wheel", ev => {
+    const svg = ev.target.closest && ev.target.closest("#planSvg"); if (!svg) return;
+    ev.preventDefault(); const c = svgPt(svg, ev.clientX, ev.clientY);
+    zoomPlan(ev.deltaY < 0 ? 1.25 : 0.8, c.x, c.y); setVB(svg); later();
+  }, {passive: false});
+})();
+
 go((() => {
   try{
     const v = localStorage.getItem("siteAppView");
