@@ -665,19 +665,25 @@ function pdfResult(key){
   if (!o || o.key !== key) return "";
   if (o.state === "busy") return `<p class="pdfout" style="flex-direction:row;align-items:center"><span class="spin"></span>Making the PDF. This can take up to a minute…</p>`;
   if (o.state === "error") return `<p class="pdfout bad">${esc(o.msg)}</p>`;
+  const canShareFile = !!(o.file && navigator.canShare && (() => { try{ return navigator.canShare({files: [o.file]}); }catch(e){ return false; } })());
+  const fileBtns = (o.blobUrl ? `<a class="btn ghost" href="${o.blobUrl}" download="${esc(o.name)}">Download</a>` : "") +
+    (canShareFile ? `<button class="btn ghost" data-sharefile>Share file</button>` : "");
+  if (!o.url) return `<div class="pdfout"><span>Ready: ${esc(o.name)}</span><div class="row-actions">${fileBtns.replace('btn ghost', 'btn')}</div>${o.note ? `<span class="small muted">${esc(o.note)}</span>` : ""}</div>`;
   const text = encodeURIComponent(`${o.name}\n${o.url}`);
   return `<div class="pdfout"><span>Ready: <a href="${esc(o.url)}" target="_blank" rel="noopener">${esc(o.name)}</a></span>
     <div class="row-actions">
       <a class="btn" href="https://wa.me/?text=${text}" target="_blank" rel="noopener">Share on WhatsApp</a>
       <a class="btn ghost" href="mailto:?subject=${encodeURIComponent(o.name)}&body=${text}" target="_blank" rel="noopener">Email</a>
       <a class="btn ghost" href="${esc(o.url)}" target="_blank" rel="noopener">Open</a>
+      ${fileBtns}
     </div><span class="small muted">Anyone with this link can open the PDF.</span></div>`;
 }
 async function runPdf(key, fn){
+  if (S.pdfOut && S.pdfOut.blobUrl){ try{ URL.revokeObjectURL(S.pdfOut.blobUrl); }catch(e){} }
   S.pdfOut = {key, state: "busy"}; render();
   try{
     const res = await fn();
-    S.pdfOut = {key, state: "done", url: res.url, name: res.name};
+    S.pdfOut = {key, state: "done", url: res.url, name: res.name, blobUrl: res.blobUrl || "", file: res.file || null, note: res.note || ""};
   }catch(e){
     S.pdfOut = {key, state: "error", msg: errText(e, "Couldn't make the PDF. Check your signal and try again.")};
   }
@@ -706,7 +712,7 @@ $("view").addEventListener("click", async ev => {
   const key = b.dataset.pdf;
   const logo = S.brand.logo || DEFAULT_LOGO;
   if (key === "home") return runPdf(key, () => server("makeSummaryPdf", summaryData(), logo));
-  if (key === "attendance") return runPdf(key, () => server("makeAttendancePdf", iso(A.week), logo));
+  if (key === "attendance") return runPdf(key, () => makeHeadcountPdf());
   if (key === "timesheet"){
     const tab = $("tsTab") ? $("tsTab").value : "Timesheet";
     return runPdf(key, () => server("makeTimesheetPdf", tab));
@@ -815,6 +821,191 @@ async function loadHome(){
   }catch(e){}
 }
 
+// ================= headcount PDF (same layout as the morning headcount, with the lads' faces) =================
+// Made here on the phone so the faces can go on it. Extras.gs then saves it to Drive for a share link.
+const HC_NAVY = "#012060", HC_TINT = "#DCE6F2", HC_LINE = "#B8C4D6", HC_GREY = "#5A6478", HC_GREEN = "#1E7A3C", HC_RED = "#B3261E";
+const HC_TRADE_ORDER = ["Carpenter", "Steel Fixer", "Chippy Labourer", "General Operative", "Fixing Foreman", "Site Manager", "Safety Rep"];
+const HC_SITE = "Boyne 1C  |  Patrician Secondary School, Newbridge";
+// jsPDF and the navy logo come from loadJsPdf() and navyLogo(), further down (shared with the pour PDF)
+function hcTrade(l){
+  const label = String(TRADE_LABEL[l.code] || l.trade || "").trim();
+  if (!label) return "Trade not set";
+  return /^chippy$/i.test(label) || /^carpenter$/i.test(label) ? "Carpenter" : label;
+}
+function loadImg(src){
+  return new Promise(resolve => {
+    if (!src) return resolve(null);
+    const im = new Image();
+    if (/^https?:/i.test(src)) im.crossOrigin = "anonymous";
+    im.onload = () => resolve(im);
+    im.onerror = () => resolve(null);
+    im.src = src;
+  });
+}
+// a round face on white, or the lad's initials if there's no photo
+async function hcFace(l, px){
+  const draw = im => {
+    const c = document.createElement("canvas"); c.width = c.height = px;
+    const g = c.getContext("2d");
+    g.fillStyle = "#fff"; g.fillRect(0, 0, px, px);
+    g.save(); g.beginPath(); g.arc(px/2, px/2, px/2, 0, Math.PI*2); g.clip();
+    if (im){
+      const s = Math.min(im.naturalWidth, im.naturalHeight);
+      g.drawImage(im, (im.naturalWidth - s)/2, (im.naturalHeight - s)/2, s, s, 0, 0, px, px);
+    } else {
+      g.fillStyle = HC_TINT; g.fillRect(0, 0, px, px);
+      g.fillStyle = HC_NAVY; g.font = `bold ${Math.round(px*0.38)}px Helvetica, Arial, sans-serif`;
+      g.textAlign = "center"; g.textBaseline = "middle"; g.fillText(initials(l.name), px/2, px/2 + 1);
+    }
+    g.restore();
+    return c.toDataURL("image/jpeg", 0.85);
+  };
+  const im = await loadImg(ladPhoto(l));
+  try{ return draw(im); }catch(e){ return draw(null); }
+}
+async function makeHeadcountPdf(){
+  if (!S.booted || !A.ready) throw new Error("Attendance is still loading. Try again in a moment.");
+  const jsPDF = await loadJsPdf();
+  const day = new Date(A.week); day.setDate(day.getDate() + A.day);
+  const dayKey = DAYS[A.day];
+  const dd = String(day.getDate()).padStart(2, "0"), mm = String(day.getMonth()+1).padStart(2, "0"), yy = String(day.getFullYear());
+  const wd = day.toLocaleDateString("en-GB", {weekday: "long"});
+  const dateLabel = `${wd} ${dd}/${mm}/${yy.slice(2)}`;
+  const fileName = `Headcount_${wd.slice(0,3)}_${dd}-${mm}-${yy.slice(2)}.pdf`;
+
+  const lads = S.lads.map(l => ({...l, hcTrade: hcTrade(l), isIn: ticked(l.id, dayKey), hcAgency: l.agency === "No agency" ? "Agency not set" : l.agency}));
+  const X = lads.filter(l => l.isIn).length, Y = lads.length;
+  const found = [...new Set(lads.map(l => l.hcTrade))];
+  const trades = [...HC_TRADE_ORDER.filter(t => found.includes(t)),
+    ...found.filter(t => !HC_TRADE_ORDER.includes(t) && t !== "Trade not set").sort(),
+    ...(found.includes("Trade not set") ? ["Trade not set"] : [])];
+  const agencies = [...new Set(lads.map(l => l.hcAgency))];
+  const faces = {};
+  await Promise.all(lads.map(async l => { faces[l.id] = await hcFace(l, 160); }));
+  const logo = await navyLogo();
+
+  const doc = new jsPDF({unit: "mm", format: "a4"});
+  doc.setProperties({title: `Headcount ${dateLabel}`, author: "New Bridge Form"});
+  const W = 210, H = 297, M = 16, BOTTOM = H - 22;
+  const txt = (s, x, y, o) => doc.text(String(s), x, y, o);
+  const font = (style, size, color) => { doc.setFont("helvetica", style); doc.setFontSize(size); doc.setTextColor(color); };
+
+  // header
+  if (logo){ const lw = 50, lh = lw * logo.r; doc.addImage(logo.url, "PNG", M, 24 - lh, lw, lh, "nbflogo", "FAST"); }
+  else { font("bold", 16, HC_NAVY); txt("NEW BRIDGE FORM", M, 20); }
+  font("normal", 10, HC_GREY); txt(HC_SITE, M, 30);
+  font("bold", 16, HC_NAVY); txt("Headcount", W - M, 17, {align: "right"});
+  font("normal", 10.5, "#000000"); txt(dateLabel, W - M, 23.5, {align: "right"});
+  doc.setDrawColor(HC_NAVY); doc.setLineWidth(0.42); doc.line(M, 34, W - M, 34);
+
+  // X of Y
+  font("bold", 28, HC_NAVY); txt(`${X} of ${Y}`, M, 48);
+  const bw = doc.getTextWidth(`${X} of ${Y}`);
+  font("normal", 11.5, HC_GREY); txt("in today", M + bw + 5, 46.5);
+
+  // by trade
+  let y = 58;
+  font("bold", 12.5, HC_NAVY); txt("By trade", M, y);
+  y += 2;
+  const rh = 5.6, cw = [70, 30, 30];
+  const trow = (vals, head, bold, fill) => {
+    let x = M;
+    vals.forEach((v, i) => {
+      doc.setFillColor(head ? HC_NAVY : (fill || "#FFFFFF")); doc.setDrawColor(HC_LINE); doc.setLineWidth(0.2);
+      doc.rect(x, y, cw[i], rh, "FD");
+      font(head || bold ? "bold" : "normal", 10.5, head ? "#FFFFFF" : "#000000");
+      if (i === 0) txt(v, x + 3, y + rh - 1.7); else txt(v, x + cw[i]/2, y + rh - 1.7, {align: "center"});
+      x += cw[i];
+    });
+    y += rh;
+  };
+  trow(["Trade", "In today", "Total"], true);
+  trades.forEach(t => trow([t, lads.filter(l => l.hcTrade === t && l.isIn).length, lads.filter(l => l.hcTrade === t).length]));
+  trow(["Total", X, Y], false, true, HC_TINT);
+
+  // In today / Not in, grouped by agency, each lad with his face
+  const top1 = y + 6, colw = (W - 2*M - 8) / 2, BAR = 8, AGH = 5.2, SEP = 2, TOP2 = 30;
+  // row height: as roomy as possible while still fitting on one page, but never so small the faces get lost
+  const need = want => { const ags = agencies.filter(a => lads.some(l => l.hcAgency === a && l.isIn === want)).length;
+    return {n: lads.filter(l => l.isIn === want).length, extra: ags * (AGH + SEP)}; };
+  const fitRH = Math.min(...[true, false].map(w => { const k = need(w); return k.n ? (BOTTOM - top1 - BAR - k.extra) / k.n : 99; }));
+  const RH = Math.max(5.5, Math.min(7.2, fitRH)), FACE = RH - 1.3;
+  const columns = [
+    {title: `In today (${X})`, color: HC_GREEN, x: M, want: true},
+    {title: `Not in (${Y - X})`, color: HC_RED, x: M + colw + 8, want: false},
+  ];
+  // lay each column out over as many pages as it needs
+  let pages = 1;
+  for (const col of columns){
+    const items = [];
+    agencies.forEach(ag => {
+      const rows = lads.filter(l => l.hcAgency === ag && l.isIn === col.want);
+      if (!rows.length) return;
+      items.push({kind: "ag", h: AGH, text: ag, keep: RH});
+      rows.forEach(l => items.push({kind: "lad", h: RH, lad: l}));
+      items.push({kind: "sep", h: SEP});
+    });
+    let p = 1, yy = top1 + BAR;
+    col.place = [];
+    for (const it of items){
+      if (yy + it.h + (it.keep || 0) > BOTTOM && it.kind !== "sep"){ p++; yy = TOP2 + BAR; }
+      col.place.push({...it, page: p, y: yy});
+      yy += it.h;
+    }
+    col.pages = p;
+    pages = Math.max(pages, p);
+  }
+  for (let p = 1; p <= pages; p++){
+    if (p > 1){
+      doc.addPage();
+      font("bold", 12, HC_NAVY); txt(`Headcount  ${dateLabel}  (continued)`, M, 20);
+      doc.setDrawColor(HC_NAVY); doc.setLineWidth(0.42); doc.line(M, 24, W - M, 24);
+    }
+    for (const col of columns){
+      const mine = col.place.filter(it => it.page === p);
+      if (p > 1 && !mine.length) continue;
+      const barY = p === 1 ? top1 : TOP2;
+      doc.setFillColor(col.color); doc.rect(col.x, barY, colw, BAR, "F");
+      font("bold", 11.5, "#FFFFFF"); txt(col.title + (p > 1 ? " continued" : ""), col.x + 3, barY + 5.6);
+      for (const it of mine){
+        if (it.kind === "ag"){ font("bold", 10, HC_NAVY); txt(it.text, col.x + 2, it.y + 4.1); }
+        if (it.kind === "lad"){
+          const l = it.lad, fy = it.y + (RH - FACE)/2;
+          doc.addImage(faces[l.id], "JPEG", col.x + 3, fy, FACE, FACE);
+          doc.setDrawColor(HC_LINE); doc.setLineWidth(0.2); doc.circle(col.x + 3 + FACE/2, fy + FACE/2, FACE/2, "S");
+          font("normal", 9.8, "#000000"); txt(l.name, col.x + 3 + FACE + 2.5, it.y + RH/2 + 1.3);
+          font("normal", 8.6, HC_GREY); txt(l.hcTrade, col.x + colw - 3, it.y + RH/2 + 1.3, {align: "right"});
+        }
+        if (it.kind === "sep"){ doc.setDrawColor(HC_LINE); doc.setLineWidth(0.18); doc.line(col.x + 2, it.y + 1.2, col.x + colw - 2, it.y + 1.2); }
+      }
+    }
+    doc.setDrawColor(HC_LINE); doc.setLineWidth(0.2); doc.line(M, H - 16, W - M, H - 16);
+    font("normal", 8, HC_GREY);
+    txt(`New Bridge Form  |  From the site app attendance for ${dd}/${mm}/${yy}`, M, H - 11.5);
+    if (pages > 1) txt(`Page ${p} of ${pages}`, W - M, H - 11.5, {align: "right"});
+  }
+
+  const blob = doc.output("blob");
+  const blobUrl = URL.createObjectURL(blob);
+  let file = null;
+  try{ file = new File([blob], fileName, {type: "application/pdf"}); }catch(e){}
+  const dataUrl = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(blob); });
+  try{
+    const up = await server("saveHeadcountPdf", String(dataUrl).replace(/^data:[^,]*;base64,/, "data:application/pdf;base64,"), fileName);
+    return {url: up.url, name: up.name, blobUrl, file};
+  }catch(e){
+    const msg = errText(e, "");
+    return {url: "", name: fileName, blobUrl, file,
+      note: /Unknown action/i.test(msg) ? "Saved on this device only. Add Extras.gs to the Apps Script to get a share link." : "Saved on this device only, so there's no share link. Download it and send it from your Downloads."};
+  }
+}
+$("view").addEventListener("click", async ev => {
+  if (!ev.target.closest("[data-sharefile]")) return;
+  const o = S.pdfOut;
+  if (!o || !o.file) return;
+  try{ await navigator.share({files: [o.file], title: o.name}); }catch(e){}
+});
+
 // ================= attendance =================
 const A = S.att;
 const ticked = (id, d) => !!(A.ticks[id] && A.ticks[id][d]);
@@ -843,7 +1034,7 @@ function attendanceHtml(){
     <div class="seg"><button class="arrow" data-week="-1" aria-label="Previous week">‹</button><span>${nice(A.week)} – ${nice(end)}</span><button class="arrow" data-week="1" aria-label="Next week">›</button></div>
     <div class="seg">${DAY_LABEL.map((d,i) => `<button data-day="${i}" aria-pressed="${!weekMode && A.day===i}">${d}</button>`).join("")}<button data-day="week" aria-pressed="${weekMode}">Week</button></div>
     ${S.edit ? `<button class="btn ghost" data-edit>${A.edit ? "Done" : "Edit lads"}</button>` : ""}
-    ${pdfBtn("attendance", "Save week as PDF")}
+    ${pdfBtn("attendance", `Save ${DAY_LABEL[A.day]} headcount as PDF`)}
   </div>
   ${modeBar()}
   ${pdfResult("attendance")}
@@ -926,12 +1117,17 @@ $("view").addEventListener("submit", async ev => {
   const msg = $("addMsg");
   if (!name){ msg.textContent = "Type the lad's name."; return; }
   if (!agency){ msg.textContent = "Type the new agency's name."; return; }
-  if (S.lads.some(l => l.id === slug(name))){ msg.textContent = name + " is already on the list."; return; }
+  if (S.lads.some(l => l.id === slug(name) && l.agency !== "No agency")){ msg.textContent = name + " is already on the list."; return; }
   const file = $("addPhoto").files && $("addPhoto").files[0];
   $("addSave").disabled = true; msg.textContent = "Adding…";
   try{
     const photo = file ? await shrinkImage(file, 320, true) : "";
-    setLadData(await server("addLad", name, agency, $("addTrade").value));
+    const trade = $("addTrade").value;
+    // addLadPlus (Extras.gs) puts a new agency on the Settings tab first; older scripts only have addLad
+    setLadData(await server("addLadPlus", name, agency, trade).catch(e => {
+      if (/Unknown action/i.test(errText(e, ""))) return server("addLad", name, agency, trade);
+      throw e;
+    }));
     if (photo){ S.ladPhotos = {...S.ladPhotos, [slug(name)]: photo}; await server("savePhoto", name, photo); }
     render();
     $("addMsg").textContent = name + " added.";
