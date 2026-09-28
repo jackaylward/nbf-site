@@ -295,6 +295,19 @@ input[readonly],textarea[readonly]{background:var(--soft);color:var(--muted);cur
 .modal{position:fixed;inset:0;background:rgba(0,0,0,.5);display:grid;place-items:center;z-index:20;padding:16px}
 .modal .box{background:#fff;border-radius:16px;padding:22px;max-width:440px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.3)}
 .modal p{margin:0 0 16px;font-size:1.02rem}
+.modal .box.wide{max-width:520px;max-height:calc(100vh - 32px);overflow:auto}
+.modal .box .field{margin-top:12px}
+.modal .box .msg{margin:10px 0 0}
+.mhead{font-size:1.35rem;text-transform:uppercase;letter-spacing:.05em;margin:0 0 6px}
+.profhead{display:flex;align-items:center;gap:14px;margin:6px 0 4px}
+.av.big{flex:0 0 76px;height:76px;font-size:1.5rem;cursor:default}
+.aglist{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:12px}
+.agrow{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line)}
+.agrow .btn{padding:8px 11px;font-size:.9rem;flex:0 0 auto}
+.agrow:last-child{border-bottom:0}
+.agrow .who{min-width:0}
+.agdot{width:12px;height:12px;border-radius:3px;flex:0 0 auto}
+.agadd{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
 @media (prefers-reduced-motion: reduce){*{transition:none!important}}
 /* pours */
 .pourwrap{display:grid;gap:14px}
@@ -532,17 +545,30 @@ function setLadData(d){
   const b = buildLads(d);
   S.lads = b.lads; S.agencies = b.agencies;
 }
+const AG_PALETTE = ["#012060","#1F6FB2","#2E7D4F","#7B3FA0","#B03A5B","#2F6F7A","#9A6700","#4B5563","#9C2F6B","#2F5D8A"];
+const agSlot = a => (S.agencyList || []).findIndex(x => x.toLowerCase() === String(a).toLowerCase());
+function agColor(a){
+  if (!a || a === "No agency") return "#5F6B7A";
+  if (AG_COLORS[a]) return AG_COLORS[a];
+  const s = agSlot(a);
+  return s >= 0 ? AG_PALETTE[s % AG_PALETTE.length] : "#5F6B7A";
+}
+// the agencies to pick from: the Settings list, plus any a lad is still on
+function agencyOptions(){
+  const base = (S.agencyList && S.agencyList.length) ? S.agencyList : AG_ORDER;
+  return [...new Set([...base, ...S.agencies.map(a => a[0])])].filter(a => a && a !== "No agency");
+}
 function buildLads(d){
   const seen = new Set();
   const lads = (d.lads || []).map((l, i) => {
     const code = String(l.trade||"").trim();
     return {id: slug(l.name), name: l.name, code, trade: TRADE_LABEL[code] || code, rank: code in TRADE_RANK ? TRADE_RANK[code] : 99,
-      agency: l.agency || "No agency", color: AG_COLORS[l.agency] || "#5F6B7A",
+      agency: l.agency || "No agency", color: agColor(l.agency || "No agency"),
       hours: (l.hours || []).slice(0,6), notes: l.notes || "", order: i};
   }).filter(l => l.name && !seen.has(l.id) && seen.add(l.id));
-  const rank = a => { const i = AG_ORDER.indexOf(a); return i < 0 ? 50 : i; };
+  const rank = a => { const s = agSlot(a); if (s >= 0) return s; const i = AG_ORDER.indexOf(a); return i < 0 ? 500 : 100 + i; };
   lads.sort((x,y) => rank(x.agency)-rank(y.agency) || x.agency.localeCompare(y.agency) || x.rank-y.rank || x.order-y.order);
-  return {lads, agencies: [...new Set(lads.map(l => l.agency))].map(a => [a, AG_COLORS[a] || "#5F6B7A"])};
+  return {lads, agencies: [...new Set(lads.map(l => l.agency))].map(a => [a, agColor(a)])};
 }
 function applyBrand(b){
   S.brand = b || S.brand;
@@ -1006,6 +1032,159 @@ $("view").addEventListener("click", async ev => {
   try{ await navigator.share({files: [o.file], title: o.name}); }catch(e){}
 });
 
+// ================= edit lads and agencies (server side is LadEdit.gs) =================
+const needScript = e => /Unknown action/i.test(errText(e, "")) ? new Error("Add the latest LadEdit.gs and Extras.gs to the Apps Script first.") : e;
+function agenciesHtml(){
+  const rows = agencyOptions().map(a => {
+    const n = S.lads.filter(l => l.agency === a).length;
+    return `<div class="agrow"><span class="agdot" style="background:${agColor(a)}"></span><div class="who"><strong>${esc(a)}</strong><em>${n} lad${n === 1 ? "" : "s"}</em></div>
+      <button class="btn ghost" data-agrename="${esc(a)}">Rename</button><button class="btn danger" data-agdelete="${esc(a)}">Delete</button></div>`;
+  }).join("");
+  const none = S.lads.filter(l => l.agency === "No agency").length;
+  return `<div class="panel" id="agPanel"><h2>Agencies</h2>
+    ${none ? `<p class="msg" style="margin:0 0 10px;color:var(--warn)">${none} lad${none === 1 ? " has" : "s have"} no agency. Tap Edit beside ${none === 1 ? "him" : "them"} to pick one.</p>` : ""}
+    <div class="aglist">${rows}</div>
+    <form class="agadd" id="agAddForm"><label class="field" style="flex:1">New agency<input id="agNewName" autocomplete="off" placeholder="Agency name"></label><button class="btn" id="agAddBtn">Add agency</button></form>
+    <p class="msg">Renaming to an agency that already exists moves its lads into that one. An agency can only be deleted once it has no lads.</p>
+  </div>`;
+}
+function openModal(html){
+  const m = document.createElement("div");
+  m.className = "modal";
+  m.innerHTML = `<div class="box" role="dialog" aria-modal="true">${html}</div>`;
+  document.body.appendChild(m);
+  return m;
+}
+function tell(message){
+  return new Promise(resolve => {
+    const m = openModal(`<p>${esc(message)}</p><div class="row-actions"><button class="btn" data-a="ok">OK</button></div>`);
+    m.onclick = ev => { if (ev.target.dataset.a || ev.target === m){ m.remove(); resolve(); } };
+    m.querySelector("[data-a=ok]").focus();
+  });
+}
+function askText(title, label, value, okLabel){
+  return new Promise(resolve => {
+    const m = openModal(`<form><h2 class="mhead">${esc(title)}</h2><label class="field">${esc(label)}<input id="askTextBox" autocomplete="off" value="${esc(value || "")}"></label>
+      <div class="row-actions" style="margin-top:16px"><button class="btn">${esc(okLabel)}</button><button type="button" class="btn ghost" data-a="no">Cancel</button></div></form>`);
+    const box = m.querySelector("#askTextBox");
+    m.onclick = ev => { if (ev.target.dataset.a === "no" || ev.target === m){ m.remove(); resolve(null); } };
+    m.querySelector("form").onsubmit = ev => { ev.preventDefault(); const v = box.value.trim().replace(/\s+/g, " "); m.remove(); resolve(v || null); };
+    box.focus(); box.select();
+  });
+}
+// his profile: name, agency, trade and photo
+async function editLad(lad){
+  let newPhoto = "";
+  const ags = agencyOptions();
+  const cur = lad.agency === "No agency" ? "" : lad.agency;
+  const m = openModal(`<form id="ladForm"><h2 class="mhead">Edit lad</h2>
+    <div class="profhead"><div class="av big" style="--c:${agColor(lad.agency)}" id="profPic">${ladPhoto(lad) ? `<img src="${ladPhoto(lad)}" alt="">` : esc(initials(lad.name))}</div>
+      <button type="button" class="btn ghost" data-a="photo">Change photo</button></div>
+    <label class="field">Name<input id="ladName" autocomplete="off" value="${esc(lad.name)}"></label>
+    <label class="field">Agency<select id="ladAgency">${cur ? "" : `<option value="" selected>Pick an agency…</option>`}${ags.map(a => `<option${a === cur ? " selected" : ""}>${esc(a)}</option>`).join("")}<option value="__new">New agency…</option></select></label>
+    <label class="field" id="ladNewAgWrap" hidden>New agency name<input id="ladNewAg" autocomplete="off"></label>
+    <label class="field">Trade<select id="ladTrade">${lad.code && !TRADE_LABEL[lad.code] ? `<option value="${esc(lad.code)}" selected>${esc(lad.code)}</option>` : ""}${!lad.code ? `<option value="" selected>No trade set</option>` : ""}${TRADES.map(([c, l]) => `<option value="${esc(c)}"${c === lad.code ? " selected" : ""}>${esc(l)}</option>`).join("")}</select></label>
+    <p class="msg" id="ladMsg"></p>
+    <div class="row-actions" style="margin-top:14px"><button class="btn" id="ladSave">Save</button><button type="button" class="btn ghost" data-a="no">Cancel</button>
+      <button type="button" class="btn danger" data-a="remove" style="margin-left:auto">Remove lad</button></div></form>`);
+  m.querySelector(".box").classList.add("wide");
+  const close = () => m.remove();
+  m.querySelector("#ladAgency").onchange = ev => { m.querySelector("#ladNewAgWrap").hidden = ev.target.value !== "__new"; };
+  m.onclick = async ev => {
+    const a = ev.target.closest("[data-a]") ? ev.target.closest("[data-a]").dataset.a : "";
+    if (a === "no" || ev.target === m) close();
+    if (a === "photo"){
+      const file = await pickImage();
+      if (!file) return;
+      try{ newPhoto = await shrinkImage(file, 320, true); m.querySelector("#profPic").innerHTML = `<img src="${newPhoto}" alt="">`; }
+      catch(e){ m.querySelector("#ladMsg").textContent = "Couldn't use that photo."; }
+    }
+    if (a === "remove"){ close(); removeLadFlow(lad); }
+  };
+  m.querySelector("#ladForm").onsubmit = async ev => {
+    ev.preventDefault();
+    const msg = m.querySelector("#ladMsg");
+    const name = m.querySelector("#ladName").value.trim().replace(/\s+/g, " ");
+    let agency = m.querySelector("#ladAgency").value;
+    if (agency === "__new") agency = m.querySelector("#ladNewAg").value.trim().replace(/\s+/g, " ");
+    const trade = m.querySelector("#ladTrade").value;
+    if (!name){ msg.textContent = "Type his name."; return; }
+    if (!agency){ msg.textContent = m.querySelector("#ladAgency").value === "__new" ? "Type the new agency's name." : "Pick an agency."; return; }
+    if (slug(name) !== lad.id && S.lads.some(l => l.id === slug(name))){ msg.textContent = name + " is already on the list."; return; }
+    const changes = {};
+    if (name !== lad.name) changes.name = name;
+    if (agency !== cur) changes.agency = agency;
+    if (trade !== lad.code) changes.trade = trade;
+    if (!Object.keys(changes).length && !newPhoto){ close(); return; }
+    m.querySelector("#ladSave").disabled = true; msg.textContent = "Saving…";
+    try{
+      if (Object.keys(changes).length){
+        const d = await server("updateLad", lad.name, changes).catch(e => { throw needScript(e); });
+        const newId = slug(name);
+        if (newId !== lad.id){
+          // carry his photo and ticks across to his new name on this phone too
+          if (S.ladPhotos[lad.id]){ S.ladPhotos = {...S.ladPhotos, [newId]: S.ladPhotos[lad.id]}; delete S.ladPhotos[lad.id]; cacheSet("ladPhotos", S.ladPhotos); }
+          if (A.ticks[lad.id]){ A.ticks = {...A.ticks, [newId]: A.ticks[lad.id]}; delete A.ticks[lad.id]; cacheSet("week:" + iso(A.week), A.ticks); }
+        }
+        setLadData(d);
+      }
+      if (newPhoto){ S.ladPhotos = {...S.ladPhotos, [slug(name)]: newPhoto}; cacheSet("ladPhotos", S.ladPhotos); await server("savePhoto", name, newPhoto); }
+      close(); render(); setStatus(`${name} saved`, true);
+    }catch(e){
+      msg.textContent = errText(e, "Couldn't save. Check your signal and try again.");
+      m.querySelector("#ladSave").disabled = false;
+    }
+  };
+  m.querySelector("#ladName").focus();
+}
+async function removeLadFlow(lad){
+  const ok = await ask(`Remove ${lad.name}? They'll come off the attendance list and the timesheet, and their hours and photo will be deleted. Past attendance is kept.`, "Remove", true);
+  if (!ok) return;
+  setStatus("Removing…");
+  try{ setLadData(await server("removeLad", lad.name)); render(); setStatus(`${lad.name} removed`, true); }
+  catch(err){ setStatus(errText(err, "Couldn't remove him. Try again")); }
+}
+$("view").addEventListener("click", async ev => {
+  if (S.view !== "attendance") return;
+  const e = ev.target.closest("[data-editlad]"), rn = ev.target.closest("[data-agrename]"), del = ev.target.closest("[data-agdelete]");
+  if (!e && !rn && !del) return;
+  if (!(await canEdit())) return;
+  if (e){ const lad = S.lads.find(l => l.id === e.dataset.editlad); if (lad) editLad(lad); return; }
+  if (rn){
+    const old = rn.dataset.agrename;
+    const name = await askText(`Rename ${old}`, "New name", old, "Rename");
+    if (!name || name === old) return;
+    const into = agencyOptions().find(a => a !== old && a.toLowerCase() === name.toLowerCase());
+    if (into){
+      const n = S.lads.filter(l => l.agency === old).length;
+      if (!(await ask(`${into} already exists. Move ${n === 1 ? "its 1 lad" : `all ${n} lads`} from ${old} into ${into} and remove ${old}?`, "Move them"))) return;
+    }
+    setStatus("Saving…");
+    try{ setLadData(await server("renameAgency", old, name).catch(x => { throw needScript(x); })); render(); setStatus(into ? `Moved into ${into}` : `Renamed to ${name}`, true); }
+    catch(x){ setStatus(""); tell(errText(x, "Couldn't rename it. Try again.")); }
+    return;
+  }
+  if (del){
+    const name = del.dataset.agdelete;
+    const n = S.lads.filter(l => l.agency === name).length;
+    if (n) return tell(`${name} still has ${n} lad${n === 1 ? "" : "s"}. Tap Edit beside each one to move them to another agency, or rename ${name} to another agency's name to move them all at once. Then delete it.`);
+    if (!(await ask(`Delete ${name}?`, "Delete", true))) return;
+    setStatus("Deleting…");
+    try{ setLadData(await server("deleteAgency", name).catch(x => { throw needScript(x); })); render(); setStatus(`${name} deleted`, true); }
+    catch(x){ setStatus(""); tell(errText(x, "Couldn't delete it. Try again.")); }
+  }
+});
+$("view").addEventListener("submit", async ev => {
+  if (ev.target.id !== "agAddForm") return;
+  ev.preventDefault();
+  const name = $("agNewName").value.trim().replace(/\s+/g, " ");
+  if (!name) return;
+  if (agencyOptions().some(a => a.toLowerCase() === name.toLowerCase())) return tell(name + " is already on the list.");
+  $("agAddBtn").disabled = true; setStatus("Adding…");
+  try{ setLadData(await server("addAgency", name).catch(x => { throw needScript(x); })); render(); setStatus(`${name} added`, true); }
+  catch(x){ setStatus(""); $("agAddBtn").disabled = false; tell(errText(x, "Couldn't add it. Try again.")); }
+});
+
 // ================= attendance =================
 const A = S.att;
 const ticked = (id, d) => !!(A.ticks[id] && A.ticks[id][d]);
@@ -1021,7 +1200,7 @@ function attendanceHtml(){
     count += inN;
     const rows = lads.map(l => {
       let right;
-      if (A.edit) right = `<button class="btn danger rm" data-remove="${esc(l.id)}">Remove</button>`;
+      if (A.edit) right = `<button class="btn ghost rm" data-editlad="${esc(l.id)}">Edit</button>`;
       else if (weekMode) right = `<div class="weekrow">${DAYS.map((d,i) => `<button class="tick${A.ready ? "" : " wait"}${S.edit ? "" : " locked"}" data-tick="${esc(l.id)}|${d}" aria-pressed="${ticked(l.id,d)}" aria-label="${esc(l.name)} ${DAY_LABEL[i]}">${TICK_SVG}</button>`).join("")}</div>`;
       else right = `<button class="tick${A.ready ? "" : " wait"}${S.edit ? "" : " locked"}" data-tick="${esc(l.id)}|${dayKey}" aria-pressed="${ticked(l.id,dayKey)}" aria-label="${esc(l.name)} ${DAY_LABEL[A.day]}">${TICK_SVG}</button>`;
       return `<div class="lad">${avatar(l)}<div class="who"><strong>${esc(l.name)}</strong><em>${esc(l.trade) || "&nbsp;"}</em></div>${right}</div>`;
@@ -1039,12 +1218,12 @@ function attendanceHtml(){
   ${modeBar()}
   ${pdfResult("attendance")}
   <div class="count"><b>${A.ready ? count : '<span class="spin" style="width:30px;height:30px"></span>'}</b><span class="muted">of ${S.lads.length} lads ${weekMode ? "in at least one day this week" : "in on " + DAY_LABEL[A.day]}</span></div>
-  <p class="muted small" style="margin:-6px 2px 12px">Tap a photo circle to add or change that lad's photo.</p>
+  <p class="muted small" style="margin:-6px 2px 12px">${A.edit ? "Tap Edit to change a lad's name, agency, trade or photo. Agencies are at the bottom." : "Tap a photo circle to add or change that lad's photo."}</p>
   ${groups}
-  ${A.edit ? addLadHtml() : ""}`;
+  ${A.edit ? agenciesHtml() + addLadHtml() : ""}`;
 }
 function addLadHtml(){
-  const ags = [...new Set([...S.agencyList, ...AG_ORDER, ...S.agencies.map(a=>a[0])])].filter(a => a && a !== "No agency");
+  const ags = agencyOptions();
   return `<form class="panel" id="addForm"><h2>Add a lad</h2>
     <div class="formgrid">
       <label class="field">Name<input id="addName" autocomplete="off"></label>
@@ -1097,12 +1276,7 @@ $("view").addEventListener("click", async ev => {
   if (r){
     if (!(await canEdit())) return;
     const lad = S.lads.find(l => l.id === r.dataset.remove);
-    if (!lad) return;
-    const ok = await ask(`Remove ${lad.name}? They'll come off the attendance list and the timesheet, and their hours and photo will be deleted. Past attendance is kept.`, "Remove", true);
-    if (!ok) return;
-    setStatus("Removing…");
-    try{ setLadData(await server("removeLad", lad.name)); render(); setStatus(`${lad.name} removed`, true); }
-    catch(err){ setStatus(errText(err, "Couldn't remove him. Try again")); }
+    if (lad) removeLadFlow(lad);
   }
 });
 $("view").addEventListener("change", ev => {
