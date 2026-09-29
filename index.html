@@ -2876,14 +2876,13 @@ async function pourSheet(btn, size, print){
     for (const [n, x] of Object.entries(PLAN.gx)){ doc.circle(px(x), py(Y0 + 800), mm(2.4), "S"); doc.text(n, px(x), py(Y0 + 800) + mm(0.9), {align: "center"}); }
     for (const [n, y] of Object.entries(PLAN.gy)){ doc.circle(px(X0 + 800), py(y), mm(2.4), "S"); doc.text(n, px(X0 + 800), py(y) + mm(0.9), {align: "center"}); }
     // walls
-    const FILL = {"": [150, 150, 150], today: [190, 80, 0], poured: NAVY};
-    const rect = (e, c) => { doc.setFillColor(...(Array.isArray(c) ? c : [c, c, c])); doc.rect(px(e.x), py(e.y + e.d), Math.max(e.w * k * u, mm(0.3)), Math.max(e.d * k * u, mm(0.3)), "F"); };
+    const FILL = {"": [150, 150, 150], today: [40, 180, 70], poured: [255, 224, 0]};
+    const rect = (e, c, hl) => { doc.setFillColor(...(Array.isArray(c) ? c : [c, c, c]));
+      const w = Math.max(e.w * k * u, hl ? mm(1.3) : mm(0.3)), h = Math.max(e.d * k * u, hl ? mm(1.3) : mm(0.3));
+      const cx = px(e.x) + e.w * k * u / 2, cy = py(e.y + e.d) + e.d * k * u / 2, x = hl && e.w < e.d ? cx - w / 2 : px(e.x), y = hl && e.d <= e.w ? cy - h / 2 : py(e.y + e.d);
+      if (hl){ doc.setDrawColor(70, 70, 70); doc.setLineWidth(mm(0.12)); doc.rect(x, y, w, h, "FD"); } else doc.rect(x, y, w, h, "F"); };
     for (const e of (PLAN.stubs || [])) rect(e, 200);
-    // highlighter halo behind poured walls so they stand out even on a black and white print
-    const HALO = {poured: [255, 226, 0], today: [255, 150, 0]}, pad = mm(1.5);
-    for (const e of PLAN.els){ const st = pourState(P[e.i]); if (!st) continue;
-      doc.setFillColor(...HALO[st]); doc.rect(px(e.x) - pad, py(e.y + e.d) - pad, Math.max(e.w * k * u, mm(0.3)) + 2 * pad, Math.max(e.d * k * u, mm(0.3)) + 2 * pad, "F"); }
-    for (const e of PLAN.els) rect(e, FILL[pourState(P[e.i])]);
+    for (const e of PLAN.els){ const st = pourState(P[e.i]); rect(e, FILL[st], !!st); }
     // tags with date and concrete
     const th = 3.4, off = 3.2 / k;
     for (const T of (PLAN.labels || [])){
@@ -2901,7 +2900,7 @@ async function pourSheet(btn, size, print){
         doc.setFont("helvetica", "normal"); doc.setFontSize(fs(5.2));
         const lw = doc.getTextWidth(line) + mm(1.4), ly = cy + h/2 + mm(2.3);
         doc.setFillColor(255); doc.rect(cx - lw/2, ly - mm(1.8), lw, mm(2.4), "F");
-        doc.setTextColor(...(st === "today" ? [180, 100, 0] : NAVY)); doc.text(line, cx, ly, {align: "center"});
+        doc.setTextColor(...(st === "today" ? [20, 120, 45] : NAVY)); doc.text(line, cx, ly, {align: "center"});
       }
     }
     // band: key, totals, table, not poured
@@ -2909,9 +2908,7 @@ async function pourSheet(btn, size, print){
     let tot = 0, anyEst = false; rows.forEach(id => { const v = pourVol(id, P[id]); if (v){ tot += v.v; anyEst = anyEst || v.est; } });
     let y = bandTop + 4; doc.setDrawColor(...NAVY); doc.setLineWidth(mm(0.4)); doc.line(mm(M), mm(bandTop), mm(W - M), mm(bandTop));
     doc.setFont("helvetica", "normal"); doc.setFontSize(fs(9)); let kx = M;
-    [["Poured", FILL.poured], ["Being poured today", FILL.today], ["Not poured", FILL[""]]].forEach(([l, c]) => { const h = l === "Poured" ? HALO.poured : l === "Being poured today" ? HALO.today : null;
-      if (h){ doc.setFillColor(...h); doc.rect(mm(kx), mm(y - 3.4), mm(6), mm(4.6), "F"); }
-      doc.setFillColor(...c); doc.rect(mm(kx), mm(y - 2.6), mm(6), mm(3), "F"); doc.setTextColor(40); doc.text(l, mm(kx + 8), mm(y)); kx += 12 + doc.getTextWidth(l) / u + 6; });
+    [["Poured", FILL.poured], ["Being poured today", FILL.today], ["Not poured", FILL[""]]].forEach(([l, c]) => { doc.setFillColor(...c); doc.setDrawColor(70, 70, 70); doc.setLineWidth(mm(0.12)); doc.rect(mm(kx), mm(y - 2.6), mm(6), mm(3), l === "Not poured" ? "F" : "FD"); doc.setTextColor(40); doc.text(l, mm(kx + 8), mm(y)); kx += 12 + doc.getTextWidth(l) / u + 6; });
     doc.setFont("helvetica", "bold"); doc.setTextColor(...NAVY); doc.setFontSize(fs(11));
     doc.text(`${poured.length} of ${ids.length} poured${tdy.length ? `, ${tdy.length} today` : ""}   |   Concrete so far: ${m3(tot)} m3`, mm(W - M), mm(y), {align: "right"});
     y += 5;
