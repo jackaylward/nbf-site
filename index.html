@@ -2840,7 +2840,7 @@ async function pourSheet(btn, size, print){
     const all = [...PLAN.els, ...(PLAN.stubs || [])], xs = all.flatMap(e => [e.x, e.x + e.w]), ys = all.flatMap(e => [e.y, e.y + e.d]);
     const X0 = Math.min(...xs) - 3500, X1 = Math.max(...xs) + 2500, Y0 = Math.min(...ys) - 3000, Y1 = Math.max(...ys) + 2500;
     // work in A3-portrait style units (WU wide) and scale everything by u
-    const M = 12, HEAD = 32;
+    const M = 12, HEAD = 42;
     const layout = (WU, HU) => {
       const B = Math.max(3, Math.floor((WU - 2 * M) / 54)), per = Math.max(1, Math.ceil(rows.length / B));
       const band = 24 + per * 3.7 + Math.ceil(left.length / 22) * 3.3 + 12;
@@ -2866,7 +2866,7 @@ async function pourSheet(btn, size, print){
     const stamp = `${today.toLocaleDateString("en-GB", {weekday: "short", day: "2-digit", month: "long", year: "numeric"})}, ${today.toLocaleTimeString("en-GB", {hour: "2-digit", minute: "2-digit"})}`;
     doc.setFont("helvetica", "bold"); doc.setFontSize(fs(11)); doc.setTextColor(...NAVY);
     doc.text(`Printed ${stamp}`, mm(W - M), mm(M + 24), {align: "right"});
-    doc.setDrawColor(...NAVY); doc.setLineWidth(mm(0.6)); doc.line(mm(M), mm(HEAD - 1), mm(W - M), mm(HEAD - 1));
+    doc.setDrawColor(...NAVY); doc.setLineWidth(mm(0.6)); doc.line(mm(M), mm(HEAD - 2), mm(W - M), mm(HEAD - 2));
     // grid
     doc.setLineWidth(mm(0.15)); doc.setDrawColor(185, 192, 205); doc.setLineDashPattern([mm(2), mm(1.2)], 0);
     doc.setFontSize(fs(7)); doc.setTextColor(...NAVY);
