@@ -3234,7 +3234,7 @@ const CAB_SEED = [
   ["2026-09-28","1","Glasses","Razvan",""],
   ["2026-09-28","1","Concrete gloves","Razvan",""],
   ["2026-09-29","1","Hi-vis vest","Marian Petre",""],
-  ["2026-09-29","1","Hi-vis vest (RETURNED)","Razvan (given back to Jack, into cabinet)","Returned"],
+  null,
   ["2026-09-24","2","Gloves","David, Calvin",""]
 ];
 async function cabSeedOnce(){
@@ -3243,6 +3243,7 @@ async function cabSeedOnce(){
     const have = new Set((S.cab.list || []).map(r => r.id));
     const pend = (await kvGet("cabPending")) || {};
     CAB_SEED.forEach((r, i) => {
+      if (!r) return;
       const id = "cb-notes-" + String(i + 1).padStart(2, "0");
       if (!have.has(id)) pend[id] = {rec: {id, date: r[0], qty: r[1], item: r[2], to: r[3], note: r[4], by: "Jack"}};
     });
