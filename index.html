@@ -2514,7 +2514,8 @@ function poursHtml(){
   <div class="plankey"><span class="pourcount">${counts.poured} of ${PLAN_IDS.length} poured</span>
     ${chip("poured", "Poured")} ${chip("today", "Today")} ${chip("", "Not poured")}
     <select aria-label="Paper size" onchange="S.pourSize=this.value" style="padding:6px 8px;font-size:.85rem;border:1px solid var(--line);border-radius:10px;background:var(--card)">${[["a3","A3"],["a2","A2"],["a1","A1"],["a4","A3 plan + A4 list"]].map(([v, l]) => `<option value="${v}"${(S.pourSize || "a3") === v ? " selected" : ""}>${l}</option>`).join("")}</select>
-    <button class="btn" data-ppdf style="padding:6px 14px;font-size:.85rem">Download plan PDF</button></div>
+    <button class="btn" data-ppdf style="padding:6px 14px;font-size:.85rem">Download plan PDF</button>
+    <button class="btn ghost" data-ppdf data-pprint style="padding:6px 14px;font-size:.85rem">Print</button></div>
   <div class="pourwrap">
     <div class="plancard">${planSvg()}
       <div class="plantools"><button data-pzoom="1.6" aria-label="Zoom in">+</button><button data-pzoom="0.625" aria-label="Zoom out">−</button><button data-pzoom="fit" aria-label="Fit whole floor" style="font-size:.7rem">FIT</button></div>
@@ -2702,7 +2703,7 @@ function navyLogo(){
 const dmy = s => { const d = fromIso(s); return d ? d.toLocaleDateString("en-GB", {day:"2-digit", month:"2-digit", year:"2-digit"}) : ""; };
 async function pourPdf(btn){
   const sz = S.pourSize || "a3";
-  if (sz !== "a4") return pourSheet(btn, sz);
+  if (sz !== "a4") return pourSheet(btn, sz, btn && btn.hasAttribute("data-pprint"));
   if (btn){ btn.disabled = true; btn.textContent = "Making PDF…"; }
   try{
     const [jsPDF, logo] = await Promise.all([loadJsPdf(), navyLogo()]);
@@ -2825,7 +2826,7 @@ async function pourPdf(btn){
   }catch(e){ setStatus(errText(e, "Couldn't make the PDF")); }
   if (btn){ btn.disabled = false; btn.textContent = "Download plan PDF"; }
 }
-async function pourSheet(btn, size){
+async function pourSheet(btn, size, print){
   const label = btn ? btn.textContent : "";
   if (btn){ btn.disabled = true; btn.textContent = "Making PDF…"; }
   try{
@@ -2930,10 +2931,26 @@ async function pourSheet(btn, size){
     doc.setFontSize(fs(6.5)); doc.setTextColor(110);
     doc.text(`Tags show wall number, pour date and concrete. * = estimated from the drawing size and pour height (door openings left out); others are docket figures. A letter after a number (32b) is a separate section of the same wall. Plan is not to scale, use the OCSC drawings to set out. Printed ${stamp}.`, mm(M), mm(y + 2.5));
     const name = `Pour record ${size.toUpperCase()} ${today.toISOString().slice(0, 10)}.pdf`;
-    const blob = doc.output("blob"), url = URL.createObjectURL(blob), a = document.createElement("a");
-    a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 30000);
-    setStatus("Pour PDF ready", true);
+    const blob = doc.output("blob"), url = URL.createObjectURL(blob);
+    if (print){
+      // print dialog, like any document. If the browser won't print from inside the page, open the PDF so its own print button works
+      let done = false;
+      try{
+        const f = document.createElement("iframe");
+        f.style.cssText = "position:fixed;right:0;bottom:0;width:1px;height:1px;border:0;opacity:0";
+        f.src = url; document.body.appendChild(f);
+        await new Promise(res => { f.onload = res; setTimeout(res, 4000); });
+        f.contentWindow.focus(); f.contentWindow.print(); done = true;
+        setTimeout(() => { f.remove(); URL.revokeObjectURL(url); }, 120000);
+      }catch(e){}
+      if (!done){ window.open(url, "_blank"); setTimeout(() => URL.revokeObjectURL(url), 120000); }
+      setStatus("Print ready", true);
+    } else {
+      const a = document.createElement("a");
+      a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 30000);
+      setStatus("Pour PDF ready", true);
+    }
   }catch(e){ setStatus(errText(e, "Couldn't make the PDF")); }
   if (btn){ btn.disabled = false; btn.textContent = label; }
 }
