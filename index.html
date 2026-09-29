@@ -2513,6 +2513,7 @@ function poursHtml(){
   return `${modeBar()}${orphanNote}
   <div class="plankey"><span class="pourcount">${counts.poured} of ${PLAN_IDS.length} poured</span>
     ${chip("poured", "Poured")} ${chip("today", "Today")} ${chip("", "Not poured")}
+    <select aria-label="Paper size" onchange="S.pourSize=this.value" style="padding:6px 8px;font-size:.85rem;border:1px solid var(--line);border-radius:10px;background:var(--card)">${[["a3","A3"],["a2","A2"],["a1","A1"],["a4","A3 plan + A4 list"]].map(([v, l]) => `<option value="${v}"${(S.pourSize || "a3") === v ? " selected" : ""}>${l}</option>`).join("")}</select>
     <button class="btn" data-ppdf style="padding:6px 14px;font-size:.85rem">Download plan PDF</button></div>
   <div class="pourwrap">
     <div class="plancard">${planSvg()}
@@ -2700,6 +2701,8 @@ function navyLogo(){
 }
 const dmy = s => { const d = fromIso(s); return d ? d.toLocaleDateString("en-GB", {day:"2-digit", month:"2-digit", year:"2-digit"}) : ""; };
 async function pourPdf(btn){
+  const sz = S.pourSize || "a3";
+  if (sz !== "a4") return pourSheet(btn, sz);
   if (btn){ btn.disabled = true; btn.textContent = "Making PDF…"; }
   try{
     const [jsPDF, logo] = await Promise.all([loadJsPdf(), navyLogo()]);
@@ -2821,6 +2824,115 @@ async function pourPdf(btn){
     setStatus("Pour PDF ready", true);
   }catch(e){ setStatus(errText(e, "Couldn't make the PDF")); }
   if (btn){ btn.disabled = false; btn.textContent = "Download plan PDF"; }
+}
+async function pourSheet(btn, size){
+  const label = btn ? btn.textContent : "";
+  if (btn){ btn.disabled = true; btn.textContent = "Making PDF…"; }
+  try{
+    const [jsPDF, logo] = await Promise.all([loadJsPdf(), navyLogo()]);
+    const P = S.pours || {}, NAVY = [1, 32, 96], today = new Date();
+    const base = {a3: [297, 420], a2: [420, 594], a1: [594, 841]}[size] || [297, 420];
+    const ids = PLAN_IDS;
+    const rows = ids.filter(id => pourState(P[id])).sort((a, b) => (P[a].date || "").localeCompare(P[b].date || "") || parseInt(a.slice(1)) - parseInt(b.slice(1)));
+    const left = ids.filter(id => !pourState(P[id])).sort((a, b) => (a[0] === b[0] ? parseInt(a.slice(1)) - parseInt(b.slice(1)) : a[0] === "W" ? -1 : 1));
+    // plan extent
+    const all = [...PLAN.els, ...(PLAN.stubs || [])], xs = all.flatMap(e => [e.x, e.x + e.w]), ys = all.flatMap(e => [e.y, e.y + e.d]);
+    const X0 = Math.min(...xs) - 3500, X1 = Math.max(...xs) + 2500, Y0 = Math.min(...ys) - 3000, Y1 = Math.max(...ys) + 2500;
+    // work in A3-portrait style units (WU wide) and scale everything by u
+    const M = 12, HEAD = 26;
+    const layout = (WU, HU) => {
+      const B = Math.max(3, Math.floor((WU - 2 * M) / 54)), per = Math.max(1, Math.ceil(rows.length / B));
+      const band = 24 + per * 3.7 + Math.ceil(left.length / 22) * 3.3 + 12;
+      const bw = WU - 2 * M, bh = HU - HEAD - band - M;
+      return {WU, HU, B, per, band, k: Math.min(bw / (X1 - X0), bh / (Y1 - Y0))};
+    };
+    const A = layout(297, 420), Bl = layout(420, 297);
+    const L = Bl.k > A.k ? Bl : A, land = L === Bl;
+    const u = (land ? base[1] : base[0]) / L.WU, W = L.WU, H = L.HU;
+    const doc = new jsPDF({orientation: land ? "landscape" : "portrait", unit: "mm", format: land ? [base[1], base[0]] : base});
+    const fs = v => v * u, mm = v => v * u;
+    const bandTop = H - M - L.band;
+    const boxT = HEAD + 2, boxH = bandTop - boxT - 2, boxW = W - 2 * M, k = L.k;
+    const ox = M + (boxW - (X1 - X0) * k) / 2, oy = boxT + (boxH - (Y1 - Y0) * k) / 2;
+    const px = x => mm(ox + (x - X0) * k), py = y => mm(oy + (Y1 - y) * k);
+    // header
+    if (logo) doc.addImage(logo.url, "PNG", mm(M), mm(M), mm(60), mm(60 * logo.r));
+    doc.setTextColor(...NAVY); doc.setFont("helvetica", "bold"); doc.setFontSize(fs(20));
+    doc.text("Pour record", mm(W - M), mm(M + 7), {align: "right"});
+    doc.setFont("helvetica", "normal"); doc.setFontSize(fs(10)); doc.setTextColor(90);
+    doc.text("Boyne 1C, Patrician Secondary School, Newbridge. Ground floor Phase 01", mm(W - M), mm(M + 13), {align: "right"});
+    doc.text(`Printed ${today.toLocaleDateString("en-GB")}  |  Walls from OCSC SE-10211 / SE-10212 Rev 01`, mm(W - M), mm(M + 18), {align: "right"});
+    doc.setDrawColor(...NAVY); doc.setLineWidth(mm(0.6)); doc.line(mm(M), mm(HEAD - 1), mm(W - M), mm(HEAD - 1));
+    // grid
+    doc.setLineWidth(mm(0.15)); doc.setDrawColor(185, 192, 205); doc.setLineDashPattern([mm(2), mm(1.2)], 0);
+    doc.setFontSize(fs(7)); doc.setTextColor(...NAVY);
+    for (const x of Object.values(PLAN.gx)) doc.line(px(x), py(Y1 - 1200), px(x), py(Y0 + 1500));
+    for (const y of Object.values(PLAN.gy)) doc.line(px(X0 + 1500), py(y), px(X1 - 500), py(y));
+    doc.setLineDashPattern([], 0); doc.setDrawColor(...NAVY); doc.setLineWidth(mm(0.25));
+    for (const [n, x] of Object.entries(PLAN.gx)){ doc.circle(px(x), py(Y0 + 800), mm(2.4), "S"); doc.text(n, px(x), py(Y0 + 800) + mm(0.9), {align: "center"}); }
+    for (const [n, y] of Object.entries(PLAN.gy)){ doc.circle(px(X0 + 800), py(y), mm(2.4), "S"); doc.text(n, px(X0 + 800), py(y) + mm(0.9), {align: "center"}); }
+    // walls
+    const FILL = {"": [138, 138, 138], today: [245, 158, 11], poured: NAVY};
+    const rect = (e, c) => { doc.setFillColor(...(Array.isArray(c) ? c : [c, c, c])); doc.rect(px(e.x), py(e.y + e.d), Math.max(e.w * k * u, mm(0.3)), Math.max(e.d * k * u, mm(0.3)), "F"); };
+    for (const e of (PLAN.stubs || [])) rect(e, 200);
+    for (const e of PLAN.els) rect(e, FILL[pourState(P[e.i])]);
+    // tags with date and concrete
+    const th = 3.4, off = 3.2 / k;
+    for (const T of (PLAN.labels || [])){
+      const p = P[T.i], st = pourState(p), t = T.t || String(parseInt(T.i.slice(1), 10));
+      const cx = px(T.x + T.dx * off), cy = py(T.y + T.dy * off);
+      doc.setDrawColor(...NAVY); doc.setLineWidth(mm(0.2)); doc.line(px(T.x), py(T.y), cx, cy);
+      doc.setFont("helvetica", "bold"); doc.setFontSize(fs(7));
+      const tw = doc.getTextWidth(t) + mm(2.6), h = mm(th);
+      if (st === "poured"){ doc.setFillColor(255); doc.roundedRect(cx - tw/2, cy - h/2, tw, h, h/2, h/2, "FD"); doc.setTextColor(...NAVY); }
+      else { doc.setFillColor(...(st === "today" ? FILL.today : NAVY)); doc.roundedRect(cx - tw/2, cy - h/2, tw, h, h/2, h/2, "F"); doc.setTextColor(255); }
+      doc.text(t, cx, cy + mm(0.95), {align: "center"});
+      if (st){
+        const v = pourVol(T.i, p);
+        const line = `${dmy(p.date)}${v ? `  ${m3(v.v)} m3${v.est ? "*" : ""}` : ""}`;
+        doc.setFont("helvetica", "normal"); doc.setFontSize(fs(5.2));
+        const lw = doc.getTextWidth(line) + mm(1.4), ly = cy + h/2 + mm(2.3);
+        doc.setFillColor(255); doc.rect(cx - lw/2, ly - mm(1.8), lw, mm(2.4), "F");
+        doc.setTextColor(...(st === "today" ? [180, 100, 0] : NAVY)); doc.text(line, cx, ly, {align: "center"});
+      }
+    }
+    // band: key, totals, table, not poured
+    const poured = rows.filter(id => pourState(P[id]) === "poured"), tdy = rows.filter(id => pourState(P[id]) === "today");
+    let tot = 0, anyEst = false; rows.forEach(id => { const v = pourVol(id, P[id]); if (v){ tot += v.v; anyEst = anyEst || v.est; } });
+    let y = bandTop + 4; doc.setDrawColor(...NAVY); doc.setLineWidth(mm(0.4)); doc.line(mm(M), mm(bandTop), mm(W - M), mm(bandTop));
+    doc.setFont("helvetica", "normal"); doc.setFontSize(fs(9)); let kx = M;
+    [["Poured", FILL.poured], ["Being poured today", FILL.today], ["Not poured", FILL[""]]].forEach(([l, c]) => { doc.setFillColor(...c); doc.rect(mm(kx), mm(y - 2.6), mm(6), mm(3), "F"); doc.setTextColor(40); doc.text(l, mm(kx + 8), mm(y)); kx += 12 + doc.getTextWidth(l) / u + 6; });
+    doc.setFont("helvetica", "bold"); doc.setTextColor(...NAVY); doc.setFontSize(fs(11));
+    doc.text(`${poured.length} of ${ids.length} poured${tdy.length ? `, ${tdy.length} today` : ""}   |   Concrete so far: ${m3(tot)} m3`, mm(W - M), mm(y), {align: "right"});
+    y += 5;
+    // table blocks
+    const bw = (W - 2 * M) / L.B, rh = 3.7;
+    doc.setFillColor(...NAVY); doc.rect(mm(M), mm(y), mm(W - 2 * M), mm(4.6), "F");
+    doc.setFont("helvetica", "bold"); doc.setFontSize(fs(6.5)); doc.setTextColor(255);
+    for (let b = 0; b < L.B; b++){ const x = M + b * bw; doc.text("Wall", mm(x + 1.5), mm(y + 3.2)); doc.text("Poured", mm(x + 13), mm(y + 3.2)); doc.text("m3", mm(x + bw - 2), mm(y + 3.2), {align: "right"}); }
+    y += 4.6;
+    const y0 = y;
+    rows.forEach((id, i) => {
+      const b = Math.floor(i / L.per), r = i % L.per, x = M + b * bw, ry = y0 + r * rh, p = P[id], v = pourVol(id, p);
+      if (r % 2 === 0){ doc.setFillColor(220, 230, 242); doc.rect(mm(x), mm(ry), mm(bw), mm(rh), "F"); }
+      const nm = pourName(id).replace("Wall ", "").replace(" / ", "/") + (/[b-g]$/.test(id) && id[0] === "W" ? id.slice(-1) : "");
+      doc.setFont("helvetica", "bold"); doc.setFontSize(fs(6.6)); doc.setTextColor(...NAVY); doc.text(nm, mm(x + 1.5), mm(ry + 2.7));
+      doc.setFont("helvetica", "normal"); doc.setTextColor(30);
+      doc.text(dmy(p.date) + (pourState(p) === "today" ? " (today)" : ""), mm(x + 13), mm(ry + 2.7));
+      if (v) doc.text(m3(v.v) + (v.est ? "*" : ""), mm(x + bw - 2), mm(ry + 2.7), {align: "right"});
+    });
+    y = y0 + L.per * rh + 3;
+    doc.setFont("helvetica", "normal"); doc.setFontSize(fs(7)); doc.setTextColor(80);
+    if (left.length){ const txt = doc.splitTextToSize(`Not poured yet (${left.length}): ` + left.map(pourName).map(n => n.replace("Wall ", "")).join(", "), mm(W - 2 * M)); doc.text(txt, mm(M), mm(y + 1)); y += txt.length * 3.1 + 1; }
+    doc.setFontSize(fs(6.5)); doc.setTextColor(110);
+    doc.text(`Tags show wall number, pour date and concrete. * = estimated from the drawing size and pour height (door openings left out); others are docket figures. A letter after a number (32b) is a separate section of the same wall. Plan is not to scale, use the OCSC drawings to set out.`, mm(M), mm(y + 2.5));
+    const name = `Pour record ${size.toUpperCase()} ${today.toISOString().slice(0, 10)}.pdf`;
+    const blob = doc.output("blob"), url = URL.createObjectURL(blob), a = document.createElement("a");
+    a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
+    setStatus("Pour PDF ready", true);
+  }catch(e){ setStatus(errText(e, "Couldn't make the PDF")); }
+  if (btn){ btn.disabled = false; btn.textContent = label; }
 }
 function zoomPlan(f, cx, cy){
   const v = S.pourView;
