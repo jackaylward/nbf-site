@@ -2815,10 +2815,9 @@ async function pourPdf(btn){
     }
     const name = `Pour record ${today.toISOString().slice(0, 10)}.pdf`;
     const blob = doc.output("blob");
-    const file = new File([blob], name, {type: "application/pdf"});
-    if (navigator.canShare && navigator.canShare({files: [file]}) && /Android|iPhone|iPad/i.test(navigator.userAgent)){
-      try{ await navigator.share({files: [file], title: "Pour record"}); }catch(e){ if (e.name !== "AbortError") doc.save(name); }
-    } else doc.save(name);
+    const url = URL.createObjectURL(blob), a = document.createElement("a");
+    a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
     setStatus("Pour PDF ready", true);
   }catch(e){ setStatus(errText(e, "Couldn't make the PDF")); }
   if (btn){ btn.disabled = false; btn.textContent = "Download plan PDF"; }
