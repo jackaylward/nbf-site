@@ -195,6 +195,12 @@ nav.tabs button[data-badge]:not([data-badge=""])::after{content:attr(data-badge)
 .list{display:grid;grid-template-columns:1fr;gap:10px}
 @media (min-width:1000px){ .list{grid-template-columns:repeat(2,1fr)} }
 @media (min-width:1500px){ .list{grid-template-columns:repeat(3,1fr)} }
+.cabrow{display:flex;gap:14px;align-items:center;padding:12px 14px;border:1px solid var(--line);border-radius:var(--radius);background:var(--card);cursor:pointer;width:100%;text-align:left;font:inherit;color:inherit}
+.cabrow .cabqty{min-width:54px;font-weight:800;font-size:1.25rem;color:#012060}
+.cabrow .cabmain{flex:1;display:flex;flex-direction:column;gap:2px;min-width:0}
+.cabrow .cabmain span{color:var(--muted);font-size:.9rem}
+.cabrow .cabdate{font-weight:600;font-size:.85rem;color:var(--muted);white-space:nowrap}
+.cabrow.wait{border-style:dashed}
 .tool{display:flex;gap:14px;align-items:center;padding:12px;border:1px solid var(--line);border-radius:var(--radius);background:var(--card);cursor:pointer;width:100%;text-align:left;box-shadow:var(--shadow);transition:transform .12s,box-shadow .12s}
 .tool:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.08)}
 .thumb{flex:0 0 72px;height:72px;border-radius:10px;background:var(--soft);overflow:hidden;display:grid;place-items:center;color:var(--muted);font-size:.7rem}
@@ -350,6 +356,7 @@ input[readonly],textarea[readonly]{background:var(--soft);color:var(--muted);cur
   <button data-view="works"><svg viewBox="0 0 24 24"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9"/></svg><span>Works<span class="lg"> Done</span></span></button>
   <button data-view="talks"><svg viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><path d="M13 3v6h6M8 14h8M8 17h5"/></svg>Talks</button>
   <button data-view="tools"><svg viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 0 0 5 5L21 13l-8 8-3-3 5.3-5.3a4 4 0 0 0-5-5L9 6l2-2z"/><path d="M3 21l6-6"/></svg>Tools</button>
+  <button data-view="cabinet"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M12 3v18M9 11v2M15 11v2"/></svg>Cabinet</button>
   <div class="navcredit">Designed and built by Aylward Solutions</div>
 </nav>
 
@@ -374,7 +381,7 @@ const DAYS = ["mon","tue","wed","thu","fri","sat"];
 const DAY_LABEL = ["Mon","Tue","Wed","Thu","Fri","Sat"];
 const STATUSES = ["In store","On site","With a lad","In repair","Off hired","Missing"];
 const TICK_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
-const VIEW_TITLES = {home:"Home", attendance:"Attendance", timesheet:"Timesheet", dayworks:"Variations", pours:"Pours", works:"Works Done", talks:"Toolbox Talks", tools:"Tools"};
+const VIEW_TITLES = {home:"Home", attendance:"Attendance", timesheet:"Timesheet", dayworks:"Variations", pours:"Pours", works:"Works Done", talks:"Toolbox Talks", tools:"Tools", cabinet:"Cabinet"};
 
 // ================= helpers =================
 const $ = id => document.getElementById(id);
@@ -649,6 +656,7 @@ function go(view){
   if (view === "tools"){ loadTools(!!S.tools); loadToolPhotos(); }
   if (view === "talks") loadTalks();
   if (view === "pours") loadPours();
+  if (view === "cabinet") loadCabinet();
   if (view === "home") loadHome();
   if (view === "timesheet"){ S.past = null; loadPastWeeks(); }
   if (view === "timesheet" && !S.tsTabs) server("timesheetTabs").then(tabs => { S.tsTabs = tabs || []; if (S.view === "timesheet" && !(document.activeElement && /INPUT|TEXTAREA/.test(document.activeElement.tagName))) render(); }).catch(() => {});
@@ -663,6 +671,7 @@ function render(){
   if (S.view === "dayworks" || S.view === "works") v.innerHTML = recordsHtml(S.view);
   if (S.view === "talks") v.innerHTML = talksHtml();
   if (S.view === "pours") v.innerHTML = poursHtml();
+  if (S.view === "cabinet") v.innerHTML = cabinetHtml();
   if (S.view === "tools") v.innerHTML = S.openTool ? toolDetailHtml() : toolsHtml();
 }
 
@@ -3045,6 +3054,132 @@ function clampView(){
     zoomPlan(ev.deltaY < 0 ? 1.25 : 0.8, c.x, c.y); setVB(svg); later();
   }, {passive: false});
 })();
+
+// ================= cabinet (what is taken from the locked cabinet) =================
+S.cab = {list: null, form: null, q: "", err: ""};
+const cabNewId = () => `cb-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+const cabSort = l => l.sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(b.at || "").localeCompare(String(a.at || "")));
+async function loadCabinet(){
+  if (!S.cab.list){ const c = await cacheGet("cabinet"); if (c && !S.cab.list){ S.cab.list = c; if (S.view === "cabinet") render(); } }
+  try{
+    const list = await (S.cab.list ? bgServer : server)("getCabinet");
+    const pend = (await kvGet("cabPending")) || {};
+    const byId = new Map((list || []).map(r => [r.id, r]));
+    for (const [id, j] of Object.entries(pend)){ if (j.del) byId.delete(id); else byId.set(id, {...j.rec, pending: true}); }
+    S.cab.list = cabSort([...byId.values()]); S.cab.err = "";
+    cacheSet("cabinet", S.cab.list);
+    if (Object.keys(pend).length) flushCabinet();
+  }catch(e){
+    if (!S.cab.list) S.cab.list = [];
+    S.cab.err = errText(e, "");
+    connectionTrouble();
+  }
+  if (S.view === "cabinet" && !S.cab.form) render();
+}
+// saved on the device first, then sent to Google, and retried until it gets through
+async function cabSaveLocal(rec, del){
+  const pend = (await kvGet("cabPending")) || {};
+  pend[rec.id] = del ? {del: true} : {rec};
+  await kvSet("cabPending", pend);
+  const rest = (S.cab.list || []).filter(r => r.id !== rec.id);
+  S.cab.list = cabSort(del ? rest : [...rest, {...rec, pending: true}]);
+  cacheSet("cabinet", S.cab.list);
+  flushCabinet();
+}
+let cabFlushing = false;
+async function flushCabinet(){
+  if (cabFlushing) return; cabFlushing = true;
+  setStatus("Saving…");
+  try{
+    for (const id of Object.keys((await kvGet("cabPending")) || {})){
+      const j = ((await kvGet("cabPending")) || {})[id];
+      if (!j) continue;
+      const snap = JSON.stringify(j);
+      if (j.del) await bgServer("deleteCabinet", id); else await bgServer("saveCabinet", j.rec);
+      const pend = (await kvGet("cabPending")) || {};
+      if (pend[id] && JSON.stringify(pend[id]) === snap) delete pend[id];
+      await kvSet("cabPending", pend);
+      if (S.cab.list) S.cab.list = S.cab.list.map(r => r.id === id ? {...r, pending: false} : r);
+    }
+    S.cab.err = "";
+    cacheSet("cabinet", S.cab.list || []);
+    setStatus("Saved", true);
+  }catch(e){
+    S.cab.err = errText(e, "Couldn't send to Google");
+    setStatus("Kept on this device. Will send when Google answers");
+  }
+  cabFlushing = false;
+  if (S.view === "cabinet" && !S.cab.form) render();
+}
+function cabRowsHtml(){
+  const q = S.cab.q.trim().toLowerCase();
+  const list = (S.cab.list || []).filter(r => !q || `${r.item} ${r.to} ${r.note} ${r.date}`.toLowerCase().includes(q));
+  if (!list.length) return `<p class="muted">${(S.cab.list || []).length ? "Nothing matches that search." : "Nothing logged yet. Tap Log something when you take a thing out."}</p>`;
+  return list.map(r => `<button class="cabrow${r.pending ? " wait" : ""}" data-cabedit="${esc(r.id)}">
+      <div class="cabqty">${esc(r.qty)} ×</div>
+      <div class="cabmain"><strong>${esc(r.item)}</strong><span>${r.to ? "To " + esc(r.to) : "No name put in"}${r.note ? " · " + esc(r.note) : ""}</span></div>
+      <div class="cabdate">${esc(dmy(r.date))}</div></button>`).join("");
+}
+function cabinetHtml(){
+  if (!S.cab.list) return loadingBox("Loading the cabinet log…");
+  if (S.cab.form) return cabFormHtml();
+  const waiting = S.cab.list.filter(r => r.pending).length;
+  const bar = waiting ? `<div class="qbar wait"><span>${waiting} ${waiting === 1 ? "entry" : "entries"} waiting to send. Safe on this device.${S.cab.err ? " " + esc(S.cab.err) : ""}</span></div>` : `<div class="qbar ok">Everything saved to Google</div>`;
+  return `${bar}
+  <div class="toolbar">
+    <input id="cabQ" type="search" placeholder="Search the log" value="${esc(S.cab.q)}" aria-label="Search the cabinet log">
+    <button class="btn" data-cabnew>Log something</button>
+  </div>
+  <p class="muted small" style="margin:0 2px 10px">${S.cab.list.length} ${S.cab.list.length === 1 ? "entry" : "entries"}</p>
+  <div class="list" id="cabList">${cabRowsHtml()}</div>`;
+}
+function cabFormHtml(){
+  const f = S.cab.form, isNew = !f.saved;
+  const items = [...new Set((S.cab.list || []).map(r => r.item).filter(Boolean))].sort();
+  const names = [...new Set([...(S.lads || []).map(l => l.name), ...(S.cab.list || []).map(r => r.to)].filter(Boolean))].sort();
+  return `<div class="row-actions" style="margin-bottom:10px"><button class="btn ghost" data-cabcancel>‹ Back to the log</button></div>
+  <div class="panel">
+    <h2>${isNew ? "Log something" : "Change this entry"}</h2>
+    <div style="display:grid;grid-template-columns:110px 1fr;gap:10px">
+      <label class="field">How many<input id="cabQty" type="number" inputmode="decimal" min="1" step="1" value="${esc(f.qty)}"></label>
+      <label class="field">What is it<input id="cabItem" type="text" list="cabItems" autocomplete="off" placeholder="e.g. Gloves, Bolts, Tape" value="${esc(f.item)}"></label>
+    </div>
+    <datalist id="cabItems">${items.map(i => `<option value="${esc(i)}">`).join("")}</datalist>
+    <label class="field">Who took it, or who you gave it to<input id="cabTo" type="text" list="cabNames" autocomplete="off" placeholder="Name" value="${esc(f.to)}"></label>
+    <datalist id="cabNames">${names.map(n => `<option value="${esc(n)}">`).join("")}</datalist>
+    <label class="field">Date<input id="cabDate" type="date" value="${esc(f.date)}"></label>
+    <label class="field">Note (optional)<textarea id="cabNote" rows="2" placeholder="Anything worth knowing">${esc(f.note)}</textarea></label>
+    <p class="small" id="cabMsg" style="color:var(--warn);min-height:1.2em;margin:4px 0"></p>
+    <div class="row-actions"><button class="btn" data-cabsave>Save</button>
+      ${isNew ? "" : `<button class="btn danger" data-cabdel>Delete</button>`}</div>
+  </div>`;
+}
+$("view").addEventListener("input", ev => {
+  if (ev.target.id === "cabQ"){ S.cab.q = ev.target.value; const l = $("cabList"); if (l) l.innerHTML = cabRowsHtml(); }
+});
+$("view").addEventListener("click", async ev => {
+  const b = ev.target.closest("[data-cabnew],[data-cabedit],[data-cabcancel],[data-cabsave],[data-cabdel]");
+  if (!b || S.view !== "cabinet") return;
+  if (b.hasAttribute("data-cabnew")){ S.cab.form = {id: cabNewId(), qty: "1", item: "", to: "", date: iso(new Date()), note: "", saved: false}; render(); return; }
+  if (b.hasAttribute("data-cabedit")){
+    const r = (S.cab.list || []).find(x => x.id === b.dataset.cabedit); if (!r) return;
+    S.cab.form = {id: r.id, qty: r.qty, item: r.item, to: r.to || "", date: r.date, note: r.note || "", saved: true, by: r.by}; render(); return;
+  }
+  if (b.hasAttribute("data-cabcancel")){ S.cab.form = null; render(); return; }
+  if (b.hasAttribute("data-cabdel")){
+    if (!(await ask("Delete this entry from the log? This can't be undone.", "Delete", true))) return;
+    const id = S.cab.form.id; S.cab.form = null;
+    await cabSaveLocal({id}, true); render(); return;
+  }
+  if (b.hasAttribute("data-cabsave")){
+    const qty = parseFloat(String($("cabQty").value).replace(",", ".")), item = $("cabItem").value.trim(), date = $("cabDate").value;
+    const msg = !item ? "Put in what was taken." : !(qty > 0) ? "Put in how many." : !date ? "Pick a date." : "";
+    $("cabMsg").textContent = msg; if (msg) return;
+    const rec = {id: S.cab.form.id, date, qty: String(Math.round(qty * 100) / 100), item, to: $("cabTo").value.trim(), note: $("cabNote").value.trim(), by: getWho() || S.cab.form.by || ""};
+    S.cab.form = null;
+    await cabSaveLocal(rec, false); render();
+  }
+});
 
 go((() => {
   try{
