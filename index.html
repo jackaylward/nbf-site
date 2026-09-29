@@ -2843,7 +2843,7 @@ async function pourSheet(btn, size, print){
     const M = 12, HEAD = 42;
     const layout = (WU, HU) => {
       const B = Math.max(3, Math.floor((WU - 2 * M) / 54)), per = Math.max(1, Math.ceil(rows.length / B));
-      const band = 24 + per * 3.7 + Math.ceil(left.length / 22) * 3.3 + 12;
+      const band = 27 + per * 3.7 + Math.ceil(left.length / 22) * 3.3 + 12;
       const bw = WU - 2 * M, bh = HU - HEAD - band - M;
       return {WU, HU, B, per, band, k: Math.min(bw / (X1 - X0), bh / (Y1 - Y0))};
     };
@@ -2876,9 +2876,13 @@ async function pourSheet(btn, size, print){
     for (const [n, x] of Object.entries(PLAN.gx)){ doc.circle(px(x), py(Y0 + 800), mm(2.4), "S"); doc.text(n, px(x), py(Y0 + 800) + mm(0.9), {align: "center"}); }
     for (const [n, y] of Object.entries(PLAN.gy)){ doc.circle(px(X0 + 800), py(y), mm(2.4), "S"); doc.text(n, px(X0 + 800), py(y) + mm(0.9), {align: "center"}); }
     // walls
-    const FILL = {"": [138, 138, 138], today: [245, 158, 11], poured: NAVY};
+    const FILL = {"": [150, 150, 150], today: [190, 80, 0], poured: NAVY};
     const rect = (e, c) => { doc.setFillColor(...(Array.isArray(c) ? c : [c, c, c])); doc.rect(px(e.x), py(e.y + e.d), Math.max(e.w * k * u, mm(0.3)), Math.max(e.d * k * u, mm(0.3)), "F"); };
     for (const e of (PLAN.stubs || [])) rect(e, 200);
+    // highlighter halo behind poured walls so they stand out even on a black and white print
+    const HALO = {poured: [255, 226, 0], today: [255, 150, 0]}, pad = mm(1.5);
+    for (const e of PLAN.els){ const st = pourState(P[e.i]); if (!st) continue;
+      doc.setFillColor(...HALO[st]); doc.rect(px(e.x) - pad, py(e.y + e.d) - pad, Math.max(e.w * k * u, mm(0.3)) + 2 * pad, Math.max(e.d * k * u, mm(0.3)) + 2 * pad, "F"); }
     for (const e of PLAN.els) rect(e, FILL[pourState(P[e.i])]);
     // tags with date and concrete
     const th = 3.4, off = 3.2 / k;
@@ -2905,7 +2909,9 @@ async function pourSheet(btn, size, print){
     let tot = 0, anyEst = false; rows.forEach(id => { const v = pourVol(id, P[id]); if (v){ tot += v.v; anyEst = anyEst || v.est; } });
     let y = bandTop + 4; doc.setDrawColor(...NAVY); doc.setLineWidth(mm(0.4)); doc.line(mm(M), mm(bandTop), mm(W - M), mm(bandTop));
     doc.setFont("helvetica", "normal"); doc.setFontSize(fs(9)); let kx = M;
-    [["Poured", FILL.poured], ["Being poured today", FILL.today], ["Not poured", FILL[""]]].forEach(([l, c]) => { doc.setFillColor(...c); doc.rect(mm(kx), mm(y - 2.6), mm(6), mm(3), "F"); doc.setTextColor(40); doc.text(l, mm(kx + 8), mm(y)); kx += 12 + doc.getTextWidth(l) / u + 6; });
+    [["Poured", FILL.poured], ["Being poured today", FILL.today], ["Not poured", FILL[""]]].forEach(([l, c]) => { const h = l === "Poured" ? HALO.poured : l === "Being poured today" ? HALO.today : null;
+      if (h){ doc.setFillColor(...h); doc.rect(mm(kx), mm(y - 3.4), mm(6), mm(4.6), "F"); }
+      doc.setFillColor(...c); doc.rect(mm(kx), mm(y - 2.6), mm(6), mm(3), "F"); doc.setTextColor(40); doc.text(l, mm(kx + 8), mm(y)); kx += 12 + doc.getTextWidth(l) / u + 6; });
     doc.setFont("helvetica", "bold"); doc.setTextColor(...NAVY); doc.setFontSize(fs(11));
     doc.text(`${poured.length} of ${ids.length} poured${tdy.length ? `, ${tdy.length} today` : ""}   |   Concrete so far: ${m3(tot)} m3`, mm(W - M), mm(y), {align: "right"});
     y += 5;
@@ -2929,7 +2935,7 @@ async function pourSheet(btn, size, print){
     doc.setFont("helvetica", "normal"); doc.setFontSize(fs(7)); doc.setTextColor(80);
     if (left.length){ const txt = doc.splitTextToSize(`Not poured yet (${left.length}): ` + left.map(pourName).map(n => n.replace("Wall ", "")).join(", "), mm(W - 2 * M)); doc.text(txt, mm(M), mm(y + 1)); y += txt.length * 3.1 + 1; }
     doc.setFontSize(fs(6.5)); doc.setTextColor(110);
-    doc.text(`Tags show wall number, pour date and concrete. * = estimated from the drawing size and pour height (door openings left out); others are docket figures. A letter after a number (32b) is a separate section of the same wall. Plan is not to scale, use the OCSC drawings to set out. Printed ${stamp}.`, mm(M), mm(y + 2.5));
+    doc.text(doc.splitTextToSize(`Tags show wall number, pour date and concrete. * = estimated from the drawing size and pour height (door openings left out); others are docket figures. A letter after a number (32b) is a separate section of the same wall. Plan is not to scale, use the OCSC drawings to set out. Printed ${stamp}.`, mm(W - 2 * M)), mm(M), mm(y + 2.5));
     const name = `Pour record ${size.toUpperCase()} ${today.toISOString().slice(0, 10)}.pdf`;
     const blob = doc.output("blob"), url = URL.createObjectURL(blob);
     if (print){
