@@ -340,7 +340,7 @@ input[readonly],textarea[readonly]{background:var(--soft);color:var(--muted);cur
 .pourwrap{display:grid;gap:14px}
 @media (min-width:1000px){.pourwrap{grid-template-columns:minmax(0,1fr) 340px;align-items:start}}
 .plancard{position:relative;border:1px solid var(--line);border-radius:var(--radius);background:#fbfcfe;overflow:hidden;box-shadow:var(--shadow)}
-.plancard svg{display:block;width:100%;height:62vh;min-height:320px;touch-action:none;user-select:none;-webkit-user-select:none}
+.plancard svg{display:block;width:100%;height:62vh;height:62svh;min-height:320px;touch-action:none;user-select:none;-webkit-user-select:none}
 .plantools{position:absolute;right:10px;top:10px;display:flex;flex-direction:column;gap:6px}
 .plantools button{width:40px;height:40px;border-radius:10px;border:1px solid var(--line);background:var(--card);font-size:1.2rem;font-weight:700;color:var(--brand);cursor:pointer}
 .plankey{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;margin:0 0 12px;font-size:.88rem}
@@ -2456,7 +2456,7 @@ setInterval(async () => {
       const t = await bgServer("getWeek", ws);
       if (A.loaded === ws && !pending){ A.ticks = t || {}; cacheSet("week:" + ws, A.ticks); }
     }
-    if (S.view !== "tools" && !KINDS[S.view] && !(document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName))) render();
+    if (["home", "attendance", "timesheet"].includes(S.view) && !(document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName))){ const sc = window.scrollY; render(); window.scrollTo(0, sc); }
   }catch(e){}
 }, 30000);
 
@@ -2601,7 +2601,7 @@ function pourPanelHtml(){
     <p class="muted" style="margin:-4px 0 12px;font-size:.85rem">${pourEst(e.i, p) ? `Estimate from the drawing: ${m3(pourEst(e.i, p))} m³ (${pourSize(e.i).len.toFixed(2)} m × ${pourSize(e.i).thk} mm × ${num(p.height)} m, doors left out). Put the docket figure in to override it.` : "Put in the pour height and it works out the concrete from the drawing, or type the docket figure."}</p>
     <label class="field">Notes<textarea id="pNotes" rows="2" placeholder="Pour no., docket, concrete grade" ${S.edit ? "" : "readonly"}>${esc(p.notes || "")}</textarea></label>
     <div class="field">Photos</div>
-    ${(photos && photos.length) ? `<div class="pourphotos">${photos.map(ph => `<img src="${ph.data}" alt="Pour photo ${e.i}" data-pbig>`).join("")}</div>` : nPh ? (photos ? `<div class="pourphotos">${photos.map(ph => `<img src="${ph.data}" alt="Pour photo ${e.i}" data-pbig>`).join("")}</div>` : `<p class="muted">Loading ${nPh} photo${nPh > 1 ? "s" : ""}…</p>`) : `<p class="muted">No photos yet.</p>`}
+    ${(photos && photos.length) ? `<div class="pourphotos">${photos.map((ph, i) => `<img src="${ph.thumb || ph.data}" alt="Pour photo ${e.i}" data-pbig="${i}" decoding="async">`).join("")}</div>` : nPh ? (photos ? `<div class="pourphotos">${photos.map((ph, i) => `<img src="${ph.thumb || ph.data}" alt="Pour photo ${e.i}" data-pbig="${i}" decoding="async">`).join("")}</div>` : `<p class="muted">Loading ${nPh} photo${nPh > 1 ? "s" : ""}…</p>`) : `<p class="muted">No photos yet.</p>`}
     <div style="display:flex;gap:8px"><button class="btn ghost" data-paddphotos style="flex:1">Add photos (pick several)</button>
     <button class="btn ghost" data-paddphoto style="flex:1">Take a photo</button></div>` : ""}`;
 }
@@ -2646,7 +2646,7 @@ async function flushPours(){
           pend = (await kvGet("pourPending")) || {}; j = pend[id];
           j.photos.shift(); j.rec.photos = [...(j.rec.photos || []), fid];
           await kvSet("pourPending", pend);
-          S.pourPhotos[id] = (S.pourPhotos[id] || []).map(p => p.data === data ? {id: fid, data} : p);
+          S.pourPhotos[id] = (S.pourPhotos[id] || []).map(p => p.data === data ? {id: fid, data, thumb: p.thumb} : p);
           if (S.pours[id]) S.pours[id] = j.rec;
           continue;
         }
@@ -2670,15 +2670,32 @@ async function flushPours(){
   pourFlushing = false;
   if (Object.keys((await kvGet("pourPending")) || {}).length) flushPours();
 }
+// small copy of a photo for the grid, so the phone isn't holding several full size pictures on screen
+function makeThumb(dataUrl){
+  return new Promise(res => {
+    const img = new Image();
+    img.onload = () => { const k = Math.min(1, 420 / Math.max(img.width, img.height)), c = document.createElement("canvas");
+      c.width = Math.round(img.width * k); c.height = Math.round(img.height * k); c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      res(c.toDataURL("image/jpeg", 0.7)); };
+    img.onerror = () => res(""); img.src = dataUrl;
+  });
+}
+async function addThumbs(list){ for (const ph of (list || [])) if (!ph.thumb && ph.data) ph.thumb = await makeThumb(ph.data); }
 async function loadPourPhotos(id){
   const p = S.pours && S.pours[id];
   if (!p || !(p.photos || []).length || S.pourPhotos[id]) return;
-  try{ S.pourPhotos[id] = await bgServer("getPourPhotos", id); }catch(e){ return; }
+  try{ S.pourPhotos[id] = await bgServer("getPourPhotos", id); await addThumbs(S.pourPhotos[id]); }catch(e){ return; }
   if (S.view === "pours" && S.pourSel === id) $("pourPanel").innerHTML = pourPanelHtml();
+}
+// redraw just the plan and the side panel, so photos and the rest of the page don't flash or jump
+function pourRefresh(withPanel){
+  const svg = $("planSvg"), panel = $("pourPanel");
+  if (!svg || !panel){ render(); return; }
+  svg.outerHTML = planSvg(); if (withPanel) panel.innerHTML = pourPanelHtml();
 }
 function pourSelect(id){
   S.pourSel = id;
-  render();
+  pourRefresh(true);
   if (id){ loadPourPhotos(id); if (innerWidth < 1000) $("pourPanel").scrollIntoView({behavior: "smooth", block: "start"}); }
 }
 function readPour(){
@@ -2711,8 +2728,8 @@ $("view").addEventListener("click", async ev => {
   if (f){ S.pourFilter = S.pourFilter === f.dataset.pfilter ? "" : f.dataset.pfilter; render(); return; }
   if (ev.target.closest("[data-ppdf]")){ pourPdf(ev.target.closest("[data-ppdf]")); return; }
   const z = ev.target.closest("[data-pzoom]");
-  if (z){ if (z.dataset.pzoom === "fit") fitView(); else zoomPlan(+z.dataset.pzoom); render(); return; }
-  if (ev.target.closest("[data-pbig]")){ const m = document.createElement("div"); m.className = "pourbig"; m.innerHTML = `<img src="${ev.target.src}" alt="Pour photo">`; m.onclick = () => m.remove(); document.body.appendChild(m); return; }
+  if (z){ if (z.dataset.pzoom === "fit") fitView(); else zoomPlan(+z.dataset.pzoom); pourRefresh(); return; }
+  if (ev.target.closest("[data-pbig]")){ const ph = ((S.pourPhotos[S.pourSel] || [])[+ev.target.closest("[data-pbig]").dataset.pbig]) || {}; const m = document.createElement("div"); m.className = "pourbig"; m.innerHTML = `<img src="${ph.data || ev.target.src}" alt="Pour photo">`; m.onclick = () => m.remove(); document.body.appendChild(m); return; }
   if (ev.target.closest("[data-paddphoto],[data-paddphotos]")){
     const multi = !!ev.target.closest("[data-paddphotos]");
     if (!(await canEdit())) return;
@@ -2725,7 +2742,7 @@ $("view").addEventListener("click", async ev => {
       try{
         setStatus(files.length > 1 ? `Adding photo ${done + bad + 1} of ${files.length}…` : "Adding photo…");
         const data = await shrinkImage(file, 1600, false);
-        S.pourPhotos[id] = [...(S.pourPhotos[id] || []), {id: "new", data}];
+        S.pourPhotos[id] = [...(S.pourPhotos[id] || []), {id: "new", data, thumb: await makeThumb(data)}];
         await savePourLocal(id, rec, data, true);
         done++;
       }catch(e){ bad++; }
@@ -3060,7 +3077,7 @@ function clampView(){
   const svgPt = (svg, x, y) => { const m = svg.getScreenCTM().inverse(); const p = new DOMPoint(x, y).matrixTransform(m); return {x: p.x, y: p.y}; };
   const setVB = svg => svg.setAttribute("viewBox", `${S.pourView.x} ${S.pourView.y} ${S.pourView.w} ${S.pourView.h}`);
   let redraw = null;
-  const later = () => { clearTimeout(redraw); redraw = setTimeout(() => { if (S.view === "pours"){ const sc = window.scrollY; render(); window.scrollTo(0, sc); } }, 180); };
+  const later = () => { clearTimeout(redraw); redraw = setTimeout(() => { if (pts.size) return later(); if (S.view === "pours") pourRefresh(); }, 180); };
   document.addEventListener("pointerdown", ev => {
     const svg = ev.target.closest && ev.target.closest("#planSvg"); if (!svg) return;
     svg.setPointerCapture(ev.pointerId);
