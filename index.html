@@ -3219,10 +3219,41 @@ function clampView(){
 S.cab = {list: null, form: null, q: "", err: ""};
 const cabNewId = () => `cb-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 const cabSort = l => l.sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(b.at || "").localeCompare(String(a.at || "")));
+const CAB_SEED = [
+  ["2026-09-24","1","Jigsaw","Cornel","1pm"],
+  ["2026-09-24","1","Mini grinder blades","Doru","12pm"],
+  ["2026-09-24","1","16mm bit","Doru","12pm"],
+  ["2026-09-24","2","Gloves","Radu, Ioan Batin","11:30am"],
+  ["2026-09-24","1","16mm bit","Marian Petre",""],
+  ["2026-09-24","1","White helmet","Jack (myself)","1pm"],
+  ["2026-09-28","3","Gloves","Bogdan, Ion, Cosmin",""],
+  ["2026-09-28","5","Gloves","Victor","For steel fixers"],
+  ["2026-09-28","1","Glasses","Bogdan",""],
+  ["2026-09-28","1","Black hat","Razvan",""],
+  ["2026-09-28","1","Gloves","Razvan",""],
+  ["2026-09-28","1","Glasses","Razvan",""],
+  ["2026-09-28","1","Concrete gloves","Razvan",""],
+  ["2026-09-29","1","Hi-vis vest","Marian Petre",""]
+];
+async function cabSeedOnce(){
+  try{
+    if (await kvGet("cabSeeded1")) return;
+    const have = new Set((S.cab.list || []).map(r => r.id));
+    const pend = (await kvGet("cabPending")) || {};
+    CAB_SEED.forEach((r, i) => {
+      const id = "cb-notes-" + String(i + 1).padStart(2, "0");
+      if (!have.has(id)) pend[id] = {rec: {id, date: r[0], qty: r[1], item: r[2], to: r[3], note: r[4], by: "Jack"}};
+    });
+    await kvSet("cabPending", pend);
+    await kvSet("cabSeeded1", "1");
+  }catch(e){}
+}
 async function loadCabinet(){
   if (!S.cab.list){ const c = await cacheGet("cabinet"); if (c && !S.cab.list){ S.cab.list = c; if (S.view === "cabinet") render(); } }
   try{
     const list = await (S.cab.list ? bgServer : server)("getCabinet");
+    S.cab.list = S.cab.list || list || [];
+    await cabSeedOnce();
     const pend = (await kvGet("cabPending")) || {};
     const byId = new Map((list || []).map(r => [r.id, r]));
     for (const [id, j] of Object.entries(pend)){ if (j.del) byId.delete(id); else byId.set(id, {...j.rec, pending: true}); }
