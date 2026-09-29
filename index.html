@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <title>New Bridge Form</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -30,6 +30,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 h1,h2,h3{font-family:"Barlow Condensed",sans-serif;margin:0;letter-spacing:.02em}
 a{color:inherit}
 
+/* the page itself never slides sideways or pinch-zooms; only the drawing moves */
+html,body{overflow-x:clip;overscroll-behavior-x:none;touch-action:pan-x pan-y}
 /* ---------- frame: phone first ---------- */
 header.top{position:sticky;top:0;z-index:5;height:var(--top);background:var(--brand);color:#fff;display:flex;align-items:center;gap:14px;padding:0 16px}
 .logo{height:30px;width:auto;max-width:160px;object-fit:contain;display:block}
