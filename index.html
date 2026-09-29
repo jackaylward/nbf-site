@@ -2765,7 +2765,7 @@ async function pourPdf(btn){
     doc.setFont("helvetica", "normal"); doc.setFontSize(9); let kx = M;
     key.forEach(([l, c]) => { doc.setFillColor(...c); doc.rect(kx, ky - 2.6, 6, 3, "F"); doc.setTextColor(40); doc.text(l, kx + 8, ky); kx += 12 + doc.getTextWidth(l) + 6; });
     doc.setFont("helvetica", "bold"); doc.setTextColor(...NAVY); doc.setFontSize(11);
-    doc.text(`${poured.length} of ${ids.length} poured${tdy.length ? `, ${tdy.length} today` : ""}   |   Concrete so far: ${m3(tot)} m3`, W - M, ky, {align: "right"});
+    doc.text(`${poured.length} of ${ids.length} poured${tdy.length ? `, ${tdy.length} today` : ""}`, W - M, ky, {align: "right"});
     doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(110);
     doc.text("Tags show the wall number, the pour date and the concrete. * = estimated from the drawing size and pour height (door openings left out); others are docket figures.", M, ky + 7);
     doc.text("Plan is for recording pours only. Do not set out from it; use the OCSC drawings.", M, ky + 11);
@@ -2930,7 +2930,7 @@ async function pourSheet(btn, size, print){
     doc.setFont("helvetica", "normal"); doc.setFontSize(fs(9)); let kx = M;
     [["Poured", FILL.poured], ["Being poured today", FILL.today], ["Not poured", FILL[""]]].forEach(([l, c]) => { doc.setFillColor(...c); doc.setDrawColor(70, 70, 70); doc.setLineWidth(mm(0.12)); doc.rect(mm(kx), mm(y - 2.6), mm(6), mm(3), l === "Not poured" ? "F" : "FD"); doc.setTextColor(40); doc.text(l, mm(kx + 8), mm(y)); kx += 12 + doc.getTextWidth(l) / u + 6; });
     doc.setFont("helvetica", "bold"); doc.setTextColor(...NAVY); doc.setFontSize(fs(11));
-    doc.text(`${poured.length} of ${ids.length} poured${tdy.length ? `, ${tdy.length} today` : ""}   |   Concrete so far: ${m3(tot)} m3`, mm(W - M), mm(y), {align: "right"});
+    doc.text(`${poured.length} of ${ids.length} poured${tdy.length ? `, ${tdy.length} today` : ""}`, mm(W - M), mm(y), {align: "right"});
     y += 5;
     // table blocks
     const bw = (W - 2 * M) / L.B, rh = 3.7;
