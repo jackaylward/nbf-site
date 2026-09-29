@@ -2839,7 +2839,7 @@ async function pourSheet(btn, size){
     const all = [...PLAN.els, ...(PLAN.stubs || [])], xs = all.flatMap(e => [e.x, e.x + e.w]), ys = all.flatMap(e => [e.y, e.y + e.d]);
     const X0 = Math.min(...xs) - 3500, X1 = Math.max(...xs) + 2500, Y0 = Math.min(...ys) - 3000, Y1 = Math.max(...ys) + 2500;
     // work in A3-portrait style units (WU wide) and scale everything by u
-    const M = 12, HEAD = 26;
+    const M = 12, HEAD = 32;
     const layout = (WU, HU) => {
       const B = Math.max(3, Math.floor((WU - 2 * M) / 54)), per = Math.max(1, Math.ceil(rows.length / B));
       const band = 24 + per * 3.7 + Math.ceil(left.length / 22) * 3.3 + 12;
@@ -2861,7 +2861,10 @@ async function pourSheet(btn, size){
     doc.text("Pour record", mm(W - M), mm(M + 7), {align: "right"});
     doc.setFont("helvetica", "normal"); doc.setFontSize(fs(10)); doc.setTextColor(90);
     doc.text("Boyne 1C, Patrician Secondary School, Newbridge. Ground floor Phase 01", mm(W - M), mm(M + 13), {align: "right"});
-    doc.text(`Printed ${today.toLocaleDateString("en-GB")}  |  Walls from OCSC SE-10211 / SE-10212 Rev 01`, mm(W - M), mm(M + 18), {align: "right"});
+    doc.text("Walls from OCSC SE-10211 / SE-10212 Rev 01", mm(W - M), mm(M + 18), {align: "right"});
+    const stamp = `${today.toLocaleDateString("en-GB", {weekday: "short", day: "2-digit", month: "long", year: "numeric"})}, ${today.toLocaleTimeString("en-GB", {hour: "2-digit", minute: "2-digit"})}`;
+    doc.setFont("helvetica", "bold"); doc.setFontSize(fs(11)); doc.setTextColor(...NAVY);
+    doc.text(`Printed ${stamp}`, mm(W - M), mm(M + 24), {align: "right"});
     doc.setDrawColor(...NAVY); doc.setLineWidth(mm(0.6)); doc.line(mm(M), mm(HEAD - 1), mm(W - M), mm(HEAD - 1));
     // grid
     doc.setLineWidth(mm(0.15)); doc.setDrawColor(185, 192, 205); doc.setLineDashPattern([mm(2), mm(1.2)], 0);
@@ -2925,7 +2928,7 @@ async function pourSheet(btn, size){
     doc.setFont("helvetica", "normal"); doc.setFontSize(fs(7)); doc.setTextColor(80);
     if (left.length){ const txt = doc.splitTextToSize(`Not poured yet (${left.length}): ` + left.map(pourName).map(n => n.replace("Wall ", "")).join(", "), mm(W - 2 * M)); doc.text(txt, mm(M), mm(y + 1)); y += txt.length * 3.1 + 1; }
     doc.setFontSize(fs(6.5)); doc.setTextColor(110);
-    doc.text(`Tags show wall number, pour date and concrete. * = estimated from the drawing size and pour height (door openings left out); others are docket figures. A letter after a number (32b) is a separate section of the same wall. Plan is not to scale, use the OCSC drawings to set out.`, mm(M), mm(y + 2.5));
+    doc.text(`Tags show wall number, pour date and concrete. * = estimated from the drawing size and pour height (door openings left out); others are docket figures. A letter after a number (32b) is a separate section of the same wall. Plan is not to scale, use the OCSC drawings to set out. Printed ${stamp}.`, mm(M), mm(y + 2.5));
     const name = `Pour record ${size.toUpperCase()} ${today.toISOString().slice(0, 10)}.pdf`;
     const blob = doc.output("blob"), url = URL.createObjectURL(blob), a = document.createElement("a");
     a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
