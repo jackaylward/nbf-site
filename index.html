@@ -2883,26 +2883,46 @@ async function pourSheet(btn, size, print){
       if (hl){ doc.setDrawColor(70, 70, 70); doc.setLineWidth(mm(0.12)); doc.rect(x, y, w, h, "FD"); } else doc.rect(x, y, w, h, "F"); };
     for (const e of (PLAN.stubs || [])) rect(e, 200);
     for (const e of PLAN.els){ const st = pourState(P[e.i]); rect(e, FILL[st], !!st); }
-    // tags with date and concrete
-    const th = 3.4, off = 3.2 / k;
+    // tags with date and concrete. Work out where each one sits first, and nudge any that would land on top of another
+    const th = 3.4, off = 3.2 / k, items = [];
     for (const T of (PLAN.labels || [])){
-      const p = P[T.i], st = pourState(p), t = T.t || String(parseInt(T.i.slice(1), 10));
-      const cx = px(T.x + T.dx * off), cy = py(T.y + T.dy * off);
-      doc.setDrawColor(...NAVY); doc.setLineWidth(mm(0.2)); doc.line(px(T.x), py(T.y), cx, cy);
+      const p = P[T.i], st = pourState(p), t = T.t || String(parseInt(T.i.slice(1), 10)), v = st ? pourVol(T.i, p) : null;
+      const line = st ? `${dmy(p.date)}${v ? `  ${m3(v.v)} m3${v.est ? "*" : ""}` : ""}` : "";
+      doc.setFont("helvetica", "bold"); doc.setFontSize(fs(7)); const tw = doc.getTextWidth(t) + mm(2.6);
+      let lw = 0; if (line){ doc.setFont("helvetica", "normal"); doc.setFontSize(fs(5.2)); lw = doc.getTextWidth(line) + mm(1.4); }
+      items.push({T, st, t, line, tw, lw, h: mm(th), ax: px(T.x), ay: py(T.y), cx: px(T.x + T.dx * off), cy: py(T.y + T.dy * off), vert: T.dx !== 0});
+    }
+    const boxOf = (it, cx, cy) => { const w = Math.max(it.tw, it.lw), top = cy - it.h / 2, bot = cy + it.h / 2 + (it.line ? mm(3.1) : 0); return [cx - w / 2, top, cx + w / 2, bot]; };
+    const hit = (A, B, g) => A[0] < B[2] + g && A[2] > B[0] - g && A[1] < B[3] + g && A[3] > B[1] - g;
+    const placed = [], step = mm(2.4), gap = mm(0.5);
+    items.forEach(it => {
+      let best = null;
+      search: for (let r = 0; r <= 16; r++){
+        const cands = r === 0 ? [[0, 0]] : it.vert
+          ? [[0, r], [0, -r], [r * 0.6, r], [r * 0.6, -r], [0, 2 * r], [0, -2 * r], [r, 0], [r, r], [r, -r]]
+          : [[r, 0], [-r, 0], [r, r * 0.6], [-r, r * 0.6], [2 * r, 0], [-2 * r, 0], [0, r], [r, r], [-r, r]];
+        for (const [ox2, oy2] of cands){
+          const cx = it.cx + ox2 * step * (it.T.dx < 0 ? -1 : 1), cy = it.cy + oy2 * step, bx = boxOf(it, cx, cy);
+          if (!placed.some(q => hit(bx, q, gap))){ best = {cx, cy, bx}; break search; }
+        }
+      }
+      if (!best) best = {cx: it.cx, cy: it.cy, bx: boxOf(it, it.cx, it.cy)};
+      it.cx = best.cx; it.cy = best.cy; placed.push(best.bx);
+    });
+    items.forEach(it => {
+      const {T, st, t, line, tw, lw, h, cx, cy} = it;
+      doc.setDrawColor(...NAVY); doc.setLineWidth(mm(0.2)); doc.line(it.ax, it.ay, cx, cy);
       doc.setFont("helvetica", "bold"); doc.setFontSize(fs(7));
-      const tw = doc.getTextWidth(t) + mm(2.6), h = mm(th);
       if (st === "poured"){ doc.setFillColor(255); doc.roundedRect(cx - tw/2, cy - h/2, tw, h, h/2, h/2, "FD"); doc.setTextColor(...NAVY); }
       else { doc.setFillColor(...(st === "today" ? FILL.today : NAVY)); doc.roundedRect(cx - tw/2, cy - h/2, tw, h, h/2, h/2, "F"); doc.setTextColor(255); }
       doc.text(t, cx, cy + mm(0.95), {align: "center"});
       if (st){
-        const v = pourVol(T.i, p);
-        const line = `${dmy(p.date)}${v ? `  ${m3(v.v)} m3${v.est ? "*" : ""}` : ""}`;
         doc.setFont("helvetica", "normal"); doc.setFontSize(fs(5.2));
-        const lw = doc.getTextWidth(line) + mm(1.4), ly = cy + h/2 + mm(2.3);
+        const ly = cy + h/2 + mm(2.3);
         doc.setFillColor(255); doc.rect(cx - lw/2, ly - mm(1.8), lw, mm(2.4), "F");
         doc.setTextColor(...(st === "today" ? [20, 120, 45] : NAVY)); doc.text(line, cx, ly, {align: "center"});
       }
-    }
+    });
     // band: key, totals, table, not poured
     const poured = rows.filter(id => pourState(P[id]) === "poured"), tdy = rows.filter(id => pourState(P[id]) === "today");
     let tot = 0, anyEst = false; rows.forEach(id => { const v = pourVol(id, P[id]); if (v){ tot += v.v; anyEst = anyEst || v.est; } });
