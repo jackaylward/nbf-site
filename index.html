@@ -327,6 +327,30 @@ input[readonly],textarea[readonly]{background:var(--soft);color:var(--muted);cur
 .pourphotos img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;background:var(--soft);cursor:zoom-in}
 .pourbig{position:fixed;inset:0;z-index:20;background:rgba(0,0,0,.9);display:flex;align-items:center;justify-content:center}
 .pourbig img{max-width:96vw;max-height:90vh}
+
+/* ---------- PDF editor ---------- */
+.pe-start{max-width:560px}
+.pe-bar{position:sticky;top:var(--top);z-index:4;display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:var(--bg);padding:8px 0 10px;margin:-8px 0 6px}
+.pe-group{display:flex;align-items:center;gap:2px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:3px}
+.pe-group button{border:0;background:transparent;min-width:42px;height:42px;border-radius:9px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;color:var(--ink);padding:0 6px;font-size:.66rem;font-weight:600}
+.pe-group button svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.pe-group button b{font-size:1.4rem;line-height:1}
+.pe-group button[aria-pressed="true"]{background:var(--brand);color:#fff}
+.pe-group button:disabled{opacity:.35}
+.pe-group #peZoom{min-width:44px;text-align:center;font-weight:700;font-size:.9rem}
+.pe-sw i{display:block;width:22px;height:22px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px var(--line)}
+.pe-sw[aria-pressed="true"]{background:var(--soft)!important}
+.pe-sw[aria-pressed="true"] i{box-shadow:0 0 0 2px var(--brand)}
+.pe-group.off{opacity:.35}
+.pe-sz i{display:block;border-radius:50%;background:currentColor}
+.pe-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+.pe-actions #peName{margin-right:auto}
+.pe-pages{overflow-x:auto;display:flex;flex-direction:column;align-items:flex-start;gap:16px;padding-bottom:20px}
+.pe-page{position:relative;flex:0 0 auto;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.15),0 6px 20px rgba(0,0,0,.08);margin:0 auto}
+.pe-page canvas{position:absolute;inset:0;width:100%;height:100%}
+.pe-over{mix-blend-mode:multiply}
+.pe.drawing .pe-over{touch-action:none}
+@media (max-width:600px){ .pe-group button span{display:none} .pe-bar{flex-wrap:nowrap;overflow-x:auto;margin-left:-16px;margin-right:-16px;padding-left:16px;padding-right:16px} .pe-group{flex:0 0 auto} .pe-actions #peName{width:100%} .pe-actions .btn{flex:1} }
 </style>
 </head>
 <body>
@@ -353,6 +377,7 @@ input[readonly],textarea[readonly]{background:var(--soft);color:var(--muted);cur
   <button data-view="talks"><svg viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><path d="M13 3v6h6M8 14h8M8 17h5"/></svg>Talks</button>
   <button data-view="tools"><svg viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 0 0 5 5L21 13l-8 8-3-3 5.3-5.3a4 4 0 0 0-5-5L9 6l2-2z"/><path d="M3 21l6-6"/></svg>Tools</button>
   <button data-view="cabinet"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M12 3v18M9 11v2M15 11v2"/></svg>Cabinet</button>
+  <button data-view="pdfedit"><svg viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M8 18l1-3 5-5 2 2-5 5z"/></svg><span>PDF<span class="lg"> Editor</span></span></button>
   <div class="navcredit">Designed and built by Aylward Solutions</div>
 </nav>
 
@@ -377,7 +402,7 @@ const DAYS = ["mon","tue","wed","thu","fri","sat"];
 const DAY_LABEL = ["Mon","Tue","Wed","Thu","Fri","Sat"];
 const STATUSES = ["In store","On site","With a lad","In repair","Off hired","Missing"];
 const TICK_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
-const VIEW_TITLES = {home:"Home", attendance:"Attendance", timesheet:"Timesheet", dayworks:"Variations", pours:"Pours", works:"Works Done", talks:"Toolbox Talks", tools:"Tools", cabinet:"Cabinet"};
+const VIEW_TITLES = {home:"Home", attendance:"Attendance", timesheet:"Timesheet", dayworks:"Variations", pours:"Pours", works:"Works Done", talks:"Toolbox Talks", tools:"Tools", cabinet:"Cabinet", pdfedit:"PDF Editor"};
 
 // ================= helpers =================
 const $ = id => document.getElementById(id);
@@ -689,6 +714,7 @@ function render(){
   if (S.view === "pours") v.innerHTML = poursHtml();
   if (S.view === "cabinet") v.innerHTML = cabinetHtml();
   if (S.view === "tools") v.innerHTML = S.openTool ? toolDetailHtml() : toolsHtml();
+  if (S.view === "pdfedit"){ const r = peRoot(); if (r.parentNode !== v){ v.innerHTML = ""; v.appendChild(r); } peSync(); }
 }
 
 // photo circle taps (any view)
@@ -3374,6 +3400,402 @@ $("view").addEventListener("click", async ev => {
     await cabSaveLocal(rec, false); render();
   }
 });
+
+// ================= PDF editor: open a PDF or photo, draw, highlight, add text, then export =================
+// Everything happens on the device. Markings are kept as shapes and written into the PDF as real lines and text,
+// so drawings stay sharp when you zoom in on the exported file.
+const PE = {bytes: null, name: "", pages: [], tool: "pen", color: "#d11a1a", size: 1, zoom: 1, undo: [], root: null, loading: "", err: ""};
+const PE_COLORS = [["#d11a1a", "Red"], ["#012060", "Navy"], ["#111111", "Black"], ["#1b7a44", "Green"], ["#1565c0", "Blue"], ["#f28c00", "Orange"]];
+const PE_HL = "#ffe600";
+const PE_SIZES = {pen: [2, 4, 8], hl: [14, 22, 34], text: [14, 20, 30]};   // screen pixels at the zoom you draw at
+const PE_TOOLS = [
+  ["move", "Scroll", '<path d="M12 3v18M3 12h18M12 3l-3 3M12 3l3 3M12 21l-3-3M12 21l3-3M3 12l3-3M3 12l3 3M21 12l-3-3M21 12l-3 3"/>'],
+  ["pen", "Draw", '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>'],
+  ["hl", "Highlight", '<path d="M9 11l-6 6v3h9l3-3"/><path d="M22 12l-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"/>'],
+  ["text", "Text", '<path d="M4 7V4h16v3M9 20h6M12 4v16"/>'],
+  ["erase", "Rubber", '<path d="M20 20H9L4 15a2 2 0 0 1 0-2.8L13.2 3a2 2 0 0 1 2.8 0L21 8a2 2 0 0 1 0 2.8L11 20"/><path d="M6 11l7 7"/>'],
+];
+
+function loadScriptOnce(src, test){
+  if (test()) return Promise.resolve();
+  return new Promise((ok, bad) => {
+    const s = document.createElement("script");
+    s.src = src; s.onload = () => ok(); s.onerror = () => bad(new Error("Couldn't load the PDF tools. Check your signal."));
+    document.head.appendChild(s);
+  });
+}
+async function loadPdfJs(){
+  await loadScriptOnce("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js", () => window.pdfjsLib);
+  window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+  return window.pdfjsLib;
+}
+async function loadPdfLib(){
+  await loadScriptOnce("https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js", () => window.PDFLib);
+  return window.PDFLib;
+}
+
+function peRoot(){
+  if (PE.root) return PE.root;
+  const r = document.createElement("div");
+  r.className = "pe";
+  r.innerHTML = `
+    <div class="pe-start" id="peStart">
+      <p class="muted">Open a PDF or a photo of a drawing, mark it up, then export it as a PDF. Nothing is uploaded, it all stays on this device.</p>
+      <div class="row-actions"><button class="btn" data-pe="open">Open PDF or photo</button></div>
+      <p class="msg" id="peMsg"></p>
+    </div>
+    <div class="pe-actions" id="peActs" hidden><span class="small muted" id="peName"></span><button class="btn ghost" data-pe="open">Open another</button><button class="btn" data-pe="export">Export PDF</button></div>
+    <div class="pe-bar" id="peBar" hidden>
+      <div class="pe-group" role="group" aria-label="Tool">${PE_TOOLS.map(([k, l, p]) => `<button data-pe-tool="${k}" aria-pressed="false" title="${l}"><svg viewBox="0 0 24 24">${p}</svg><span>${l}</span></button>`).join("")}</div>
+      <div class="pe-group" role="group" aria-label="Colour" id="peColors">${PE_COLORS.map(([c, l]) => `<button class="pe-sw" data-pe-color="${c}" aria-pressed="false" title="${l}" aria-label="${l}"><i style="background:${c}"></i></button>`).join("")}</div>
+      <div class="pe-group" role="group" aria-label="Size">${["Thin", "Medium", "Thick"].map((l, i) => `<button class="pe-sz" data-pe-size="${i}" aria-pressed="false" title="${l}" aria-label="${l}"><i style="width:${6 + i * 5}px;height:${6 + i * 5}px"></i></button>`).join("")}</div>
+      <div class="pe-group" role="group" aria-label="Zoom"><button data-pe="zout" title="Zoom out" aria-label="Zoom out"><b>−</b></button><span id="peZoom">100%</span><button data-pe="zin" title="Zoom in" aria-label="Zoom in"><b>+</b></button></div>
+      <div class="pe-group"><button data-pe="undo" title="Undo"><svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg><span>Undo</span></button></div>
+    </div>
+    <div id="peOut"></div>
+    <div class="pe-pages" id="pePages"></div>`;
+  r.addEventListener("click", peClick);
+  PE.root = r;
+  return r;
+}
+function peSync(){
+  const r = PE.root; if (!r) return;
+  const has = PE.pages.length > 0;
+  r.querySelector("#peStart").hidden = has;
+  r.querySelector("#peBar").hidden = !has;
+  r.querySelector("#peMsg").textContent = PE.loading || PE.err;
+  r.querySelector("#peMsg").className = "msg" + (PE.err ? " bad" : "");
+  r.querySelectorAll("[data-pe-tool]").forEach(b => b.setAttribute("aria-pressed", b.dataset.peTool === PE.tool));
+  r.querySelectorAll("[data-pe-color]").forEach(b => b.setAttribute("aria-pressed", b.dataset.peColor === PE.color));
+  r.querySelectorAll("[data-pe-size]").forEach(b => b.setAttribute("aria-pressed", +b.dataset.peSize === PE.size));
+  r.querySelector("#peColors").classList.toggle("off", PE.tool === "hl" || PE.tool === "erase");
+  r.querySelector("[data-pe=undo]").disabled = !PE.undo.length;
+  r.querySelector("#peZoom").textContent = Math.round(PE.zoom * 100) + "%";
+  r.querySelector("#peActs").hidden = !has;
+  const nm = r.querySelector("#peName"); nm.textContent = has ? `${PE.name} · ${PE.pages.length} page${PE.pages.length === 1 ? "" : "s"}` : "";
+  r.querySelector("#peOut").innerHTML = pdfResult("peExport");
+  r.classList.toggle("drawing", PE.tool !== "move");
+  PE.pages.forEach(p => { p.over.style.cursor = PE.tool === "move" ? "" : PE.tool === "text" ? "text" : PE.tool === "erase" ? "pointer" : "crosshair"; });
+}
+
+async function peClick(ev){
+  const t = ev.target.closest("[data-pe-tool]");
+  if (t){ PE.tool = t.dataset.peTool; return peSync(); }
+  const c = ev.target.closest("[data-pe-color]");
+  if (c){ PE.color = c.dataset.peColor; if (PE.tool === "move" || PE.tool === "erase") PE.tool = "pen"; return peSync(); }
+  const z = ev.target.closest("[data-pe-size]");
+  if (z){ PE.size = +z.dataset.peSize; return peSync(); }
+  const a = ev.target.closest("[data-pe]");
+  if (!a) return;
+  const act = a.dataset.pe;
+  if (act === "open") return peOpen();
+  if (act === "undo") return peUndo();
+  if (act === "zin" || act === "zout") return peZoom(act === "zin" ? 1 : -1);
+  if (act === "export") return peExport();
+}
+
+function pickFile(accept){
+  return new Promise(resolve => {
+    const i = document.createElement("input");
+    i.type = "file"; i.accept = accept; i.style.display = "none";
+    i.onchange = () => { resolve(i.files && i.files[0] || null); i.remove(); };
+    document.body.appendChild(i); i.click();
+  });
+}
+async function peOpen(){
+  if (PE.pages.some(p => p.ann.length) && !confirm("Open a different file? Your markings on this one will be lost unless you've exported it.")) return;
+  const f = await pickFile("application/pdf,.pdf,image/*");
+  if (!f) return;
+  PE.err = ""; PE.loading = "Opening " + f.name + "…"; PE.pages = []; PE.undo = []; PE.zoom = 1;
+  if (S.pdfOut && S.pdfOut.key === "peExport") S.pdfOut = null;
+  PE.root.querySelector("#pePages").innerHTML = ""; peSync();
+  try{
+    let bytes;
+    if (/pdf$/i.test(f.type) || /\.pdf$/i.test(f.name)) bytes = new Uint8Array(await f.arrayBuffer());
+    else bytes = await peImageToPdf(f);
+    PE.bytes = bytes;
+    PE.name = f.name.replace(/\.[^.]+$/, "");
+    const lib = await loadPdfJs();
+    const doc = await lib.getDocument({data: bytes.slice()}).promise;
+    PE.doc = doc;
+    for (let i = 1; i <= doc.numPages; i++){
+      const pg = await doc.getPage(i);
+      const vp = pg.getViewport({scale: 1});
+      PE.pages.push(peMakePage(pg, vp, i - 1));
+    }
+    PE.loading = "";
+    if (PE.tool === "move") PE.tool = "pen";
+    peSync();
+    await peRenderAll();
+  }catch(e){
+    PE.pages = []; PE.loading = "";
+    PE.err = /password/i.test(String(e && e.message)) ? "That PDF is password protected, so it can't be opened here." : errText(e, "Couldn't open that file.");
+    peSync();
+  }
+}
+// a photo becomes a one page PDF the same size as the photo
+async function peImageToPdf(file){
+  const url = URL.createObjectURL(file);
+  try{
+    const im = await new Promise((ok, bad) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => bad(new Error("Couldn't read that photo.")); i.src = url; });
+    const max = 3000, s = Math.min(1, max / Math.max(im.naturalWidth, im.naturalHeight));
+    const c = document.createElement("canvas");
+    c.width = Math.round(im.naturalWidth * s); c.height = Math.round(im.naturalHeight * s);
+    c.getContext("2d").drawImage(im, 0, 0, c.width, c.height);
+    const jpg = await new Promise(ok => c.toBlob(ok, "image/jpeg", 0.9));
+    const L = await loadPdfLib();
+    const pdf = await L.PDFDocument.create();
+    const img = await pdf.embedJpg(new Uint8Array(await jpg.arrayBuffer()));
+    const w = c.width * 0.75, h = c.height * 0.75;   // 96 dpi pixels to points
+    pdf.addPage([w, h]).drawImage(img, {x: 0, y: 0, width: w, height: h});
+    return await pdf.save();
+  } finally { URL.revokeObjectURL(url); }
+}
+
+function peMakePage(pg, vp, index){
+  const wrap = document.createElement("div");
+  wrap.className = "pe-page";
+  const base = document.createElement("canvas"), over = document.createElement("canvas");
+  base.className = "pe-base"; over.className = "pe-over";
+  wrap.append(base, over);
+  PE.root.querySelector("#pePages").appendChild(wrap);
+  const p = {pg, index, w: vp.width, h: vp.height, wrap, base, over, ann: [], k: 1, rendered: 0};
+  peBindDrawing(p);
+  return p;
+}
+function peCssWidth(p){
+  const box = PE.root.querySelector("#pePages");
+  const avail = Math.max(260, (box.clientWidth || window.innerWidth - 32));
+  return Math.round(avail * PE.zoom);
+}
+async function peRenderAll(){
+  const job = PE.renderJob = {};
+  for (const p of PE.pages){
+    if (PE.renderJob !== job) return;
+    await peRenderPage(p);
+  }
+}
+async function peRenderPage(p){
+  const cssW = peCssWidth(p), cssH = Math.round(cssW * p.h / p.w);
+  p.wrap.style.width = cssW + "px"; p.wrap.style.height = cssH + "px";
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  let pxW = cssW * dpr, pxH = cssH * dpr;
+  const cap = 12e6 / (pxW * pxH);          // keep each page under ~12 million pixels so tablets don't run out of memory
+  if (cap < 1){ pxW *= Math.sqrt(cap); pxH *= Math.sqrt(cap); }
+  pxW = Math.floor(pxW); pxH = Math.floor(pxH);
+  if (p.rendered === pxW) { peDraw(p); return; }
+  const scale = pxW / p.w;
+  const tmp = document.createElement("canvas"); tmp.width = pxW; tmp.height = pxH;
+  if (p.task) try{ p.task.cancel(); }catch(e){}
+  p.task = p.pg.render({canvasContext: tmp.getContext("2d"), viewport: p.pg.getViewport({scale})});
+  try{ await p.task.promise; }catch(e){ return; }
+  p.base.width = pxW; p.base.height = pxH; p.base.getContext("2d").drawImage(tmp, 0, 0);
+  tmp.width = tmp.height = 0;
+  p.over.width = pxW; p.over.height = pxH;
+  p.rendered = pxW; p.k = pxW / p.w;
+  peDraw(p);
+}
+let peZoomTimer = 0;
+function peZoom(dir){
+  const steps = [0.5, 0.75, 1, 1.5, 2, 3, 4];
+  let i = steps.findIndex(s => s >= PE.zoom - 0.001);
+  i = Math.max(0, Math.min(steps.length - 1, i + dir));
+  const box = PE.root.querySelector("#pePages"), old = PE.zoom;
+  const cx = (box.scrollLeft + box.clientWidth / 2) / old, cy = (window.scrollY - box.offsetTop + window.innerHeight / 2) / old;
+  PE.zoom = steps[i]; peSync();
+  // resize straight away (blurry for a moment), redraw sharp once the zooming stops
+  PE.pages.forEach(p => { const w = peCssWidth(p); p.wrap.style.width = w + "px"; p.wrap.style.height = Math.round(w * p.h / p.w) + "px"; });
+  box.scrollLeft = cx * PE.zoom - box.clientWidth / 2;
+  window.scrollTo(0, cy * PE.zoom + box.offsetTop - window.innerHeight / 2);
+  clearTimeout(peZoomTimer); peZoomTimer = setTimeout(peRenderAll, 250);
+}
+window.addEventListener("resize", () => { if (S.view === "pdfedit" && PE.pages.length){ clearTimeout(peZoomTimer); peZoomTimer = setTimeout(peRenderAll, 300); } });
+
+// ----- drawing -----
+function peStrokePath(ctx, pts, k){
+  ctx.beginPath();
+  if (pts.length === 1){ ctx.moveTo(pts[0][0] * k, pts[0][1] * k); ctx.lineTo(pts[0][0] * k + 0.01, pts[0][1] * k); return; }
+  ctx.moveTo(pts[0][0] * k, pts[0][1] * k);
+  for (let i = 1; i < pts.length - 1; i++){
+    const mx = (pts[i][0] + pts[i + 1][0]) / 2, my = (pts[i][1] + pts[i + 1][1]) / 2;
+    ctx.quadraticCurveTo(pts[i][0] * k, pts[i][1] * k, mx * k, my * k);
+  }
+  const l = pts[pts.length - 1]; ctx.lineTo(l[0] * k, l[1] * k);
+}
+function peDrawObj(ctx, o, k){
+  if (o.type === "text"){
+    ctx.fillStyle = o.color; ctx.textBaseline = "alphabetic";
+    ctx.font = `bold ${o.size * k}px Helvetica, Arial, sans-serif`;
+    ctx.fillText(o.text, o.x * k, o.y * k);
+    return;
+  }
+  ctx.save();
+  ctx.lineCap = "round"; ctx.lineJoin = "round";
+  ctx.strokeStyle = o.color; ctx.lineWidth = o.width * k;
+  if (o.type === "hl") ctx.globalAlpha = 0.4;
+  peStrokePath(ctx, o.pts, k); ctx.stroke();
+  ctx.restore();
+}
+function peDraw(p){
+  const ctx = p.over.getContext("2d");
+  ctx.clearRect(0, 0, p.over.width, p.over.height);
+  p.ann.forEach(o => peDrawObj(ctx, o, p.k));
+  if (p.live) peDrawObj(ctx, p.live, p.k);
+}
+function pePoint(p, ev){
+  const r = p.over.getBoundingClientRect();
+  return [(ev.clientX - r.left) / r.width * p.w, (ev.clientY - r.top) / r.height * p.h];
+}
+function peBindDrawing(p){
+  const ov = p.over;
+  let active = null;
+  ov.addEventListener("pointerdown", async ev => {
+    if (PE.tool === "move" || (ev.pointerType === "mouse" && ev.button !== 0)) return;
+    ev.preventDefault();
+    const pt = pePoint(p, ev), cssPerPt = p.wrap.clientWidth / p.w;
+    if (PE.tool === "text"){
+      const text = await askText("Add text", "Text", "", "Add");
+      if (!text) return;
+      const size = PE_SIZES.text[PE.size] / cssPerPt;
+      peAdd(p, {type: "text", text, x: pt[0], y: pt[1] + size * 0.35, size, color: PE.color});
+      return;
+    }
+    if (PE.tool === "erase"){
+      const i = peHit(p, pt, 14 / cssPerPt);
+      if (i >= 0){ const o = p.ann.splice(i, 1)[0]; PE.undo.push({p, o, i, del: true}); peDraw(p); peSync(); }
+      active = {erase: true};
+      ov.setPointerCapture(ev.pointerId);
+      return;
+    }
+    const hl = PE.tool === "hl";
+    p.live = {type: hl ? "hl" : "pen", color: hl ? PE_HL : PE.color, width: PE_SIZES[PE.tool][PE.size] / cssPerPt, pts: [pt]};
+    active = {id: ev.pointerId};
+    ov.setPointerCapture(ev.pointerId);
+    peDraw(p);
+  });
+  ov.addEventListener("pointermove", ev => {
+    if (!active) return;
+    ev.preventDefault();
+    const pt = pePoint(p, ev);
+    if (active.erase){
+      const i = peHit(p, pt, 14 / (p.wrap.clientWidth / p.w));
+      if (i >= 0){ const o = p.ann.splice(i, 1)[0]; PE.undo.push({p, o, i, del: true}); peDraw(p); peSync(); }
+      return;
+    }
+    const evs = ev.getCoalescedEvents ? ev.getCoalescedEvents() : [ev];
+    (evs.length ? evs : [ev]).forEach(e => p.live.pts.push(pePoint(p, e)));
+    peDraw(p);
+  });
+  const end = () => {
+    if (!active) return;
+    const wasErase = active.erase; active = null;
+    if (wasErase || !p.live) return;
+    const o = p.live; p.live = null;
+    // highlighter: if it's nearly a straight line, make it perfectly straight
+    if (o.type === "hl" && o.pts.length > 2){
+      const a = o.pts[0], b = o.pts[o.pts.length - 1], len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      const dev = Math.max(...o.pts.map(q => Math.abs((b[0] - a[0]) * (a[1] - q[1]) - (a[0] - q[0]) * (b[1] - a[1])) / (len || 1)));
+      if (len > o.width * 2 && dev < o.width * 0.6) o.pts = [a, b];
+    }
+    o.pts = peSimplify(o.pts, 0.35 / p.k);
+    peAdd(p, o);
+  };
+  ov.addEventListener("pointerup", end);
+  ov.addEventListener("pointercancel", end);
+}
+function peAdd(p, o){ p.ann.push(o); PE.undo.push({p, o}); peDraw(p); peSync(); }
+function peUndo(){
+  const u = PE.undo.pop(); if (!u) return;
+  if (u.del) u.p.ann.splice(u.i, 0, u.o);
+  else { const i = u.p.ann.lastIndexOf(u.o); if (i >= 0) u.p.ann.splice(i, 1); }
+  peDraw(u.p); peSync();
+}
+function peHit(p, pt, tol){
+  for (let i = p.ann.length - 1; i >= 0; i--){
+    const o = p.ann[i];
+    if (o.type === "text"){
+      const ctx = p.over.getContext("2d"); ctx.font = `bold ${o.size}px Helvetica, Arial, sans-serif`;
+      const w = ctx.measureText(o.text).width;
+      if (pt[0] > o.x - tol && pt[0] < o.x + w + tol && pt[1] > o.y - o.size - tol && pt[1] < o.y + o.size * 0.3 + tol) return i;
+      continue;
+    }
+    const r = tol + o.width / 2;
+    for (let j = 0; j < o.pts.length; j++){
+      const a = o.pts[j], b = o.pts[j + 1] || a;
+      if (peSegDist(pt, a, b) < r) return i;
+    }
+  }
+  return -1;
+}
+function peSegDist(p, a, b){
+  const dx = b[0] - a[0], dy = b[1] - a[1], l = dx * dx + dy * dy;
+  const t = l ? Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / l)) : 0;
+  return Math.hypot(p[0] - a[0] - t * dx, p[1] - a[1] - t * dy);
+}
+function peSimplify(pts, tol){
+  if (pts.length < 3) return pts;
+  const out = [pts[0]];
+  for (let i = 1; i < pts.length - 1; i++){
+    const l = out[out.length - 1];
+    if (Math.hypot(pts[i][0] - l[0], pts[i][1] - l[1]) >= tol) out.push(pts[i]);
+  }
+  out.push(pts[pts.length - 1]);
+  return out;
+}
+
+// ----- export: write the markings into the original PDF as real lines and text -----
+async function peExport(){
+  if (!PE.bytes) return;
+  await runPdf("peExport", async () => {
+    const L = await loadPdfLib();
+    const doc = await L.PDFDocument.load(PE.bytes, {ignoreEncryption: true});
+    const font = await doc.embedFont(L.StandardFonts.HelveticaBold);
+    const pages = doc.getPages();
+    PE.pages.forEach((pp, i) => {
+      if (!pp.ann.length) return;
+      const page = pages[i];
+      const box = page.getCropBox(), W = box.width, H = box.height;
+      const rot = ((page.getRotation().angle % 360) + 360) % 360;
+      // screen point (x across, y down, as the page is shown) -> PDF page point
+      const map = (x, y) => {
+        let u, v;
+        if (rot === 90){ u = y; v = x; }
+        else if (rot === 180){ u = W - x; v = y; }
+        else if (rot === 270){ u = W - y; v = H - x; }
+        else { u = x; v = H - y; }
+        return [box.x + u, box.y + v];
+      };
+      const hl = pp.ann.filter(o => o.type === "hl"), rest = pp.ann.filter(o => o.type !== "hl");
+      [...hl, ...rest].forEach(o => {
+        const col = peRgb(L, o.color);
+        if (o.type === "text"){
+          const [x, y] = map(o.x, o.y);
+          page.drawText(peSafeText(font, o.text), {x, y, size: o.size, font, color: col, rotate: L.degrees(rot)});
+          return;
+        }
+        const pts = o.pts.length === 1 ? [o.pts[0], [o.pts[0][0] + 0.01, o.pts[0][1]]] : o.pts;
+        // drawSvgPath flips y around the origin we give it, so feed it page coordinates with y pointing down from the top
+        const d = pts.map((q, j) => { const [x, y] = map(q[0], q[1]); return `${j ? "L" : "M"}${(x - box.x).toFixed(2)} ${(H - (y - box.y)).toFixed(2)}`; }).join(" ");
+        page.drawSvgPath(d, {x: box.x, y: box.y + H, borderColor: col, borderWidth: o.width, borderLineCap: L.LineCapStyle.Round,
+          borderOpacity: o.type === "hl" ? 0.45 : 1, blendMode: o.type === "hl" ? L.BlendMode.Multiply : undefined});
+      });
+    });
+    const out = await doc.save();
+    const name = (PE.name || "Drawing") + " - marked up.pdf";
+    const blob = new Blob([out], {type: "application/pdf"});
+    const file = new File([blob], name, {type: "application/pdf"});
+    return {name, blobUrl: URL.createObjectURL(blob), file, note: "Saved on this device. Download it or share it straight from here."};
+  });
+}
+function peRgb(L, hex){
+  const n = parseInt(hex.slice(1), 16);
+  return L.rgb(((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255);
+}
+function peSafeText(font, s){
+  let out = "";
+  for (const ch of s){ try{ font.encodeText(ch); out += ch; }catch(e){ out += "?"; } }
+  return out;
+}
 
 go((() => {
   try{
