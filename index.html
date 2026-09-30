@@ -876,7 +876,7 @@ async function loadHome(){
 // Made here on the phone so the faces can go on it. Extras.gs then saves it to Drive for a share link.
 const HC_NAVY = "#012060", HC_TINT = "#DCE6F2", HC_LINE = "#B8C4D6", HC_GREY = "#5A6478", HC_GREEN = "#1E7A3C", HC_RED = "#B3261E";
 const HC_TRADE_ORDER = ["Carpenter", "Steel Fixer", "Chippy Labourer", "General Operative", "Fixing Foreman", "Site Manager", "Safety Rep"];
-const HC_SITE = "Boyne 1C  |  Patrician Secondary School, Newbridge";
+const HC_SITE = "Patrician Secondary School, Newbridge";
 // jsPDF and the navy logo come from loadJsPdf() and navyLogo(), further down (shared with the pour PDF)
 function hcTrade(l){
   const label = String(TRADE_LABEL[l.code] || l.trade || "").trim();
@@ -2769,7 +2769,7 @@ async function pourPdf(btn){
     doc.setTextColor(...NAVY); doc.setFont("helvetica", "bold"); doc.setFontSize(20);
     doc.text("Pour record", W - M, M + 7, {align: "right"});
     doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(90);
-    doc.text(`Boyne 1C, Patrician Secondary School, Newbridge. Ground floor Phase 01`, W - M, M + 13, {align: "right"});
+    doc.text(`Patrician Secondary School, Newbridge. Ground floor Phase 01`, W - M, M + 13, {align: "right"});
     doc.text(`Printed ${today.toLocaleDateString("en-GB")}  |  Walls from OCSC SE-10211 / SE-10212 Rev 01`, W - M, M + 18, {align: "right"});
     const top = M + 24; doc.setDrawColor(...NAVY); doc.setLineWidth(0.6); doc.line(M, top, W - M, top);
     // fit the plan
@@ -2915,7 +2915,7 @@ async function pourSheet(btn, size, print){
     doc.setTextColor(...NAVY); doc.setFont("helvetica", "bold"); doc.setFontSize(fs(20));
     doc.text("Pour record", mm(W - M), mm(M + 7), {align: "right"});
     doc.setFont("helvetica", "normal"); doc.setFontSize(fs(10)); doc.setTextColor(90);
-    doc.text("Boyne 1C, Patrician Secondary School, Newbridge. Ground floor Phase 01", mm(W - M), mm(M + 13), {align: "right"});
+    doc.text("Patrician Secondary School, Newbridge. Ground floor Phase 01", mm(W - M), mm(M + 13), {align: "right"});
     doc.text("Walls from OCSC SE-10211 / SE-10212 Rev 01", mm(W - M), mm(M + 18), {align: "right"});
     const stamp = `${today.toLocaleDateString("en-GB", {weekday: "short", day: "2-digit", month: "long", year: "numeric"})}, ${today.toLocaleTimeString("en-GB", {hour: "2-digit", minute: "2-digit"})}`;
     doc.setFont("helvetica", "bold"); doc.setFontSize(fs(11)); doc.setTextColor(...NAVY);
@@ -3074,10 +3074,10 @@ async function pourReport(btn){
       doc.setFont("helvetica", "normal"); doc.setFontSize(8.5); doc.setTextColor(90); if (sub) doc.text(sub, W - M, M + 11, {align: "right"});
       doc.setDrawColor(...NAVY); doc.setLineWidth(0.5); doc.line(M, M + 16, W - M, M + 16); y = M + 22;
     };
-    const newPage = () => { doc.addPage("a4", "portrait"); brand("Pour report", "Boyne 1C, Patrician Secondary School, Newbridge"); };
+    const newPage = () => { doc.addPage("a4", "portrait"); brand("Pour report", "Patrician Secondary School, Newbridge"); };
     const need = h => { if (y + h > H - 16) newPage(); };
     // cover + overview
-    brand("Pour report", "Boyne 1C, Patrician Secondary School, Newbridge. Ground floor Phase 01");
+    brand("Pour report", "Patrician Secondary School, Newbridge. Ground floor Phase 01");
     doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.setTextColor(...NAVY);
     doc.text(`${poured.length} of ${PLAN_IDS.length} walls and columns poured`, M, y); y += 5.5;
     doc.setFont("helvetica", "normal"); doc.setFontSize(8.5); doc.setTextColor(80);
@@ -3104,7 +3104,7 @@ async function pourReport(btn){
     // one section per element
     for (const id of poured){
       const p = P[id], v = pourVol(id, p), s = pourSize(id), st = pourState(p), list = pics[id] || [];
-      doc.addPage("a4", "portrait"); brand("Pour report", "Boyne 1C, Patrician Secondary School, Newbridge");
+      doc.addPage("a4", "portrait"); brand("Pour report", "Patrician Secondary School, Newbridge");
       doc.setFillColor(...NAVY); doc.rect(M, y, CW, 10, "F");
       doc.setFont("helvetica", "bold"); doc.setFontSize(14); doc.setTextColor(255); doc.text(pourName(id), M + 3, y + 7);
       doc.setFontSize(10); doc.text(`${st === "today" ? "Poured today" : "Poured"} ${dmy(p.date)}`, W - M - 3, y + 6.6, {align: "right"}); y += 14;
