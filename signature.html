@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="robots" content="noindex"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Jack Aylward Outlook signature</title>
+<style>
+body{font-family:Arial,sans-serif;margin:0;padding:20px;background:#f4f6fa;color:#012060}
+.card{background:#fff;border:1px solid #C9D5E8;border-radius:10px;padding:20px;max-width:640px}
+button{margin-top:16px;padding:14px 22px;font-size:16px;font-weight:bold;color:#fff;background:#012060;border:0;border-radius:8px}
+#done{margin-left:12px;font-size:14px}
+</style></head><body>
+<div class="card">
+<div id="sig">
+<table cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;font-family:Arial,Helvetica,sans-serif;color:#012060;">
+  <tr><td style="padding:0 0 14px 0;font-size:14px;line-height:20px;color:#012060;">Regards,</td></tr>
+  <tr><td style="padding:0 0 6px 0;font-size:18px;line-height:22px;font-weight:bold;color:#012060;letter-spacing:0.5px;">Jack Aylward</td></tr>
+  <tr><td style="padding:0;">
+    <table cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;font-family:Arial,Helvetica,sans-serif;">
+      <tr>
+        <td style="width:18px;padding:0;font-size:12px;line-height:20px;color:#012060;font-weight:bold;">M</td>
+        <td style="padding:0;font-size:13px;line-height:20px;"><a href="tel:+353892114359" style="color:#012060;text-decoration:none;">089 211 4359</a></td>
+      </tr>
+      <tr>
+        <td style="width:18px;padding:0;font-size:12px;line-height:20px;color:#012060;font-weight:bold;">E</td>
+        <td style="padding:0;font-size:13px;line-height:20px;"><a href="mailto:ja@nbf.ie" style="color:#012060;text-decoration:none;">ja@nbf.ie</a></td>
+      </tr>
+    </table>
+  </td></tr>
+  <tr><td style="padding:12px 0 0 0;">
+    <img src="https://raw.githubusercontent.com/jackaylward/nbf-logo/main/nbf-signature-logo.png" width="170" alt="New Bridge Form" style="display:block;width:170px;height:auto;border:0;">
+  </td></tr>
+  <tr><td style="padding:14px 0 0 0;">
+    <table cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;max-width:560px;">
+      <tr><td style="border-top:1px solid #C9D5E8;padding:8px 0 0 0;font-family:Arial,Helvetica,sans-serif;font-size:9.5px;line-height:13px;color:#012060;">
+        <b>CONFIDENTIALITY NOTICE:</b> This email and any attachments are confidential and intended solely for the person or organisation to whom they are addressed. They may contain privileged or commercially sensitive information. If you have received this email in error, please notify the sender immediately and delete it from your system. You must not copy, forward, disclose or use any part of it.
+        <br><br>
+        Any views or opinions expressed are those of the sender and do not necessarily represent those of New Bridge Form. Nothing in this email is intended to form a binding contract unless expressly stated. While we take reasonable precautions, we cannot accept liability for any loss or damage caused by software viruses, and you should carry out your own checks before opening any attachment. We process personal data in line with the GDPR and applicable data protection law.
+      </td></tr>
+    </table>
+  </td></tr>
+</table></div>
+<button id="copy">Copy signature</button><span id="done"></span>
+</div>
+<script>
+document.getElementById('copy').onclick=function(){
+  var el=document.getElementById('sig'),r=document.createRange();
+  r.selectNodeContents(el);var s=window.getSelection();s.removeAllRanges();s.addRange(r);
+  var ok=false;try{ok=document.execCommand('copy');}catch(e){}
+  document.getElementById('done').textContent=ok?'Copied. Now paste it into Outlook.':'Select the signature and copy it.';
+};
+</script></body></html>
