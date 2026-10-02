@@ -281,6 +281,12 @@ input[readonly],textarea[readonly]{background:var(--soft);color:var(--muted);cur
 .logrow .when{flex:0 0 104px;color:var(--muted);font-size:.78rem}
 .logrow b{white-space:nowrap}
 .dwthumbs{display:flex;gap:5px;margin-top:8px}
+.srph{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px}
+.srimg{position:relative;aspect-ratio:1;border-radius:10px;overflow:hidden;background:var(--line)}
+.srimg img{width:100%;height:100%;object-fit:cover;display:block}
+.srimg .skel{display:block;width:100%;height:100%}
+.srx{position:absolute;top:4px;right:4px;width:30px;height:30px;border-radius:50%;border:0;background:rgba(0,0,0,.6);color:#fff;font-size:1.2rem;line-height:1;cursor:pointer}
+.tag.rec{background:#e7f5ec;color:#1d6b3f}
 .dwthumbs img,.dwthumbs .skel{width:56px;height:56px;border-radius:8px;object-fit:cover;display:block;border:1px solid var(--line)}
 @media (max-width:620px){ .tool.dw{flex-wrap:wrap} .tool.dw .info{flex:1 1 60%} .dwthumbs{order:3;width:100%;margin-top:6px} }
 
@@ -701,6 +707,7 @@ function go(view){
   if (view === "talks") loadTalks();
   if (view === "pours") loadPours();
   if (view === "cabinet") loadCabinet();
+  if (view === "dayworks" && S.dwTab === "records") loadSiteRecords();
   if (view === "home") loadHome();
   if (view === "timesheet"){ S.past = null; loadPastWeeks(); }
   if (view === "timesheet" && !S.tsTabs) server("timesheetTabs").then(tabs => { S.tsTabs = tabs || []; if (S.view === "timesheet" && !(document.activeElement && /INPUT|TEXTAREA/.test(document.activeElement.tagName))) render(); }).catch(() => {});
@@ -712,7 +719,8 @@ function render(){
   if (S.view === "home") v.innerHTML = homeHtml();
   if (S.view === "attendance") v.innerHTML = attendanceHtml();
   if (S.view === "timesheet") v.innerHTML = timesheetHtml();
-  if (S.view === "dayworks" || S.view === "works") v.innerHTML = recordsHtml(S.view);
+  if (S.view === "dayworks" && S.dwTab === "records") v.innerHTML = siteRecordsHtml();
+  else if (S.view === "dayworks" || S.view === "works") v.innerHTML = recordsHtml(S.view);
   if (S.view === "talks") v.innerHTML = talksHtml();
   if (S.view === "pours") v.innerHTML = poursHtml();
   if (S.view === "cabinet") v.innerHTML = cabinetHtml();
@@ -2045,7 +2053,7 @@ function recordsHtml(kind){
         <span class="small muted">${r.photos || 0} photo${r.photos==1?"":"s"}</span>
         ${r.pending ? `<span class="pill amber">Sending</span>` : `<span class="pill ok">Saved</span>`}</div></button>`;
   }).join("");
-  return `
+  return `${kind === "dayworks" ? dwTabBar() : ""}
   ${queueHtml(K)}
   ${offline}
   ${modeBar()}
@@ -3401,6 +3409,226 @@ $("view").addEventListener("click", async ev => {
     const rec = {id: S.cab.form.id, date, qty: String(Math.round(qty * 100) / 100), item, to: $("cabTo").value.trim(), note: $("cabNote").value.trim(), by: getWho() || S.cab.form.by || ""};
     S.cab.form = null;
     await cabSaveLocal(rec, false); render();
+  }
+});
+
+
+// ================= records (on the Variations page, kept separate): a description and photos =================
+// Saved on the device first, then sent to Google (SiteRecords.gs), retried until it gets through.
+S.sr = {list: null, form: null, q: "", err: "", photos: {}};
+S.dwTab = (() => { try{ return localStorage.getItem("siteAppDwTab") || "main"; }catch(e){ return "main"; } })();
+const srNewId = () => `rc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+const srPhotoName = () => `ph-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+const srSort = l => l.sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(b.at || "").localeCompare(String(a.at || "")));
+function dwTabBar(){
+  return `<div class="seg" style="margin-bottom:12px">
+    <button data-dwtab="main" aria-pressed="${S.dwTab !== "records"}">Variations &amp; delays</button>
+    <button data-dwtab="records" aria-pressed="${S.dwTab === "records"}">Records</button></div>`;
+}
+$("view").addEventListener("click", ev => {
+  const b = ev.target.closest("[data-dwtab]");
+  if (!b || S.view !== "dayworks") return;
+  S.dwTab = b.dataset.dwtab;
+  try{ localStorage.setItem("siteAppDwTab", S.dwTab); }catch(e){}
+  if (S.dwTab === "records") loadSiteRecords();
+  render(); window.scrollTo(0, 0);
+});
+async function loadSiteRecords(){
+  if (!S.sr.list){ const c = await cacheGet("siterecords"); if (c && !S.sr.list){ S.sr.list = c; srRender(); } }
+  try{
+    const list = await (S.sr.list ? bgServer : server)("getSiteRecords");
+    const pend = (await kvGet("srPending")) || {};
+    const byId = new Map((list || []).map(r => [r.id, r]));
+    for (const [id, j] of Object.entries(pend)){
+      if (j.del) byId.delete(id);
+      else byId.set(id, {...(byId.get(id) || {}), ...j.rec, photos: (byId.get(id) || {}).photos || 0, pending: true, newPhotos: (j.add || []).length});
+    }
+    S.sr.list = srSort([...byId.values()]); S.sr.err = "";
+    cacheSet("siterecords", S.sr.list.map(r => ({...r})));
+    if (Object.keys(pend).length) flushSiteRecords();
+  }catch(e){
+    if (!S.sr.list) S.sr.list = [];
+    S.sr.err = errText(e, "");
+    connectionTrouble();
+  }
+  srRender();
+}
+function srRender(){ if (S.view === "dayworks" && S.dwTab === "records" && !S.sr.form) render(); }
+async function srSaveLocal(rec, opts){
+  const pend = (await kvGet("srPending")) || {};
+  const old = pend[rec.id] || {};
+  if (opts.del) pend[rec.id] = {del: true};
+  else pend[rec.id] = {rec, add: [...(old.add || []), ...(opts.add || [])].filter(p => !(opts.remove || []).includes(p.name)),
+    remove: [...(old.remove || []), ...(opts.remove || []).filter(n => !(old.add || []).some(p => p.name === n))]};
+  await kvSet("srPending", pend);
+  const rest = (S.sr.list || []).filter(r => r.id !== rec.id);
+  const prev = (S.sr.list || []).find(r => r.id === rec.id) || {};
+  S.sr.list = srSort(opts.del ? rest : [...rest, {...prev, ...rec, pending: true, newPhotos: (pend[rec.id].add || []).length}]);
+  if (opts.photos) S.sr.photos[rec.id] = opts.photos;
+  flushSiteRecords();
+}
+let srFlushing = false;
+async function flushSiteRecords(){
+  if (srFlushing) return; srFlushing = true;
+  setStatus("Saving…");
+  try{
+    for (const id of Object.keys((await kvGet("srPending")) || {})){
+      let j = ((await kvGet("srPending")) || {})[id];
+      if (!j) continue;
+      if (j.del){
+        await bgServer("deleteSiteRecord", id);
+      } else {
+        const res = await bgServer("saveSiteRecord", j.rec);
+        // photos go one at a time, each one ticked off as soon as it lands
+        for (const p of [...(j.add || [])]){
+          const r2 = await bgServer("addSiteRecordPhoto", id, p.name, p.data);
+          const pend = (await kvGet("srPending")) || {};
+          if (pend[id] && pend[id].add){ pend[id].add = pend[id].add.filter(x => x.name !== p.name); await kvSet("srPending", pend); }
+          if (S.sr.list) S.sr.list = S.sr.list.map(r => r.id === id ? {...r, photos: r2 && r2.photos != null ? r2.photos : r.photos, newPhotos: Math.max(0, (r.newPhotos || 1) - 1)} : r);
+          srRender();
+        }
+        for (const n of [...(j.remove || [])]) await bgServer("removeSiteRecordPhoto", id, n);
+        if (res && S.sr.list) S.sr.list = S.sr.list.map(r => r.id === id ? {...r, folder: res.folder || r.folder} : r);
+      }
+      const pend = (await kvGet("srPending")) || {};
+      const now = pend[id];
+      // only clear it if nothing new was added while it was sending
+      if (now && (now.del || (!(now.add || []).length && JSON.stringify(now.rec) === JSON.stringify(j.rec) && JSON.stringify(now.remove || []) === JSON.stringify(j.remove || [])))) delete pend[id];
+      else if (now && now.remove) now.remove = now.remove.filter(n => !(j.remove || []).includes(n));
+      await kvSet("srPending", pend);
+      if (!pend[id] && S.sr.list){
+        S.sr.list = S.sr.list.map(r => r.id === id ? {...r, pending: false, newPhotos: 0} : r);
+        delete S.sr.photos[id];
+      }
+    }
+    S.sr.err = "";
+    cacheSet("siterecords", (S.sr.list || []).map(r => ({...r})));
+    setStatus("Saved", true);
+  }catch(e){
+    S.sr.err = errText(e, "Couldn't send to Google");
+    setStatus("Kept on this device. Will send when Google answers");
+  }
+  srFlushing = false;
+  if (Object.keys((await kvGet("srPending")) || {}).length && !S.sr.err) flushSiteRecords();
+  srRender();
+}
+function srRowsHtml(){
+  const q = S.sr.q.trim().toLowerCase();
+  const list = (S.sr.list || []).filter(r => !q || `${r.description} ${r.date}`.toLowerCase().includes(q));
+  if (!list.length) return `<p class="muted">${(S.sr.list || []).length ? "Nothing matches that search." : "No records yet. Tap New record to add one."}</p>`;
+  return list.map(r => {
+    const n = (+r.photos || 0) + (+r.newPhotos || 0);
+    const lines = String(r.description || "").split("\n");
+    return `<button class="tool dw" data-sropen="${esc(r.id)}">
+      <div class="info"><span class="tag rec">Record</span><strong>${esc(lines[0] || "No description")}</strong>
+        <span>${esc(niceYmd(r.date))}${r.by ? " · " + esc(r.by) : ""}</span>
+        ${lines.length > 1 ? `<span>${esc(lines.slice(1).join(" "))}</span>` : ""}</div>
+      <div class="dwside"><b>${n}</b><span class="small muted">photo${n == 1 ? "" : "s"}</span>
+        ${r.pending ? `<span class="pill amber">Sending</span>` : `<span class="pill ok">Saved</span>`}</div></button>`;
+  }).join("");
+}
+function siteRecordsHtml(){
+  if (S.sr.form) return srFormHtml();
+  if (!S.sr.list) return `${dwTabBar()}${loadingBox("Loading records…")}`;
+  const waiting = S.sr.list.filter(r => r.pending).length;
+  const bar = waiting ? `<div class="qbar wait"><span>${waiting} ${waiting === 1 ? "record" : "records"} waiting to send. Safe on this device.${S.sr.err ? " " + esc(S.sr.err) : ""}</span></div>` : `<div class="qbar ok">Everything saved to Google</div>`;
+  return `${dwTabBar()}${bar}${modeBar()}
+  <div class="toolbar">
+    ${S.edit ? `<button class="btn" data-srnew>New record</button>` : ""}
+    <input id="srQ" type="search" placeholder="Search records" value="${esc(S.sr.q)}" aria-label="Search records">
+  </div>
+  <p class="muted small" style="margin:0 2px 10px">${S.sr.list.length} ${S.sr.list.length === 1 ? "record" : "records"}. Kept separate from variations and crane delays.</p>
+  <div class="list" id="srList">${srRowsHtml()}</div>`;
+}
+function srFormHtml(){
+  const f = S.sr.form, isNew = !f.saved, ro = S.edit ? "" : "readonly";
+  const ph = f.photos === null ? `<p class="muted small"><span class="spin sm"></span> Loading photos…</p>`
+    : f.photos.length ? `<div class="srph">${f.photos.map(p => `<div class="srimg">${p.data ? `<img src="${p.data}" alt="">` : `<span class="skel"></span>`}
+        ${S.edit ? `<button class="srx" data-srrm="${esc(p.name)}" aria-label="Remove this photo">×</button>` : ""}</div>`).join("")}</div>`
+    : `<p class="muted small">No photos yet.</p>`;
+  return `<div class="row-actions" style="margin-bottom:10px"><button class="btn ghost" data-srcancel>‹ Back to records</button></div>
+  ${modeBar()}
+  <div class="panel">
+    <h2>${isNew ? "New record" : "Record"}</h2>
+    <label class="field">Date<input id="srDate" type="date" value="${esc(f.date)}" ${ro}></label>
+    <label class="field">Description<textarea id="srDesc" rows="5" placeholder="What happened, where, anything worth noting" ${ro}>${esc(f.description)}</textarea></label>
+    <h3 style="margin:14px 0 6px">Photos</h3>
+    ${ph}
+    ${S.edit ? `<div style="display:flex;gap:8px;margin-top:8px"><button class="btn ghost" data-sradd="multi" style="flex:1">Add photos (pick several)</button>
+      <button class="btn ghost" data-sradd="one" style="flex:1">Take a photo</button></div>` : ""}
+    <p class="small" id="srMsg" style="color:var(--warn);min-height:1.2em;margin:8px 0 4px"></p>
+    ${S.edit ? `<div class="row-actions"><button class="btn" data-srsave>Save</button>
+      ${isNew ? "" : `<button class="btn danger" data-srdel>Delete</button>`}</div>` : ""}
+  </div>`;
+}
+async function srOpen(r){
+  S.sr.form = {id: r.id, date: r.date, description: r.description || "", saved: true, by: r.by, add: [], remove: [], photos: null};
+  render();
+  const local = S.sr.photos[r.id];
+  const pend = ((await kvGet("srPending")) || {})[r.id] || {};
+  let got = [];
+  if (+r.photos > 0){ try{ got = await server("getSiteRecordPhotos", r.id) || []; }catch(e){ got = []; S.sr.err = errText(e, ""); } }
+  if (!S.sr.form || S.sr.form.id !== r.id) return;
+  const removed = new Set(pend.remove || []);
+  const list = got.filter(p => !removed.has(p.name));
+  for (const p of (pend.add || [])) if (!list.some(x => x.name === p.name)) list.push(p);
+  for (const p of (local || [])) if (!list.some(x => x.name === p.name) && p.data) list.push(p);
+  S.sr.form.photos = list;
+  render();
+}
+function srKeepForm(){
+  const f = S.sr.form; if (!f) return;
+  if ($("srDate")) f.date = $("srDate").value;
+  if ($("srDesc")) f.description = $("srDesc").value;
+}
+$("view").addEventListener("input", ev => {
+  if (ev.target.id === "srQ"){ S.sr.q = ev.target.value; const l = $("srList"); if (l) l.innerHTML = srRowsHtml(); }
+});
+$("view").addEventListener("click", async ev => {
+  const b = ev.target.closest("[data-srnew],[data-sropen],[data-srcancel],[data-srsave],[data-srdel],[data-sradd],[data-srrm]");
+  if (!b || S.view !== "dayworks") return;
+  if (b.hasAttribute("data-srnew")){
+    if (!(await canEdit())) return;
+    S.sr.form = {id: srNewId(), date: iso(new Date()), description: "", saved: false, add: [], remove: [], photos: []}; render(); return;
+  }
+  if (b.hasAttribute("data-sropen")){ const r = (S.sr.list || []).find(x => x.id === b.dataset.sropen); if (r) srOpen(r); return; }
+  if (b.hasAttribute("data-srcancel")){ S.sr.form = null; render(); return; }
+  if (!(await canEdit())) return;
+  if (b.hasAttribute("data-sradd")){
+    srKeepForm();
+    const files = b.dataset.sradd === "multi" ? await pickImages() : [await pickImage()].filter(Boolean);
+    if (!files.length || !S.sr.form) return;
+    $("srMsg") && ($("srMsg").textContent = "Adding photos…");
+    for (const file of files){
+      try{
+        const data = await shrinkImage(file, 1280, false);
+        const p = {name: srPhotoName(), data};
+        S.sr.form.add.push(p); (S.sr.form.photos = S.sr.form.photos || []).push(p);
+      }catch(e){ setStatus(errText(e, "Couldn't use that photo")); }
+    }
+    render(); return;
+  }
+  if (b.hasAttribute("data-srrm")){
+    srKeepForm();
+    const n = b.dataset.srrm, f = S.sr.form;
+    if (f.add.some(p => p.name === n)) f.add = f.add.filter(p => p.name !== n); else f.remove.push(n);
+    f.photos = (f.photos || []).filter(p => p.name !== n);
+    render(); return;
+  }
+  if (b.hasAttribute("data-srdel")){
+    if (!(await ask("Delete this record and its photos? This can't be undone.", "Delete", true))) return;
+    const id = S.sr.form.id; S.sr.form = null;
+    await srSaveLocal({id}, {del: true}); render(); return;
+  }
+  if (b.hasAttribute("data-srsave")){
+    srKeepForm();
+    const f = S.sr.form;
+    const msg = !f.date ? "Pick a date." : !f.description.trim() ? "Put in a description." : "";
+    $("srMsg").textContent = msg; if (msg) return;
+    const rec = {id: f.id, date: f.date, description: f.description.trim(), by: f.by || getWho() || ""};
+    S.sr.form = null;
+    await srSaveLocal(rec, {add: f.add, remove: f.remove, photos: (f.photos || []).filter(p => p.data)});
+    render();
   }
 });
 
