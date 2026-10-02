@@ -309,7 +309,10 @@ input[readonly],textarea[readonly]{background:var(--soft);color:var(--muted);cur
 .agadd{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
 @media (prefers-reduced-motion: reduce){*{transition:none!important}}
 /* pours */
-.pourwrap{display:grid;gap:14px}
+.pourwrap{display:grid;gap:14px;grid-template-columns:minmax(0,1fr)}
+.pourwrap>*{min-width:0}
+.pourpanel{overflow-wrap:anywhere}
+.pourpanel .field input,.pourpanel .field select,.pourpanel .field textarea{width:100%;min-width:0;max-width:100%;box-sizing:border-box}
 @media (min-width:1000px){.pourwrap{grid-template-columns:minmax(0,1fr) 340px;align-items:start}}
 .plancard{position:relative;border:1px solid var(--line);border-radius:var(--radius);background:#fbfcfe;overflow:hidden;box-shadow:var(--shadow)}
 .plancard svg{display:block;width:100%;height:62vh;height:62svh;min-height:320px;touch-action:none;user-select:none;-webkit-user-select:none}
