@@ -2177,6 +2177,7 @@ async function loadRecords(kind, quiet){
     st.loadFailed = false;
     cacheSet("records:" + kind, st.list);
     // moveSiteRecords() was a one-off and is switched off
+    if (kind === "dayworks") unmoveLadderRecord();
   }catch(e){
     st.loadFailed = !st.list;
     if (!quiet) connectionTrouble();
@@ -2498,6 +2499,17 @@ async function srPhotoData(p){
   const im = await loadImg(p.data);
   if (!im) return null;
   try{ const c = document.createElement("canvas"); c.width = im.naturalWidth; c.height = im.naturalHeight; c.getContext("2d").drawImage(im, 0, 0); return c.toDataURL("image/jpeg", 0.85); }catch(e){ return null; }
+}
+async function unmoveLadderRecord(){
+  const id = "dw-rc-mur3hu5c-1d50t";
+  try{
+    if (await kvGet("ladderBackToRecords")) return;
+    if (await jobGet("save:" + id)) await jobDel("save:" + id);
+    if (RS("dayworks").list && RS("dayworks").list.some(r => r.id === id)) await queueRecordDelete("dayworks", id);
+    await kvSet("ladderBackToRecords", true);
+    await refreshJobs();
+    if (S.view === "dayworks") render();
+  }catch(e){}
 }
 async function moveSiteRecords(){
   if (S.srMoving || !RS("dayworks").list) return;
@@ -3859,12 +3871,11 @@ $("view").addEventListener("click", async ev => {
 // ================= records (on the Variations page, kept separate): a description and photos =================
 // Saved on the device first, then sent to Google (SiteRecords.gs), retried until it gets through.
 S.sr = {list: null, form: null, q: "", err: "", photos: {}};
-S.dwTab = "main";
+S.dwTab = (() => { try{ return localStorage.getItem("siteAppDwTab") || "main"; }catch(e){ return "main"; } })();
 const srNewId = () => `rc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 const srPhotoName = () => `ph-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
 const srSort = l => l.sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(b.at || "").localeCompare(String(a.at || "")));
 function dwTabBar(){
-  return "";   // Records tab removed: its two entries were moved into Delays (see moveSiteRecords)
   return `<div class="seg" style="margin-bottom:12px">
     <button data-dwtab="main" aria-pressed="${S.dwTab !== "records"}">Variations &amp; delays</button>
     <button data-dwtab="records" aria-pressed="${S.dwTab === "records"}">Records</button></div>`;
@@ -3958,7 +3969,9 @@ async function flushSiteRecords(){
 }
 function srRowsHtml(){
   const q = S.sr.q.trim().toLowerCase();
-  const list = (S.sr.list || []).filter(r => !q || `${r.description} ${r.date}`.toLowerCase().includes(q));
+  const asDelay = new Set(mergedRecords("dayworks").map(r => r.id));
+  const shown = (S.sr.list || []).filter(r => !asDelay.has("dw-" + r.id));   // ones moved into Delays aren't shown twice
+  const list = shown.filter(r => !q || `${r.description} ${r.date}`.toLowerCase().includes(q));
   if (!list.length) return `<p class="muted">${(S.sr.list || []).length ? "Nothing matches that search." : "No records yet. Tap New record to add one."}</p>`;
   return list.map(r => {
     const n = (+r.photos || 0) + (+r.newPhotos || 0);
@@ -3971,6 +3984,10 @@ function srRowsHtml(){
         ${r.pending ? `<span class="pill amber">Sending</span>` : `<span class="pill ok">Saved</span>`}</div></button>`;
   }).join("");
 }
+function srShownCount(){
+  const asDelay = new Set(mergedRecords("dayworks").map(r => r.id));
+  return (S.sr.list || []).filter(r => !asDelay.has("dw-" + r.id)).length;
+}
 function siteRecordsHtml(){
   if (S.sr.form) return srFormHtml();
   if (!S.sr.list) return `${dwTabBar()}${loadingBox("Loading records…")}`;
@@ -3981,7 +3998,7 @@ function siteRecordsHtml(){
     ${S.edit ? `<button class="btn" data-srnew>New record</button>` : ""}
     <input id="srQ" type="search" placeholder="Search records" value="${esc(S.sr.q)}" aria-label="Search records">
   </div>
-  <p class="muted small" style="margin:0 2px 10px">${S.sr.list.length} ${S.sr.list.length === 1 ? "record" : "records"}. Kept separate from variations and crane delays.</p>
+  <p class="muted small" style="margin:0 2px 10px">${srShownCount()} ${srShownCount() === 1 ? "record" : "records"}. Kept separate from variations and delays.</p>
   <div class="list" id="srList">${srRowsHtml()}</div>`;
 }
 function srFormHtml(){
