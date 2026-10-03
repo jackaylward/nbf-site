@@ -234,6 +234,12 @@ main{padding-bottom:40px}
 .dwadd{aspect-ratio:1/1;border:2px dashed var(--line);border-radius:10px;display:grid;place-items:center;cursor:pointer;font-weight:700;text-align:center;padding:6px}
 .dwadd:hover{border-color:var(--ink)}
 .dwmiss{margin:12px 0 0;padding:10px 12px;border-radius:10px;background:#fdecea;color:var(--warn);font-weight:600}
+.req{color:var(--warn)}
+.dwhint{margin:6px 0 0;padding:8px 12px;border-radius:10px;background:#fff4e0;color:#8a4b0f;font-size:.9rem}
+.namepick{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 6px}
+.namepick button{font:inherit;font-size:.82rem;padding:6px 10px;border-radius:999px;border:1px solid #c9ced6;background:#fff;color:var(--ink);cursor:pointer}
+.namepick button[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:#fff}
+.modal .box p{white-space:pre-line}
 .field input.bad,.field textarea.bad{border-color:var(--warn);background:#fff8f7}
 .dwtable{width:100%;border-collapse:collapse;margin-top:6px}
 .dwtable th,.dwtable td{text-align:left;vertical-align:top;padding:10px;border-bottom:1px solid var(--line)}
@@ -1774,6 +1780,154 @@ const shortYmd = s => { const d = fromIso(s); return d ? d.toLocaleDateString("e
 
 // ---- the two kinds of record ----
 const REC_TYPES = ["Variation", "Crane delay"];
+
+// ---- extra details for variations and crane delays ----
+// Stored as a labelled block at the end of the description, so the Google sheet, PDFs and running logs
+// pick them up with no backend change, and older records (with no block) stay exactly as they were.
+const DET_HEAD = "--- Record details ---";
+const ZONES = ["Zone 1", "Zone 2", "Zone 3", "Other / site-wide"];
+const HOW_INSTRUCTED = ["Verbal", "Email", "Site instruction", "RFI answer", "Drawing revision", "Other"];
+const CRANE_CAUSES = ["In use by another trade", "Breakdown", "Too windy", "No driver or banksman", "Taken off us by JJR", "Other"];
+const REC_STATUS = ["Not notified yet", "Notified", "Priced", "Agreed", "Paid", "Disputed"];
+// key, label stored in the block, which types use it
+const DET_FIELDS = [
+  ["ref", "Ref", "both"],
+  ["zone", "Zone", "both"],
+  ["why", "Why it's extra", "var"],
+  ["drg", "Drawing / RFI ref", "var"],
+  ["how", "How instructed", "var"],
+  ["by", "Instructed by", "var"],
+  ["cause", "Cause", "crane"],
+  ["causeInfo", "Cause details", "crane"],
+  ["cby", "Delay confirmed by", "crane"],
+  ["co", "Company", "both"],
+  ["conf", "Confirmed by email", "var"],
+  ["qty", "Quantities", "var"],
+  ["plant", "Plant used", "var"],
+  ["mats", "Materials used", "var"],
+  ["effect", "Knock-on effect", "crane"],
+  ["pstand", "Plant standing", "crane"],
+  ["sign", "Signed off by JJR", "both"],
+  ["notice", "Notice sent to JJR", "both"],
+  ["status", "Status", "both"],
+];
+const detTypeKey = type => type === "Crane delay" ? "crane" : "var";
+const detFieldsFor = type => DET_FIELDS.filter(f => f[2] === "both" || f[2] === detTypeKey(type));
+function parseDet(desc){
+  const s = String(desc || "");
+  const i = s.indexOf(DET_HEAD);
+  if (i < 0) return {work: s, det: {}, has: false};
+  const det = {};
+  const byLabel = Object.fromEntries(DET_FIELDS.map(f => [f[1].toLowerCase(), f[0]]));
+  s.slice(i + DET_HEAD.length).split("\n").forEach(line => {
+    const m = /^([^:]+):\s?(.*)$/.exec(line.trim());
+    if (m && byLabel[m[1].trim().toLowerCase()]) det[byLabel[m[1].trim().toLowerCase()]] = m[2].trim();
+  });
+  return {work: s.slice(0, i).replace(/\s+$/, ""), det, has: true};
+}
+const workText = desc => parseDet(desc).work;
+function composeDet(work, rec){
+  const lines = detFieldsFor(rec.type)
+    .map(([k, label]) => [label, String(rec["x_" + k] || "").replace(/\s*\n\s*/g, " / ").trim()])
+    .filter(([, v]) => v)
+    .map(([label, v]) => `${label}: ${v}`);
+  const w = String(work || "").replace(/\s+$/, "");
+  return lines.length ? `${w}\n\n${DET_HEAD}\n${lines.join("\n")}` : w;
+}
+function nextRef(type){
+  const pre = type === "Crane delay" ? "CD" : "VO";
+  let max = 0;
+  const all = RS("dayworks") && RS("dayworks").list ? mergedRecords("dayworks") : (RS("dayworks") ? kindJobs("dayworks").filter(j => j.rec).map(j => j.rec) : []);
+  all.forEach(r => { const m = new RegExp("^" + pre + "-(\\d+)$").exec(parseDet(r.description).det.ref || ""); if (m) max = Math.max(max, +m[1]); });
+  return `${pre}-${String(max + 1).padStart(3, "0")}`;
+}
+const namesList = s => String(s || "").split(/[,;\n]+/).map(x => x.trim()).filter(Boolean);
+function dwStrict(r){ return !!r._strict; }
+function dwMissing(r){
+  const miss = [];
+  if (!dwStrict(r)) return miss;
+  const need = (k, label) => { if (!String(r["x_" + k] || "").trim()) miss.push(label); };
+  need("ref", "reference number");
+  need("zone", "zone");
+  if (r.type === "Crane delay"){
+    need("cause", "cause of the delay");
+    need("cby", "who confirmed the delay");
+    need("co", "their company");
+  } else {
+    need("why", "why it's extra");
+    need("how", "how it was instructed");
+    need("by", "who instructed it");
+    need("co", "their company");
+  }
+  if (!namesList(r.other).length) miss.push("names of the men");
+  return miss;
+}
+function dwWarnings(r, photoCount){
+  const w = [];
+  if (!photoCount) w.push("No photos. Photos are the best proof you have.");
+  if (r.type !== "Crane delay" && r.x_how === "Verbal" && !String(r.x_conf || "").trim()) w.push("Verbal instruction with no confirming email. Send one today.");
+  if (!String(r.x_sign || "").trim()) w.push("Not signed off by JJR yet. Get it signed today if you can.");
+  if (!String(r.x_notice || "").trim()) w.push("No notice sent to JJR yet. Tell them in writing within the week.");
+  const n = namesList(r.other).length, men = recMen(r);
+  if (n && men && n !== men) w.push(`${n} name${n === 1 ? "" : "s"} listed but ${men} men counted. Check they match.`);
+  return w;
+}
+function dwExtraHtml(r){
+  const crane = r.type === "Crane delay";
+  const sel = (k, opts, blankLabel) => `<select data-rf="x_${k}"><option value="">${blankLabel || "Pick one"}</option>${opts.map(o => `<option${o === r["x_" + k] ? " selected" : ""}>${esc(o)}</option>`).join("")}</select>`;
+  const inp = (k, ph, max) => `<input data-rf="x_${k}" maxlength="${max || 200}" value="${esc(r["x_" + k] || "")}" placeholder="${esc(ph || "")}">`;
+  const req = dwStrict(r) ? ` <span class="req">*</span>` : "";
+  return `
+    <div class="formgrid">
+      <label class="field"><span>Ref no.${req}</span>${inp("ref", crane ? "CD-001" : "VO-001", 20)}</label>
+      <label class="field"><span>Zone${req}</span>${sel("zone", ZONES)}</label>
+    </div>
+    ${crane ? `
+    <div class="formgrid">
+      <label class="field"><span>Cause of delay${req}</span>${sel("cause", CRANE_CAUSES)}</label>
+      <label class="field">Cause details${inp("causeInfo", "e.g. Crane lifting steel for another trade")}</label>
+    </div>
+    ${r.x_cause === "Too windy" ? `<p class="dwhint">Wind is usually time only, not money, under the main contract. Still record it.</p>` : ""}
+    <div class="formgrid">
+      <label class="field"><span>Who confirmed the delay${req}</span>${inp("cby", "Name, e.g. crane driver or JJR supervisor")}</label>
+      <label class="field"><span>Their company${req}</span>${inp("co", "e.g. JJ Rhatigan")}</label>
+    </div>` : `
+    <label class="field" style="margin-top:10px"><span>Why it's extra${req}</span><textarea data-rf="x_why" maxlength="600" rows="2" placeholder="What changed compared to what was priced, e.g. new duct opening added on revised drawing">${esc(r.x_why || "")}</textarea></label>
+    <div class="formgrid">
+      <label class="field">Drawing / RFI ref${inp("drg", "e.g. SE-26035 Rev 03 to Rev 04, or RFI 112")}</label>
+      <label class="field"><span>How instructed${req}</span>${sel("how", HOW_INSTRUCTED)}</label>
+      <label class="field"><span>Instructed by${req}</span>${inp("by", "Name")}</label>
+      <label class="field"><span>Their company${req}</span>${inp("co", "e.g. JJ Rhatigan")}</label>
+    </div>
+    <label class="field">Confirmed by email${inp("conf", "e.g. Yes, 10:02 to site manager")}</label>`}`;
+}
+function dwExtra2Html(r){
+  const crane = r.type === "Crane delay";
+  const inp = (k, ph, max) => `<input data-rf="x_${k}" maxlength="${max || 300}" value="${esc(r["x_" + k] || "")}" placeholder="${esc(ph || "")}">`;
+  return `
+    <div class="formgrid">
+      ${crane ? `
+      <label class="field">Knock-on effect${inp("effect", "e.g. Pour pushed to next day")}</label>
+      <label class="field">Plant standing${inp("pstand", "e.g. Concrete pump, 2 hrs")}</label>` : `
+      <label class="field">Quantities${inp("qty", "e.g. 1 box-out, 2.0 m stop-end, 6 m2 shutter")}</label>
+      <label class="field">Plant used${inp("plant", "e.g. Crane 1 hr")}</label>
+      <label class="field">Materials used${inp("mats", "e.g. 2 sheets ply, 4 lengths 4x2")}</label>`}
+      <label class="field">Signed off by JJR${inp("sign", "Name and time, e.g. P. Murphy 16:30")}</label>
+      <label class="field">Notice sent to JJR${inp("notice", "e.g. Email 2 Oct 17:05 to site manager")}</label>
+      <label class="field">Status<select data-rf="x_status">${dwStrict(r) ? "" : `<option value="">Not set</option>`}${REC_STATUS.map(o => `<option${o === (r.x_status || (dwStrict(r) ? REC_STATUS[0] : "")) ? " selected" : ""}>${esc(o)}</option>`).join("")}</select></label>
+    </div>`;
+}
+function namePickHtml(r){
+  const lads = (S.lads || []).map(l => l && l.name).filter(Boolean);
+  if (!lads.length) return "";
+  const on = new Set(namesList(r.other).map(x => x.toLowerCase()));
+  return `<div class="namepick" aria-label="Tap names to add them">${lads.map(n => `<button type="button" data-act="pickname" data-name="${esc(n)}" aria-pressed="${on.has(n.toLowerCase())}">${esc(n)}</button>`).join("")}</div>`;
+}
+function detRowsHtml(r){
+  const p = parseDet(r.description);
+  if (!p.has) return "";
+  return detFieldsFor(r.type).filter(([k]) => k !== "ref" && p.det[k]).map(([k, label]) => `<tr><th>${esc(label)}</th><td>${esc(p.det[k])}</td></tr>`).join("");
+}
 const KINDS = {
   dayworks: {
     kind: "dayworks", prefix: "dw", one: "variation", many: "variations", One: "Variation", Many: "Variations",
@@ -1782,7 +1936,8 @@ const KINDS = {
     blank(){
       const now = new Date();
       const hh = String(now.getHours()).padStart(2,"0"), mm = String(Math.floor(now.getMinutes()/15)*15).padStart(2,"0");
-      return {type: REC_TYPES[0], date: iso(now), start: `${hh}:${mm}`, end: "", location: "", description: "", chippies: 0, fixers: 0, operatives: 0, other: ""};
+      return {type: REC_TYPES[0], date: iso(now), start: `${hh}:${mm}`, end: "", location: "", description: "", chippies: 0, fixers: 0, operatives: 0, other: "",
+        _strict: true, x_ref: nextRef(REC_TYPES[0]), x_co: "JJ Rhatigan", x_status: REC_STATUS[0]};
     },
     missing(r){
       const miss = [];
@@ -1791,10 +1946,15 @@ const KINDS = {
       if (toMin(r.end) < 0) miss.push("end time");
       if (toMin(r.start) >= 0 && toMin(r.end) >= 0 && toMin(r.end) <= toMin(r.start)) miss.push("an end time after the start time");
       if (!String(r.location||"").trim()) miss.push("location");
-      if (!String(r.description||"").trim()) miss.push("description of works");
+      if (!String(r.description||"").trim()) miss.push(r.type === "Crane delay" ? "what work was held up" : "description of works");
       if (recMen(r) < 1) miss.push("at least one man");
-      return miss;
+      return miss.concat(dwMissing(r));
     },
+    extraHtml: dwExtraHtml, extra2Html: dwExtra2Html, namePick: true,
+    descLabel: r => r.type === "Crane delay" ? "What work was held up" : "Description of works (what you did)",
+    descPlaceholder: r => r.type === "Crane delay" ? "e.g. Shuttering for Wall 55 stood waiting for crane to lift panels" : "e.g. Formed and stripped box-out for duct in Wall 55",
+    namesLabel: r => r._strict ? `<span>Names of men <span class="req">*</span></span>` : "Names",
+    locationPlaceholder: "e.g. Grid 9-10, Ground floor, Wall 55",
     derive: r => ({hours: dwHours(r), men: recMen(r), manHours: Math.round(dwHours(r)*recMen(r)*100)/100}),
     inRange: (r, a, b) => r.date >= a && r.date <= b,
     calc(r){ const h = dwHours(r), men = recMen(r); return h ? `${fmtH(h)} hrs × ${men} men = <b>${fmtH(h*men)} man-hours</b>` : "Enter start and end times"; },
@@ -1804,16 +1964,18 @@ const KINDS = {
       <label class="field">Start time<input type="time" data-rf="start" value="${esc(r.start)}"></label>
       <label class="field">End time<input type="time" data-rf="end" value="${esc(r.end)}"></label>`,
     locationLabel: "Location", locationRequired: true,
-    rowTitle: r => r.location,
+    rowTitle: r => { const ref = parseDet(r.description).det.ref; return (ref ? ref + " · " : "") + (r.location || ""); },
     rowSub: r => `${r.start} – ${r.end}, ${menText(r)}`,
     rowTag: r => (r.type || "Variation"),
     rowSide: r => `<b>${fmtH(r.manHours || 0)}</b><span class="small muted">man-hrs</span>`,
     detailRows: r => `
       <tr><th>Type</th><td>${esc(r.type || "Variation")}</td></tr>
+      ${parseDet(r.description).det.ref ? `<tr><th>Ref</th><td>${esc(parseDet(r.description).det.ref)}</td></tr>` : ""}
       <tr><th>Date / time</th><td>${esc(niceYmd(r.date))}, ${esc(r.start)} – ${esc(r.end)} (${fmtH(r.hours||0)} hrs)</td></tr>
       <tr><th>Location</th><td>${esc(r.location)}</td></tr>
       <tr><th>Men</th><td>${esc(menText(r))}</td></tr>
-      <tr><th>Man-hours</th><td>${fmtH(r.manHours||0)}</td></tr>`,
+      <tr><th>Man-hours</th><td>${fmtH(r.manHours||0)}</td></tr>
+      ${detRowsHtml(r)}`,
     weekSummary: list => `${fmtH(list.reduce((a,r)=>a+(r.manHours||0),0))} man-hours this week`,
     pdfNote: "Includes every variation and crane delay between the dates, with photos.",
   },
@@ -2047,7 +2209,8 @@ function recordsHtml(kind){
     return `${head}<button class="tool dw" data-act="open" data-id="${esc(r.id)}">
       <div class="info">${K.rowTag ? `<span class="tag ${K.rowTag(r) === "Crane delay" ? "crane" : "var"}">${esc(K.rowTag(r))}</span>` : ""}<strong>${esc(K.rowTitle(r))}</strong>
         <span>${esc(K.rowSub(r))}</span>
-        ${K.rowTitle(r) === String(r.description||"").split("\n")[0] ? "" : `<span>${esc(r.description)}</span>`}</div>
+        ${K.rowTitle(r) === String(workText(r.description)).split("\n")[0] ? "" : `<span>${esc(workText(r.description))}</span>`}
+        ${(() => { const st2 = parseDet(r.description).det.status; return st2 ? `<span class="small muted">Status: ${esc(st2)}</span>` : ""; })()}</div>
       ${(S.recThumbs[r.id] && S.recThumbs[r.id].length) ? `<div class="dwthumbs">${S.recThumbs[r.id].map(p => `<img src="${p}" alt="" loading="lazy" decoding="async">`).join("")}</div>` : (r.photos > 0 && !S.thumbsDone[r.id] ? `<div class="dwthumbs">${Array.from({length: Math.min(3, r.photos)}, () => '<span class="skel"></span>').join("")}</div>` : "")}
       <div class="dwside">${K.rowSide(r)}
         <span class="small muted">${r.photos || 0} photo${r.photos==1?"":"s"}</span>
@@ -2082,7 +2245,15 @@ async function getRecPhotos(kind, id){
 async function openRecForm(K, rec, isNew){
   const st = RS(K.kind);
   const existing = isNew ? [] : Object.keys(await getRecPhotos(K.kind, rec.id));
-  st.form = {rec: {...rec}, isNew, existing, added: [], removed: [], tried: false};
+  rec = {...rec};
+  if (K.kind === "dayworks" && !isNew){
+    // pull the labelled details back out of the description so they can be edited
+    const p = parseDet(rec.description);
+    rec.description = p.work;
+    for (const [k] of DET_FIELDS) rec["x_" + k] = p.det[k] || "";
+    rec._strict = p.has;
+  }
+  st.form = {rec, isNew, existing, added: [], removed: [], tried: false};
   st.view = "form";
   render(); window.scrollTo(0,0);
 }
@@ -2112,16 +2283,19 @@ function recFormHtml(K){
     <h2>${f.isNew ? K.newLabel : "Edit " + K.one}</h2>
     ${f.restored ? `<p class="pill amber">Your unsaved entry was brought back.</p>` : ""}
     <div class="formgrid">${K.dateFields(r)}</div>
-    <label class="field">${K.locationLabel}<input data-rf="location" maxlength="200" list="recLocs" value="${esc(r.location)}" placeholder="e.g. Ground Floor Wall 60"></label>
+    <label class="field">${K.locationLabel}<input data-rf="location" maxlength="200" list="recLocs" value="${esc(r.location)}" placeholder="${esc(K.locationPlaceholder || "e.g. Ground Floor Wall 60")}"></label>
     <datalist id="recLocs">${locs.map(l=>`<option value="${esc(l)}">`).join("")}</datalist>
-    <label class="field" style="margin-top:10px">Description of works<textarea data-rf="description" maxlength="3000" rows="4" placeholder="What was done">${esc(r.description)}</textarea></label>
+    ${K.extraHtml ? K.extraHtml(r) : ""}
+    <label class="field" style="margin-top:10px">${K.descLabel ? K.descLabel(r) : "Description of works"}<textarea data-rf="description" maxlength="3000" rows="4" placeholder="${esc(K.descPlaceholder ? K.descPlaceholder(r) : "What was done")}">${esc(r.description)}</textarea></label>
     <div class="formgrid">
       <label class="field">Chippies<input type="number" min="0" inputmode="numeric" data-rf="chippies" value="${esc(r.chippies)}"></label>
       <label class="field">Fixers<input type="number" min="0" inputmode="numeric" data-rf="fixers" value="${esc(r.fixers)}"></label>
       <label class="field">General operatives<input type="number" min="0" inputmode="numeric" data-rf="operatives" value="${esc(r.operatives)}"></label>
-      <label class="field">Names (optional)<input data-rf="other" maxlength="300" value="${esc(r.other)}" placeholder="Who did it"></label>
+      <label class="field">${K.namesLabel ? K.namesLabel(r) : "Names (optional)"}<input data-rf="other" maxlength="300" value="${esc(r.other)}" placeholder="Who did it, separated by commas"></label>
     </div>
+    ${K.namePick ? namePickHtml(r) : ""}
     <p class="dwcalc" id="recCalc">${K.calc(r)}</p>
+    ${K.extra2Html ? K.extra2Html(r) : ""}
     <h3 style="margin:14px 0 6px">Photos (${photosNow.length})</h3>
     <div class="dwphotos">
       ${photosNow.map(p => `<div class="dwph">${p.data ? `<img src="${p.data}" alt="">` : `<span class="small muted">Loading…</span>`}
@@ -2155,7 +2329,7 @@ function recDetailHtml(K){
     <p>${r.pending ? `<span class="pill amber">Waiting to send</span>` : `<span class="pill ok">Saved to Google</span>`}</p>
     <table class="dwtable">
       ${K.detailRows(r)}
-      <tr><th>Description of works</th><td>${esc(r.description)}</td></tr>
+      <tr><th>${K.descLabel ? esc(K.descLabel(r)) : "Description of works"}</th><td>${esc(workText(r.description))}</td></tr>
       ${r.saved ? `<tr><th>Last saved</th><td>${esc(r.saved)}</td></tr>` : ""}
     </table>
     <h3 style="margin:14px 0 6px">Photos (${st.photos[r.id] ? names.length : "loading"})</h3>
@@ -2177,6 +2351,12 @@ $("view").addEventListener("click", async ev => {
     const draft = await kvGet("draft:" + K.kind) || (K.kind === "dayworks" ? await kvGet("dwDraft") : null);
     const rec = draft && draft.rec ? {...draft.rec} : {...K.blank(), id: newRecId(K)};
     if (!rec.id || !rec.id.startsWith(K.prefix)) rec.id = newRecId(K);
+    if (K.kind === "dayworks"){
+      rec._strict = true;
+      if (!rec.x_ref) rec.x_ref = nextRef(rec.type);
+      if (!rec.x_co) rec.x_co = "JJ Rhatigan";
+      if (!rec.x_status) rec.x_status = REC_STATUS[0];
+    }
     await openRecForm(K, rec, true);
     if (draft && draft.rec){ st.form.added = draft.added || []; st.form.restored = true; render(); }
     return;
@@ -2199,6 +2379,15 @@ $("view").addEventListener("click", async ev => {
     const r = mergedRecords(K.kind).find(x => x.id === a.dataset.id);
     if (r) await openRecForm(K, r, false);
     return;
+  }
+  if (act === "pickname"){
+    readRecForm(K);
+    const f = st.form, name = a.dataset.name;
+    const list = namesList(f.rec.other);
+    const i = list.findIndex(x => x.toLowerCase() === name.toLowerCase());
+    if (i >= 0) list.splice(i, 1); else list.push(name);
+    f.rec.other = list.join(", ");
+    saveRecDraft(K); render(); return;
   }
   if (act === "rmphoto"){
     readRecForm(K);
@@ -2225,7 +2414,14 @@ $("view").addEventListener("input", ev => {
     return;
   }
   if (ev.target.dataset && ev.target.dataset.rf != null && st.form){
+    const prevType = st.form.rec.type;
     readRecForm(K); saveRecDraft(K);
+    if (K.kind === "dayworks" && (ev.target.dataset.rf === "type" || ev.target.dataset.rf === "x_cause")){
+      const r = st.form.rec;
+      // switching type: swap an untouched VO-/CD- number for the next one of the new type
+      if (ev.target.dataset.rf === "type" && r.type !== prevType && /^(VO|CD)-\d+$/.test(r.x_ref || "")) r.x_ref = nextRef(r.type);
+      saveRecDraft(K); render(); return;
+    }
     const c = $("recCalc");
     if (c) c.innerHTML = K.calc(st.form.rec);
   }
@@ -2256,6 +2452,15 @@ $("view").addEventListener("submit", async ev => {
   if (miss.length){ render(); const m = document.querySelector(".dwmiss"); if (m) m.scrollIntoView({block:"center"}); return; }
   const rec = {...f.rec, chippies: +f.rec.chippies||0, fixers: +f.rec.fixers||0, operatives: +f.rec.operatives||0};
   if (K.kind === "dayworks" && !REC_TYPES.includes(rec.type)) rec.type = REC_TYPES[0];
+  if (K.kind === "dayworks"){
+    const photoCount = f.existing.filter(n => !f.removed.includes(n)).length + f.added.length;
+    const warn = dwStrict(rec) ? dwWarnings(rec, photoCount) : [];
+    if (warn.length && !(await ask("Before you save:\n• " + warn.join("\n• ") + "\n\nYou can save now and add these later.", "Save anyway"))) return;
+    rec.other = namesList(rec.other).join(", ");
+    rec.description = composeDet(rec.description, rec);
+  }
+  // the new detail fields only travel inside the description
+  for (const k of Object.keys(rec)) if (k.startsWith("x_") || k.startsWith("_")) delete rec[k];
   $("recSave").disabled = true; $("recMsg").textContent = "Saving on this device…";
   try{
     await queueRecordSave(K.kind, rec, f.added, f.removed);
@@ -2525,7 +2730,7 @@ function variationLabel(id){
   const r = (RS("dayworks").list ? mergedRecords("dayworks") : []).find(x => x.id === id);
   if (!r) return id ? "Variation (not loaded)" : "";
   const d = fromIso(r.date);
-  return `${d ? d.toLocaleDateString("en-IE", {day:"numeric", month:"short"}) : ""} · ${r.location || ""} · ${String(r.description || "").slice(0, 40)}`;
+  { const ref = parseDet(r.description).det.ref; return `${ref ? ref + " · " : ""}${d ? d.toLocaleDateString("en-IE", {day:"numeric", month:"short"}) : ""} · ${r.location || ""} · ${String(workText(r.description)).slice(0, 40)}`; }
 }
 function planSvg(){
   if (!S.pourView) fitView();
