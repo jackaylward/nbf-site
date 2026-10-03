@@ -2059,6 +2059,7 @@ async function queueRecordSave(kind, rec, newPhotos, removed){
   const job = old || {key, kind, id: rec.id, ts: Date.now(), newPhotos: [], removed: []};
   job.kind = kind;
   job.rec = rec;
+  job.error = "";
   for (const p of newPhotos) job.newPhotos.push({name: p.name, data: p.data, sent: false});
   for (const name of removed){
     const i = job.newPhotos.findIndex(p => p.name === name);
@@ -2084,6 +2085,7 @@ function sameRec(K, a, b){
 async function processQueue(){
   if (DWQ.busy) return;
   DWQ.busy = true; updateQueueBadges();
+  const rejected = [];
   try{
     for (const job of await jobsAll()){
       const kind = job.kind || "dayworks", K = KINDS[kind], st = RS(kind);
@@ -2093,7 +2095,17 @@ async function processQueue(){
         if (st.list) st.list = st.list.filter(r => r.id !== job.id);
         continue;
       }
-      const saved = await server("saveRecord", kind, job.rec);
+      let saved;
+      try{ saved = await server("saveRecord", kind, job.rec); }
+      catch(e){
+        if (isNetworkError(e) || e.code === "PIN") throw e;
+        // Google said no (e.g. missing times or men): mark this one and carry on with the rest
+        if (String(job.id).startsWith("dw-rc-") && (st.list || []).some(r => r.id === job.id)){ await jobDel(job.key); continue; }
+        job.error = errText(e, "Google wouldn't take this one.");
+        await jobPut(job);
+        rejected.push(job);
+        continue;
+      }
       if (!sameRec(K, saved, job.rec)) throw new Error("Google saved something different. Retrying.");
       for (const name of job.removed) await server("removeRecordPhoto", kind, job.id, name);
       // two photos at a time: quicker on site, still safe
@@ -2132,7 +2144,7 @@ async function processQueue(){
         for (const n of job.removed) delete st.photos[job.id][n];
       }
     }
-    DWQ.failed = "";
+    DWQ.failed = rejected.length ? `${rejected.length} entr${rejected.length === 1 ? "y needs" : "ies need"} fixing before ${rejected.length === 1 ? "it" : "they"} can send. Open the ones marked Needs fixing, tap Edit and fill in what's missing.` : "";
     for (const kind of Object.keys(KINDS)) if (!RS(kind).list) loadRecords(kind);
   }catch(e){
     DWQ.failed = errText(e, "No signal");
@@ -2164,7 +2176,7 @@ async function loadRecords(kind, quiet){
     st.list = await (S.view === kind && !quiet ? server : bgServer)("getRecords", kind);
     st.loadFailed = false;
     cacheSet("records:" + kind, st.list);
-    if (kind === "dayworks") moveSiteRecords();
+    // moveSiteRecords() was a one-off and is switched off
   }catch(e){
     st.loadFailed = !st.list;
     if (!quiet) connectionTrouble();
@@ -2180,7 +2192,7 @@ function mergedRecords(kind){
     if (j.del){ byId.delete(j.id); continue; }
     const base = byId.get(j.id) || {photos: 0};
     const unsent = j.newPhotos.filter(p => !p.sent).length;
-    byId.set(j.id, {...base, ...j.rec, ...K.derive(j.rec), photos: (base.photos||0) + unsent - j.removed.length, pending: true});
+    byId.set(j.id, {...base, ...j.rec, ...K.derive(j.rec), photos: (base.photos||0) + unsent - j.removed.length, pending: true, needs: j.error || ""});
   }
   return [...byId.values()].sort((a,b) => K.sortKey(b).localeCompare(K.sortKey(a)));
 }
@@ -2213,7 +2225,7 @@ function recordsHtml(kind){
       ${(S.recThumbs[r.id] && S.recThumbs[r.id].length) ? `<div class="dwthumbs">${S.recThumbs[r.id].map(p => `<img src="${p}" alt="" loading="lazy" decoding="async">`).join("")}</div>` : (r.photos > 0 && !S.thumbsDone[r.id] ? `<div class="dwthumbs">${Array.from({length: Math.min(3, r.photos)}, () => '<span class="skel"></span>').join("")}</div>` : "")}
       <div class="dwside">${K.rowSide(r)}
         <span class="small muted">${r.photos || 0} photo${r.photos==1?"":"s"}</span>
-        ${r.pending ? `<span class="pill amber">Sending</span>` : `<span class="pill ok">Saved</span>`}</div></button>`;
+        ${r.needs ? `<span class="pill warn">Needs fixing</span>` : r.pending ? `<span class="pill amber">Sending</span>` : `<span class="pill ok">Saved</span>`}</div></button>`;
   }).join("");
   return `${kind === "dayworks" ? dwTabBar() : ""}
   ${queueHtml(K)}
@@ -2326,7 +2338,8 @@ function recDetailHtml(K){
   <div class="panel">
     <h2>${esc(K.rowTitle(r))}</h2>
     ${K.rowTag ? `<p><span class="tag big ${K.rowTag(r) === "Delay" ? "crane" : "var"}">${esc(K.rowTag(r))}</span></p>` : ""}
-    <p>${r.pending ? `<span class="pill amber">Waiting to send</span>` : `<span class="pill ok">Saved to Google</span>`}</p>
+    <p>${r.needs ? `<span class="pill warn">Needs fixing</span>` : r.pending ? `<span class="pill amber">Waiting to send</span>` : `<span class="pill ok">Saved to Google</span>`}</p>
+    ${r.needs ? `<p class="dwmiss">Not sent yet. Google says: ${esc(r.needs)} Tap Edit, fill it in and save.</p>` : ""}
     <table class="dwtable">
       ${K.detailRows(r)}
       <tr><th>${K.descLabel ? esc(K.descLabel(r)) : "Description of works"}</th><td>${esc(workText(r.description))}</td></tr>
