@@ -1946,7 +1946,7 @@ const KINDS = {
       if (!String(r.location||"").trim()) miss.push("location");
       if (!String(r.description||"").trim()) miss.push(r.type === "Crane delay" ? "what work was held up" : "description of works");
       if (recMen(r) < 1) miss.push("at least one man");
-      return miss.concat(dwMissing(r));
+      return [];   // nothing is mandatory on variations and delays (Jack's choice); the checks above are kept for reference
     },
     extraHtml: dwExtraHtml, extra2Html: dwExtra2Html, namePick: true,
     descLabel: r => r.type === "Crane delay" ? "What work was held up" : "Description of works (what you did)",
