@@ -817,6 +817,13 @@ $("view").addEventListener("click", async ev => {
   }
   if (key === "tools") return runPdf(key, () => server("makeToolsPdf", filteredTools().map(x => x.id), logo));
   if (key === "tool") return runPdf(key, () => server("makeToolsPdf", [b.dataset.id], logo));
+  if (key === "eas") return runPdf(key, () => easOne(b.dataset.id));
+  if (key === "easAll"){
+    const from = $("pdfFrom").value, to = $("pdfTo").value;
+    RS("dayworks").pdf = {from, to};
+    if (!from || !to || to < from){ S.pdfOut = {key, state: "error", msg: "Pick a From date and a To date after it."}; render(); return; }
+    return runPdf(key, () => easRange(from, to));
+  }
   if (key === "record" || key === "records"){
     const kind = b.dataset.kind;
     if (kindJobs(kind).length){
@@ -1835,10 +1842,15 @@ function composeDet(work, rec){
   return lines.length ? `${w}\n\n${DET_HEAD}\n${lines.join("\n")}` : w;
 }
 function nextRef(type){
-  const pre = type === "Crane delay" ? "CD" : "VO";
-  let max = 0;
-  const all = RS("dayworks") && RS("dayworks").list ? mergedRecords("dayworks") : (RS("dayworks") ? kindJobs("dayworks").filter(j => j.rec).map(j => j.rec) : []);
-  all.forEach(r => { const m = new RegExp("^" + pre + "-(\\d+)$").exec(parseDet(r.description).det.ref || ""); if (m) max = Math.max(max, +m[1]); });
+  // carries on from the numbers already used, including EAS sheets issued before refs existed (Variation 14, Crane delay 5)
+  const pre = type === "Crane delay" ? "CD" : "VO", t = type === "Crane delay" ? "Crane delay" : "Variation";
+  let max = t === "Variation" ? 14 : 5;
+  if (RS("dayworks") && RS("dayworks").list){
+    const nums = easNumbers();
+    mergedRecords("dayworks").forEach(r => { if (easType(r) === t) max = Math.max(max, nums[r.id] || 0); });
+  } else if (RS("dayworks")){
+    kindJobs("dayworks").filter(j => j.rec && easType(j.rec) === t).forEach(j => { const m = /^(?:VO|CD)-(\d+)$/.exec(parseDet(j.rec.description).det.ref || ""); if (m) max = Math.max(max, +m[1]); });
+  }
   return `${pre}-${String(max + 1).padStart(3, "0")}`;
 }
 const namesList = s => String(s || "").split(/[,;\n]+/).map(x => x.trim()).filter(Boolean);
@@ -2214,9 +2226,9 @@ function recordsHtml(kind){
   <div class="panel" style="margin-top:16px"><h2>Save a PDF to send</h2>
     <div class="formgrid"><label class="field">From<input type="date" id="pdfFrom" value="${esc(pdf.from)}"></label>
       <label class="field">To<input type="date" id="pdfTo" value="${esc(pdf.to)}"></label></div>
-    <div class="row-actions">${pdfBtn("records", "Save as PDF", `data-kind="${K.kind}"`)}</div>
-    <p class="msg">${K.pdfNote}</p>
-    ${pdfResult("records")}
+    <div class="row-actions">${pdfBtn("records", "Save as PDF", `data-kind="${K.kind}"`)}${kind === "dayworks" ? pdfBtn("easAll", "All as EAS sheets") : ""}</div>
+    <p class="msg">${K.pdfNote}${kind === "dayworks" ? " EAS sheets: one Event Analysis Sheet for each variation and crane delay between the dates, with photos." : ""}</p>
+    ${pdfResult("records")}${pdfResult("easAll")}
   </div>`;
 }
 
@@ -2306,8 +2318,9 @@ function recDetailHtml(K){
   return `
   <div class="row-actions" style="margin-bottom:10px"><button class="btn ghost" data-act="back">‹ ${K.Many}</button>
     ${S.edit ? `<button class="btn" data-act="edit" data-id="${esc(r.id)}">Edit</button>` : `<button class="btn ghost" data-mode="on">Edit</button>`}
-    ${r.pending ? "" : pdfBtn("record", "Save as PDF", `data-kind="${K.kind}" data-id="${esc(r.id)}"`)}</div>
-  ${pdfResult("record")}
+    ${r.pending ? "" : pdfBtn("record", "Save as PDF", `data-kind="${K.kind}" data-id="${esc(r.id)}"`)}
+    ${K.kind === "dayworks" ? pdfBtn("eas", "EAS sheet", `data-id="${esc(r.id)}"`) : ""}</div>
+  ${pdfResult("record")}${pdfResult("eas")}
   <div class="panel">
     <h2>${esc(K.rowTitle(r))}</h2>
     ${K.rowTag ? `<p><span class="tag big ${K.rowTag(r) === "Crane delay" ? "crane" : "var"}">${esc(K.rowTag(r))}</span></p>` : ""}
@@ -2459,6 +2472,196 @@ $("view").addEventListener("submit", async ev => {
     $("recSave").disabled = false;
   }
 });
+
+// ================= Event Analysis Sheets (EAS) =================
+// Same layout as the EAS sheets made for Mark Deevy (based on the DCOR sheet): logo, site and title bar, Date / EAS Nr.,
+// Description of Works, Labour, Materials, Plant (unused rows crossed out), blank Signature, then a photo page.
+const EAS_SITE = "Patrician Secondary School, Newbridge";
+// Numbers already issued on EAS sheets before refs were added to the app. Kept fixed so they never change.
+const EAS_ISSUED = {
+  "dw-seed-001": 1, "dw-seed-002": 2, "dw-seed-003": 3, "dw-mu5g3ihu-ty1zd": 4, "dw-muay8xcb-anhck": 5, "dw-muayla51-xxl7w": 6,
+  "dw-mucn5z55-0l6e3": 7, "dw-mugwkd6u-izfoe": 8, "dw-muqlcdms-kvv0p": 9, "dw-munzp3se-6s492": 10, "dw-muqmqrvz-tbsxo": 11,
+  "dw-muqmycjc-sm0tj": 12, "dw-muqnnk1r-swj0b": 13, "dw-muqor3w3-6j77r": 14,
+  "dw-mu6sm9q4-3fs8n": 1, "dw-mubbtnhl-7ft3q": 2, "dw-mue1a1qv-im6pm": 3, "dw-mumam3d5-c8qte": 4, "dw-muqq6gjy-abk82": 5,
+};
+const easType = r => (r.type === "Crane delay" ? "Crane delay" : "Variation");
+function easNumbers(){
+  // ref number if it has one, else the already-issued number, else next free number in date order
+  const all = RS("dayworks").list ? mergedRecords("dayworks") : [];
+  const out = {}, max = {"Variation": 0, "Crane delay": 0}, loose = [];
+  for (const r of all){
+    const t = easType(r), m = /^(?:VO|CD)-(\d+)$/.exec(parseDet(r.description).det.ref || "");
+    const n = m ? +m[1] : EAS_ISSUED[r.id];
+    if (n){ out[r.id] = n; max[t] = Math.max(max[t], n); } else loose.push(r);
+  }
+  loose.sort((a, b) => (a.date + a.start + a.id).localeCompare(b.date + b.start + b.id))
+    .forEach(r => { const t = easType(r); out[r.id] = ++max[t]; });
+  return out;
+}
+const easDate = s => { const d = fromIso(s); return d ? `${d.getDate()}/${d.getMonth() + 1}/${String(d.getFullYear()).slice(2)}` : (s || ""); };
+const easHrs = h => { const v = Math.round((+h || 0) * 100) / 100; return `${v} hr${v === 1 ? "" : "s"}`; };
+const capFirst = s => { s = String(s || "").trim(); return s ? s[0].toUpperCase() + s.slice(1) : s; };
+function easTradeShort(label){
+  const t = String(label || "").toLowerCase();
+  if (/chippy|carpenter/.test(t)) return "Carp";
+  if (/fix/.test(t)) return "Fixer";
+  if (/general|^go$/.test(t)) return "GO";
+  return label || "";
+}
+function easLabour(r){
+  const hrs = easHrs(dwHours(r));
+  if (easType(r) === "Crane delay") return [["", "", "", r.start || "", r.end || "", hrs]];   // times only
+  const left = {Carp: +r.chippies || 0, Fixer: +r.fixers || 0, GO: +r.operatives || 0};
+  const rows = [];
+  for (const full of namesList(r.other)){
+    const lad = (S.lads || []).find(l => l.name && l.name.toLowerCase() === full.toLowerCase());
+    let trade = lad ? easTradeShort(lad.trade) : "";
+    if (!(trade in left) || left[trade] < 1) trade = Object.keys(left).find(k => left[k] > 0) || trade;
+    if (trade in left && left[trade] > 0) left[trade]--;
+    const parts = full.split(/\s+/);
+    rows.push([parts.length > 1 ? parts.slice(0, -1).join(" ") : full, parts.length > 1 ? parts[parts.length - 1] : "", trade, r.start || "", r.end || "", hrs]);
+  }
+  for (const [trade, n] of Object.entries(left)) for (let i = 0; i < n; i++) rows.push(["", "", trade, r.start || "", r.end || "", hrs]);
+  return rows;
+}
+function easDescription(r){
+  const p = parseDet(r.description), d = p.det, out = [capFirst(p.work)];
+  if (easType(r) === "Crane delay"){
+    if (d.cause) out.push(`Cause: ${d.cause}${d.causeInfo ? ", " + d.causeInfo : ""}.`);
+    if (d.cby) out.push(`Delay confirmed by ${d.cby}${d.co ? " (" + d.co + ")" : ""}.`);
+    if (d.effect) out.push(`Knock-on effect: ${d.effect}.`);
+  } else {
+    if (d.why) out.push(`Reason: ${d.why}.`);
+    if (d.drg) out.push(`Drawing / RFI: ${d.drg}.`);
+    if (d.by || d.how) out.push(`Instructed${d.how ? " (" + d.how.toLowerCase() + ")" : ""}${d.by ? " by " + d.by : ""}${d.co ? ", " + d.co : ""}.${d.conf ? " Confirmed by email: " + d.conf + "." : ""}`);
+    if (d.qty) out.push(`Quantities: ${d.qty}.`);
+  }
+  return out.filter(Boolean).map(s => s.replace(/\.\.$/, "."));
+}
+async function easPhotos(r){
+  const st = RS("dayworks");
+  const pics = {...(await getRecPhotos("dayworks", r.id))};
+  const job = kindJobs("dayworks").find(j => j.id === r.id && !j.del);
+  if (job){ job.newPhotos.forEach(p => pics[p.name] = p.data); job.removed.forEach(n => delete pics[n]); }
+  const out = [];
+  for (const n of Object.keys(pics).sort()){
+    const im = await loadImg(pics[n]);
+    if (!im) continue;
+    try{
+      const c = document.createElement("canvas"), s = Math.min(1, 1400 / Math.max(im.naturalWidth, im.naturalHeight));
+      c.width = Math.round(im.naturalWidth * s); c.height = Math.round(im.naturalHeight * s);
+      c.getContext("2d").drawImage(im, 0, 0, c.width, c.height);
+      out.push({url: c.toDataURL("image/jpeg", 0.82), w: c.width, h: c.height});
+    }catch(e){}
+  }
+  return out;
+}
+function easPage(doc, r, num, logo){
+  const NAVY = "#012060", PALE = "#DCE6F2", HEAD = "#F2F5FA", M = 15, W = 180, typ = easType(r);
+  const font = (st, sz, col) => { doc.setFont("helvetica", st); doc.setFontSize(sz); doc.setTextColor(col || "#000000"); };
+  doc.setDrawColor(NAVY); doc.setLineWidth(0.25);
+  const cell = (x, y, w, h, fill) => { if (fill){ doc.setFillColor(fill); doc.rect(x, y, w, h, "FD"); } else doc.rect(x, y, w, h); };
+  const put = (s, x, y, h, o) => doc.text(String(s), x, y + h / 2, {baseline: "middle", ...(o || {})});
+  let y = 12;
+  if (logo){ const lw = 50, lh = lw * logo.r; doc.addImage(logo.url, "PNG", M, y, lw, lh, "nbflogo", "FAST"); y += lh + 3; }
+  else { font("bold", 16, NAVY); doc.text("NEW BRIDGE FORM", M, y + 6); y += 10; }
+  // site + title bar
+  doc.setLineWidth(0.35); cell(M, y, 110, 9); cell(M + 110, y, 70, 9, NAVY); doc.setLineWidth(0.25);
+  font("bold", 10, NAVY); put(EAS_SITE, M + 2, y, 9);
+  font("bold", 11, "#FFFFFF"); put("Event Analysis Sheet [EAS]", M + 145, y, 9, {align: "center"});
+  y += 11;
+  // date / EAS nr (EAS Nr. left blank for the QS)
+  cell(M, y, 30, 8, PALE); cell(M + 30, y, 90, 8); cell(M + 120, y, 60, 8);
+  font("bold", 9, NAVY); put("Date:", M + 2, y, 8); put("EAS Nr.", M + 122, y, 8);
+  font("normal", 10); put(easDate(r.date), M + 32, y, 8);
+  y += 10;
+  // description
+  cell(M, y, W, 7, PALE); font("bold", 10, NAVY); put("Description of Works:", M + 2, y, 7); y += 7;
+  font("bold", 9.5); const head = doc.splitTextToSize(`${typ} ${num} - ${capFirst(r.location) || "Site"}.`, W - 4);
+  font("normal", 9.5); const body = easDescription(r).flatMap(p => doc.splitTextToSize(p, W - 4));
+  const lh = 4.2, dh = Math.max(24, 3 + (head.length + body.length) * lh + 2);
+  cell(M, y, W, dh);
+  let ty = y + 4.5;
+  font("bold", 9.5); head.forEach(l => { doc.text(l, M + 2, ty); ty += lh; });
+  font("normal", 9.5); body.forEach(l => { doc.text(l, M + 2, ty); ty += lh; });
+  y += dh + 2.5;
+  // labour / materials / plant
+  const section = (title, heads, ws, rows, blankH) => {
+    cell(M, y, W, 7, PALE); font("bold", 10, NAVY); put(title, M + 2, y, 7); y += 7;
+    let x = M; heads.forEach((h, i) => { cell(x, y, ws[i], 6, HEAD); font("bold", 8.5, NAVY); put(h, x + 1.5, y, 6); x += ws[i]; }); y += 6;
+    rows.forEach(rw => {
+      x = M; rw.forEach((v, i) => { cell(x, y, ws[i], 6); font("normal", 9); put(doc.splitTextToSize(String(v), ws[i] - 3)[0] || "", x + 1.5, y, 6); x += ws[i]; }); y += 6;
+    });
+    x = M; ws.forEach(w => { cell(x, y, w, blankH); x += w; });
+    doc.setLineWidth(0.3); doc.line(M, y, M + W, y + blankH); doc.setLineWidth(0.25);   // cross out the unused part
+    y += blankH + 2.5;
+  };
+  const lab = easLabour(r);
+  section("Labour", ["Name", "Surname", "Trade", "Start Time", "Finish Time", "Duration"], [34, 34, 22, 30, 30, 30], lab, Math.max(8, 40 - 6 * lab.length));
+  const d = parseDet(r.description).det;
+  const mats = d.mats ? [[d.mats, "", ""]] : [];
+  section("Materials", ["Description", "Qty", "Comments"], [90, 25, 65], mats, Math.max(8, 24 - 6 * mats.length));
+  const plantTxt = easType(r) === "Crane delay" ? d.pstand : d.plant;
+  const plant = plantTxt ? [[plantTxt, "", ""]] : [];
+  section("Plant", ["Description", "Qty", "Comments"], [90, 25, 65], plant, Math.max(8, 18 - 6 * plant.length));
+  // signature, left blank
+  cell(M, y, W, 7, PALE); font("bold", 10, NAVY); put("Signature", M + 2, y, 7); y += 7;
+  [["Name", 70], ["Position", 55], ["Date", 55]].reduce((x, [h, w]) => { cell(x, y, w, 6, HEAD); font("bold", 8.5, NAVY); put(h, x + 1.5, y, 6); return x + w; }, M); y += 6;
+  [70, 55, 55].reduce((x, w) => { cell(x, y, w, 12); return x + w; }, M);
+}
+function easPhotoPages(doc, r, num, logo, photos){
+  if (!photos.length) return;
+  const NAVY = "#012060", M = 15, typ = easType(r);
+  const perPage = photos.length === 1 ? 1 : (photos.length <= 4 ? 4 : 6);
+  for (let i = 0; i < photos.length; i += perPage){
+    doc.addPage();
+    let y = 12;
+    if (logo){ const lw = 50, lh = lw * logo.r; doc.addImage(logo.url, "PNG", M, y, lw, lh, "nbflogo", "FAST"); y += lh + 6; }
+    doc.setFont("helvetica", "bold"); doc.setFontSize(13); doc.setTextColor(NAVY); doc.text(`${typ} ${num} - Photographs`, M, y + 4); y += 9;
+    doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.text(`${easDate(r.date)}  |  ${capFirst(r.location)}`, M, y + 2); y += 7;
+    const set = photos.slice(i, i + perPage), cols = set.length === 1 ? 1 : 2;
+    const bw = cols === 1 ? 160 : 88, bh = set.length === 1 ? 150 : (perPage === 4 ? 110 : 72);
+    set.forEach((p, j) => {
+      const s = Math.min(bw / p.w, bh / p.h), w = p.w * s, h = p.h * s;
+      const cx = cols === 1 ? 105 : (j % 2 ? 105 + 46 : 105 - 46), top = y + Math.floor(j / cols) * (bh + 4);
+      doc.addImage(p.url, "JPEG", cx - w / 2, top + (bh - h) / 2, w, h);
+    });
+  }
+}
+async function makeEasPdf(recs, fileName){
+  if (!recs.length) throw new Error("No variations or crane delays to put on EAS sheets for those dates.");
+  const jsPDF = await loadJsPdf();
+  const logo = await navyLogo();
+  const nums = easNumbers();
+  const doc = new jsPDF({unit: "mm", format: "a4"});
+  doc.setProperties({title: fileName.replace(/\.pdf$/, ""), author: "New Bridge Form"});
+  let first = true;
+  for (const r of recs){
+    if (!first) doc.addPage();
+    first = false;
+    const num = nums[r.id] || "";
+    easPage(doc, r, num, logo);
+    easPhotoPages(doc, r, num, logo, await easPhotos(r));
+  }
+  const blob = doc.output("blob");
+  let file = null;
+  try{ file = new File([blob], fileName, {type: "application/pdf"}); }catch(e){}
+  return {url: "", name: fileName, blobUrl: URL.createObjectURL(blob), file, note: "Made on this device. Download it or share it from here."};
+}
+function easSorted(list){
+  const nums = easNumbers(), rank = r => (easType(r) === "Variation" ? 0 : 1);
+  return list.slice().sort((a, b) => rank(a) - rank(b) || (nums[a.id] || 0) - (nums[b.id] || 0));
+}
+async function easOne(id){
+  const r = mergedRecords("dayworks").find(x => x.id === id);
+  if (!r) throw new Error("That entry has been deleted.");
+  const n = easNumbers()[id] || "";
+  return makeEasPdf([r], `EAS - ${easType(r)} ${n} (${easDate(r.date).replace(/\//g, "-")}).pdf`);
+}
+async function easRange(from, to){
+  const list = easSorted(mergedRecords("dayworks").filter(r => r.date >= from && r.date <= to));
+  return makeEasPdf(list, `EAS - Variations and Crane Delays ${easDate(from).replace(/\//g, "-")} to ${easDate(to).replace(/\//g, "-")}.pdf`);
+}
 
 // ================= toolbox talks =================
 S.talks = {list: null, view: "list", q: "", form: null, open: null, pdfOut: null};
