@@ -1844,23 +1844,8 @@ function nextRef(type){
 const namesList = s => String(s || "").split(/[,;\n]+/).map(x => x.trim()).filter(Boolean);
 function dwStrict(r){ return !!r._strict; }
 function dwMissing(r){
-  const miss = [];
-  if (!dwStrict(r)) return miss;
-  const need = (k, label) => { if (!String(r["x_" + k] || "").trim()) miss.push(label); };
-  need("ref", "reference number");
-  need("zone", "zone");
-  if (r.type === "Crane delay"){
-    need("cause", "cause of the delay");
-    need("cby", "who confirmed the delay");
-    need("co", "their company");
-  } else {
-    need("why", "why it's extra");
-    need("how", "how it was instructed");
-    need("by", "who instructed it");
-    need("co", "their company");
-  }
-  if (!namesList(r.other).length) miss.push("names of the men");
-  return miss;
+  // all the new detail fields are optional: nothing here stops a save
+  return [];
 }
 function dwWarnings(r, photoCount){
   const w = [];
@@ -1876,7 +1861,7 @@ function dwExtraHtml(r){
   const crane = r.type === "Crane delay";
   const sel = (k, opts, blankLabel) => `<select data-rf="x_${k}"><option value="">${blankLabel || "Pick one"}</option>${opts.map(o => `<option${o === r["x_" + k] ? " selected" : ""}>${esc(o)}</option>`).join("")}</select>`;
   const inp = (k, ph, max) => `<input data-rf="x_${k}" maxlength="${max || 200}" value="${esc(r["x_" + k] || "")}" placeholder="${esc(ph || "")}">`;
-  const req = dwStrict(r) ? ` <span class="req">*</span>` : "";
+  const req = "";
   return `
     <div class="formgrid">
       <label class="field"><span>Ref no.${req}</span>${inp("ref", crane ? "CD-001" : "VO-001", 20)}</label>
@@ -1953,7 +1938,7 @@ const KINDS = {
     extraHtml: dwExtraHtml, extra2Html: dwExtra2Html, namePick: true,
     descLabel: r => r.type === "Crane delay" ? "What work was held up" : "Description of works (what you did)",
     descPlaceholder: r => r.type === "Crane delay" ? "e.g. Shuttering for Wall 55 stood waiting for crane to lift panels" : "e.g. Formed and stripped box-out for duct in Wall 55",
-    namesLabel: r => r._strict ? `<span>Names of men <span class="req">*</span></span>` : "Names",
+    namesLabel: r => "Names of men",
     locationPlaceholder: "e.g. Grid 9-10, Ground floor, Wall 55",
     derive: r => ({hours: dwHours(r), men: recMen(r), manHours: Math.round(dwHours(r)*recMen(r)*100)/100}),
     inRange: (r, a, b) => r.date >= a && r.date <= b,
