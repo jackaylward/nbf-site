@@ -4019,7 +4019,7 @@ function srFormHtml(){
       <button class="btn ghost" data-sradd="one" style="flex:1">Take a photo</button></div>` : ""}
     <p class="small" id="srMsg" style="color:var(--warn);min-height:1.2em;margin:8px 0 4px"></p>
     ${S.edit ? `<div class="row-actions"><button class="btn" data-srsave>Save</button>
-      ${isNew ? "" : `<button class="btn danger" data-srdel>Delete</button>`}</div>` : ""}
+      ${isNew ? "" : `<button class="btn ghost" data-srtodelay>Move to Delays</button><button class="btn danger" data-srdel>Delete</button>`}</div>` : ""}
   </div>`;
 }
 async function srOpen(r){
@@ -4046,7 +4046,7 @@ $("view").addEventListener("input", ev => {
   if (ev.target.id === "srQ"){ S.sr.q = ev.target.value; const l = $("srList"); if (l) l.innerHTML = srRowsHtml(); }
 });
 $("view").addEventListener("click", async ev => {
-  const b = ev.target.closest("[data-srnew],[data-sropen],[data-srcancel],[data-srsave],[data-srdel],[data-sradd],[data-srrm]");
+  const b = ev.target.closest("[data-srnew],[data-sropen],[data-srcancel],[data-srsave],[data-srdel],[data-sradd],[data-srrm],[data-srtodelay]");
   if (!b || S.view !== "dayworks") return;
   if (b.hasAttribute("data-srnew")){
     if (!(await canEdit())) return;
@@ -4075,6 +4075,25 @@ $("view").addEventListener("click", async ev => {
     if (f.add.some(p => p.name === n)) f.add = f.add.filter(p => p.name !== n); else f.remove.push(n);
     f.photos = (f.photos || []).filter(p => p.name !== n);
     render(); return;
+  }
+  if (b.hasAttribute("data-srtodelay")){
+    srKeepForm();
+    const f = S.sr.form;
+    if (f.photos === null){ $("srMsg").textContent = "Photos are still loading. Try again in a moment."; return; }
+    if (!(await ask("Move this record into Delays, with its photos? The record is kept in the Records sheet but won't show here twice.", "Move to Delays"))) return;
+    $("srMsg").textContent = "Moving…";
+    const photos = [];
+    for (const ph of (f.photos || [])){ const data = await srPhotoData(ph); if (data) photos.push({name: `dw-${f.id}-${ph.name || photos.length}`, data}); }
+    const rec = {id: "dw-" + f.id, type: "Crane delay", date: f.date, start: "", end: "", location: SR_MOVE_LOC[f.id] || "",
+      description: "", chippies: 0, fixers: 0, operatives: 0, other: ""};
+    rec.description = composeDet(capFirst(f.description), {...rec, x_ref: nextRef("Crane delay"), x_status: REC_STATUS[0]});
+    await queueRecordSave("dayworks", rec, photos, []);
+    S.sr.form = null; S.dwTab = "main";
+    try{ localStorage.setItem("siteAppDwTab", "main"); }catch(e){}
+    const st = RS("dayworks"); st.detail = rec.id; st.view = "detail";
+    render(); window.scrollTo(0, 0);
+    setStatus("Moved into Delays. Sending…", true);
+    return;
   }
   if (b.hasAttribute("data-srdel")){
     if (!(await ask("Delete this record and its photos? This can't be undone.", "Delete", true))) return;
