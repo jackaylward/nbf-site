@@ -818,6 +818,13 @@ $("view").addEventListener("click", async ev => {
   if (key === "tools") return runPdf(key, () => server("makeToolsPdf", filteredTools().map(x => x.id), logo));
   if (key === "tool") return runPdf(key, () => server("makeToolsPdf", [b.dataset.id], logo));
   if (key === "eas") return runPdf(key, () => easOne(b.dataset.id));
+  if (key === "vo") return runPdf(key, () => voOne(b.dataset.id));
+  if (key === "voAll"){
+    const from = $("pdfFrom").value, to = $("pdfTo").value;
+    RS("dayworks").pdf = {from, to};
+    if (!from || !to || to < from){ S.pdfOut = {key, state: "error", msg: "Pick a From date and a To date after it."}; render(); return; }
+    return runPdf(key, () => voRange(from, to));
+  }
   if (key === "easAll"){
     const from = $("pdfFrom").value, to = $("pdfTo").value;
     RS("dayworks").pdf = {from, to};
@@ -1803,6 +1810,7 @@ const DET_FIELDS = [
   ["zone", "Zone", "both"],
   ["why", "Why it's extra", "var"],
   ["drg", "Drawing / RFI ref", "var"],
+  ["spec", "Spec / contract clause", "var"],
   ["how", "How instructed", "var"],
   ["by", "Instructed by", "var"],
   ["cause", "Cause", "crane"],
@@ -1893,6 +1901,7 @@ function dwExtraHtml(r){
     <label class="field" style="margin-top:10px"><span>Why it's extra${req}</span><textarea data-rf="x_why" maxlength="600" rows="2" placeholder="What changed compared to what was priced, e.g. new duct opening added on revised drawing">${esc(r.x_why || "")}</textarea></label>
     <div class="formgrid">
       <label class="field">Drawing / RFI ref${inp("drg", "e.g. SE-26035 Rev 03 to Rev 04, or RFI 112")}</label>
+      <label class="field">Spec / contract clause${inp("spec", "Optional, e.g. Spec E20/330: inserts to be cast in")}</label>
       <label class="field"><span>How instructed${req}</span>${sel("how", HOW_INSTRUCTED)}</label>
       <label class="field"><span>Instructed by${req}</span>${inp("by", "Name")}</label>
       <label class="field"><span>Their company${req}</span>${inp("co", "e.g. JJ Rhatigan")}</label>
@@ -2241,9 +2250,9 @@ function recordsHtml(kind){
   <div class="panel" style="margin-top:16px"><h2>Save a PDF to send</h2>
     <div class="formgrid"><label class="field">From<input type="date" id="pdfFrom" value="${esc(pdf.from)}"></label>
       <label class="field">To<input type="date" id="pdfTo" value="${esc(pdf.to)}"></label></div>
-    <div class="row-actions">${pdfBtn("records", "Save as PDF", `data-kind="${K.kind}"`)}${kind === "dayworks" ? pdfBtn("easAll", "Variations as EAS sheets") : ""}</div>
-    <p class="msg">${K.pdfNote}${kind === "dayworks" ? " EAS sheets: one Event Analysis Sheet for each variation between the dates (not delays), with photos." : ""}</p>
-    ${pdfResult("records")}${pdfResult("easAll")}
+    <div class="row-actions">${pdfBtn("records", "Save as PDF", `data-kind="${K.kind}"`)}${kind === "dayworks" ? pdfBtn("easAll", "Variations as EAS sheets") + pdfBtn("voAll", "Variation sheets (QS layout)") : ""}</div>
+    <p class="msg">${K.pdfNote}${kind === "dayworks" ? " EAS sheets: one Event Analysis Sheet for each variation between the dates (not delays), with photos. Variation sheets (optional): a cover sheet in the QS layout for each variation, with its EAS sheet and photos behind it." : ""}</p>
+    ${pdfResult("records")}${pdfResult("easAll")}${pdfResult("voAll")}
   </div>`;
 }
 
@@ -2334,8 +2343,8 @@ function recDetailHtml(K){
   <div class="row-actions" style="margin-bottom:10px"><button class="btn ghost" data-act="back">‹ ${K.Many}</button>
     ${S.edit ? `<button class="btn" data-act="edit" data-id="${esc(r.id)}">Edit</button>` : `<button class="btn ghost" data-mode="on">Edit</button>`}
     ${r.pending ? "" : pdfBtn("record", "Save as PDF", `data-kind="${K.kind}" data-id="${esc(r.id)}"`)}
-    ${K.kind === "dayworks" && r.type !== "Crane delay" ? pdfBtn("eas", "EAS sheet", `data-id="${esc(r.id)}"`) : ""}</div>
-  ${pdfResult("record")}${pdfResult("eas")}
+    ${K.kind === "dayworks" && r.type !== "Crane delay" ? pdfBtn("eas", "EAS sheet", `data-id="${esc(r.id)}"`) + pdfBtn("vo", "Variation sheet", `data-id="${esc(r.id)}"`) : ""}</div>
+  ${pdfResult("record")}${pdfResult("eas")}${pdfResult("vo")}
   <div class="panel">
     <h2>${esc(K.rowTitle(r))}</h2>
     ${K.rowTag ? `<p><span class="tag big ${K.rowTag(r) === "Delay" ? "crane" : "var"}">${esc(K.rowTag(r))}</span></p>` : ""}
@@ -2723,6 +2732,112 @@ async function easOne(id){
 async function easRange(from, to){
   const list = easSorted(mergedRecords("dayworks").filter(r => r.date >= from && r.date <= to && easType(r) === "Variation"));
   return makeEasPdf(list, `EAS - Variations ${easDate(from).replace(/\//g, "-")} to ${easDate(to).replace(/\//g, "-")}.pdf`);
+}
+
+// ================= Variation (VO) sheets =================
+// Optional cover sheet in the layout Mark Deevy uses for variations: header, key references,
+// description (instructed / carried out / not in our price / how it is valued), indirect costs
+// reserved, then a labour summary. The EAS sheet and photos follow as the backing records.
+// Rates are left blank on purpose so the QS fills them in (and no rates sit in the website code).
+const VO_SUB = "New Bridge Form";
+const VO_MAIN = "JJ Rhatigan";
+const VO_RESERVE = `Where this Variation has the effect of causing disruption and / or prolongation to ${VO_SUB}'s Sub-Contract Works activities and / or prolongation to the Completion Date of ${VO_SUB}'s Sub-Contract Works, the required Extension of Time and related losses, loss and expense (and disruption) and Increased Costs are not included in the Direct Costs of this Variation as provided herein, but will be applied for separately by ${VO_SUB}, when it is feasible / practicable for them to do so.`;
+function voDescription(r, num, nPhotos){
+  const p = parseDet(r.description), d = p.det, out = [];
+  const work = capFirst(p.work).replace(/\.?\s*$/, ".");
+  const by = [d.by, d.co].filter(Boolean).join(", ");
+  if (by || d.how) out.push(`${d.co || VO_MAIN} instructed ${VO_SUB} to carry out the following works${d.how ? " (" + d.how.toLowerCase() + ")" : ""}${d.by ? ", instruction given by " + by : ""}.${d.conf ? " Instruction confirmed by email: " + d.conf + "." : ""}`);
+  out.push(work);
+  const men = [[+r.chippies, "carpenter"], [+r.fixers, "steel fixer"], [+r.operatives, "general operative"]]
+    .filter(([n]) => n > 0).map(([n, t]) => `${n} ${t}${n === 1 ? "" : "s"}`).join(", ");
+  out.push(`${VO_SUB} carried out the works on ${easDate(r.date)}${r.start && r.end ? ", " + r.start + " to " + r.end : ""}${men ? ", with " + men : ""}${capFirst(r.location) ? ", at " + capFirst(r.location) : ""}.`);
+  out.push(`${d.why ? capFirst(d.why).replace(/\.?\s*$/, ". ") : ""}These works were not included in ${VO_SUB}'s Sub-Contract scope or price. Thus, the works carried out by ${VO_SUB} constitute a variation to the Sub-Contract Works.`);
+  if (d.spec) out.push(`Reference: ${capFirst(d.spec).replace(/\.?\s*$/, ".")}`);
+  if (d.qty) out.push(`Quantities: ${d.qty.replace(/\.?\s*$/, ".")}`);
+  out.push(`${VO_SUB} have evaluated this variation on a daywork basis, as set out below. The Event Analysis Sheet (EAS ${num}) and ${nPhotos ? nPhotos + " photograph" + (nPhotos === 1 ? "" : "s") : "photographs"} are attached.`);
+  return out.filter(Boolean);
+}
+function voPage(doc, r, num, logo, nPhotos){
+  const NAVY = "#012060", PALE = "#DCE6F2", HEAD = "#F2F5FA", M = 15, W = 180;
+  const font = (st, sz, col) => { doc.setFont("helvetica", st); doc.setFontSize(sz); doc.setTextColor(col || "#000000"); };
+  doc.setDrawColor(NAVY); doc.setLineWidth(0.25);
+  const cell = (x, y, w, h, fill) => { if (fill){ doc.setFillColor(fill); doc.rect(x, y, w, h, "FD"); } else doc.rect(x, y, w, h); };
+  const put = (s, x, y, h, o) => doc.text(String(s), x, y + h / 2, {baseline: "middle", ...(o || {})});
+  const d = parseDet(r.description).det;
+  let y = 12;
+  if (logo){ const lw = 50, lh = lw * logo.r; doc.addImage(logo.url, "PNG", M, y, lw, lh, "nbflogo", "FAST"); y += lh + 3; }
+  else { font("bold", 16, NAVY); doc.text("NEW BRIDGE FORM", M, y + 6); y += 10; }
+  // title bar
+  doc.setLineWidth(0.35); cell(M, y, W, 9, NAVY); doc.setLineWidth(0.25);
+  font("bold", 11, "#FFFFFF"); put(`Variation ${num}${d.ref ? " (" + d.ref + ")" : ""} - ${capFirst(r.location) || "Site"}`, M + 2, y, 9);
+  y += 11;
+  // header
+  const hdr = [["Contract:", EAS_SITE], ["Main Contractor:", VO_MAIN], ["Sub-Contract:", "Formwork, Steel Fixing & Concrete Placing"],
+    ["Sub-Contractor:", VO_SUB], ["Date:", easDate(r.date)], ["Status:", `Variation Nr ${String(num).padStart(3, "0")}`]];
+  hdr.forEach(([k, v]) => { cell(M, y, 40, 6, PALE); cell(M + 40, y, W - 40, 6); font("bold", 8.5, NAVY); put(k, M + 2, y, 6); font("normal", 9); put(v, M + 42, y, 6); y += 6; });
+  y += 3;
+  // key references
+  cell(M, y, W, 7, PALE); font("bold", 10, NAVY); put("Key References / Information", M + 2, y, 7); y += 7;
+  const instr = [d.how, [d.by, d.co].filter(Boolean).join(", "), d.conf ? "email " + d.conf : ""].filter(Boolean).join("; ");
+  const refs = [["Instruction:", instr || "-"], ["Drawings / RFI:", d.drg || "-"], ["Spec / contract:", d.spec || "-"],
+    ["Record Sheets:", `EAS ${num}, attached`], ["Pictures:", nPhotos ? `${nPhotos} photograph${nPhotos === 1 ? "" : "s"}, attached` : "-"],
+    ["Signed off by JJR:", d.sign || "-"], ["Notice sent:", d.notice || "-"]];
+  refs.forEach(([k, v]) => { cell(M, y, 40, 6); cell(M + 40, y, W - 40, 6); font("bold", 8.5, NAVY); put(k, M + 2, y, 6); font("normal", 9); put(doc.splitTextToSize(v, W - 44)[0] || "", M + 42, y, 6); y += 6; });
+  y += 3;
+  // description
+  const block = (title, paras, bold) => {
+    cell(M, y, W, 7, PALE); font("bold", 10, NAVY); put(title, M + 2, y, 7); y += 7;
+    font(bold ? "bold" : "normal", 9.2); const lines = paras.flatMap((p, i) => (i ? [""] : []).concat(doc.splitTextToSize(p, W - 4)));
+    const lh = 4.1, h = 3 + lines.length * lh + 2;
+    cell(M, y, W, h); let ty = y + 4.5; lines.forEach(l => { doc.text(l, M + 2, ty); ty += lh; }); y += h + 3;
+  };
+  block("Description of Variation", voDescription(r, num, nPhotos));
+  block("Indirect and Consequential Costs", [VO_RESERVE]);
+  // labour summary, rates left blank for the QS
+  cell(M, y, W, 7, PALE); font("bold", 10, NAVY); put("Summary of Direct Costs of Variation (daywork basis)", M + 2, y, 7); y += 7;
+  const ws = [70, 30, 25, 25, 30], heads = ["Item", "Man-hours", "Unit", "Rate (€)", "Total (€)"];
+  let x = M; heads.forEach((h, i) => { cell(x, y, ws[i], 6, HEAD); font("bold", 8.5, NAVY); put(h, x + 1.5, y, 6); x += ws[i]; }); y += 6;
+  const hrs = dwHours(r);
+  const rows = [[+r.chippies, "Labour: Carpenter"], [+r.fixers, "Labour: Steel Fixer"], [+r.operatives, "Labour: General Operative"]]
+    .filter(([n]) => n > 0).map(([n, t]) => [t, String(Math.round(n * hrs * 100) / 100), "hr", "", ""]);
+  if (d.mats) rows.push([`Materials: ${d.mats}`, "", "item", "", ""]);
+  if (d.plant) rows.push([`Plant: ${d.plant}`, "", "item", "", ""]);
+  if (!rows.length) rows.push(["Labour", String(hrs || ""), "hr", "", ""]);
+  rows.push(["Total for the Direct Cost of this Variation", "", "", "", ""]);
+  rows.forEach((rw, j) => { x = M; rw.forEach((v, i) => { cell(x, y, ws[i], 6); font(j === rows.length - 1 ? "bold" : "normal", 8.8); put(doc.splitTextToSize(String(v), ws[i] - 3)[0] || "", x + 1.5, y, 6); x += ws[i]; }); y += 6; });
+}
+async function makeVoPdf(recs, fileName){
+  if (!recs.length) throw new Error("No variations for those dates.");
+  const jsPDF = await loadJsPdf();
+  const logo = await navyLogo();
+  const nums = easNumbers();
+  const doc = new jsPDF({unit: "mm", format: "a4"});
+  doc.setProperties({title: fileName.replace(/\.pdf$/, ""), author: VO_SUB});
+  let first = true;
+  for (const r of recs){
+    const num = nums[r.id] || "", photos = await easPhotos(r);
+    if (!first) doc.addPage();
+    first = false;
+    voPage(doc, r, num, logo, photos.length);
+    doc.addPage();
+    easPage(doc, r, num, logo);
+    easPhotoPages(doc, r, num, logo, photos);
+  }
+  const blob = doc.output("blob");
+  let file = null;
+  try{ file = new File([blob], fileName, {type: "application/pdf"}); }catch(e){}
+  return {url: "", name: fileName, blobUrl: URL.createObjectURL(blob), file, note: "Made on this device. Download it or share it from here."};
+}
+async function voOne(id){
+  const r = mergedRecords("dayworks").find(x => x.id === id);
+  if (!r) throw new Error("That entry has been deleted.");
+  if (easType(r) !== "Variation") throw new Error("Variation sheets are for variations only.");
+  const n = easNumbers()[id] || "";
+  return makeVoPdf([r], `Variation ${n} (${easDate(r.date).replace(/\//g, "-")}).pdf`);
+}
+async function voRange(from, to){
+  const list = easSorted(mergedRecords("dayworks").filter(r => r.date >= from && r.date <= to && easType(r) === "Variation"));
+  return makeVoPdf(list, `Variations ${easDate(from).replace(/\//g, "-")} to ${easDate(to).replace(/\//g, "-")}.pdf`);
 }
 
 // ================= toolbox talks =================
