@@ -1966,7 +1966,7 @@ const KINDS = {
     inRange: (r, a, b) => r.date >= a && r.date <= b,
     calc(r){ const h = dwHours(r), men = recMen(r); return h ? `${fmtH(h)} hrs × ${men} men = <b>${fmtH(h*men)} man-hours</b>` : "Enter start and end times"; },
     dateFields: r => `
-      <label class="field">Type<select data-rf="type">${REC_TYPES.map(x => `<option value="${x}"${x === (r.type || REC_TYPES[0]) ? " selected" : ""}>${typeLabel(x)}</option>`).join("")}</select></label>
+      <label class="field">Type<select data-rf="type">${REC_TYPES.map(x => `<option value="${x}"${x === (r.type || REC_TYPES[0]) ? " selected" : ""}>${typeLabel(x)}</option>`).join("")}${r._isNew ? `<option value="__record">Record</option>` : ""}</select></label>
       <label class="field">Date<input type="date" data-rf="date" value="${esc(r.date)}"></label>
       <label class="field">Start time<input type="time" data-rf="start" value="${esc(r.start)}"></label>
       <label class="field">End time<input type="time" data-rf="end" value="${esc(r.end)}"></label>`,
@@ -2375,7 +2375,7 @@ $("view").addEventListener("click", async ev => {
     const rec = draft && draft.rec ? {...draft.rec} : {...K.blank(), id: newRecId(K)};
     if (!rec.id || !rec.id.startsWith(K.prefix)) rec.id = newRecId(K);
     if (K.kind === "dayworks"){
-      rec._strict = true;
+      rec._strict = true; rec._isNew = true;
       if (!rec.x_ref) rec.x_ref = nextRef(rec.type);
       if (!rec.x_co) rec.x_co = "JJ Rhatigan";
       if (!rec.x_status) rec.x_status = REC_STATUS[0];
@@ -2439,6 +2439,20 @@ $("view").addEventListener("input", ev => {
   if (ev.target.dataset && ev.target.dataset.rf != null && st.form){
     const prevType = st.form.rec.type;
     readRecForm(K); saveRecDraft(K);
+    if (K.kind === "dayworks" && ev.target.dataset.rf === "type" && st.form.rec.type === "__record"){
+      const f = st.form, r = f.rec;
+      const desc = [capFirst(r.location), r.description].map(x => String(x || "").trim()).filter(Boolean).join(" - ");
+      const photos = (f.added || []).map(ph => ({name: srPhotoName(), data: ph.data}));
+      st.form = null; st.view = "list";
+      kvSet("draft:dayworks", null).catch(() => {}); kvSet("dwDraft", null).catch(() => {});
+      S.sr.form = {id: srNewId(), date: r.date || iso(new Date()), description: desc, saved: false, add: photos, remove: [], photos: photos.slice()};
+      S.dwTab = "records";
+      try{ localStorage.setItem("siteAppDwTab", "records"); }catch(e){}
+      loadSiteRecords();
+      render(); window.scrollTo(0, 0);
+      setStatus("Now a record. Tap Save when you're done.", true);
+      return;
+    }
     if (K.kind === "dayworks" && (ev.target.dataset.rf === "type" || ev.target.dataset.rf === "x_cause")){
       const r = st.form.rec;
       // switching type: swap an untouched VO-/CD- number for the next one of the new type
