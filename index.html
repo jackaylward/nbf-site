@@ -1317,6 +1317,49 @@ function addLadHtml(){
     <div class="row-actions"><button class="btn" id="addSave">Add lad</button></div>
     <p class="msg" id="addMsg"></p></form>`;
 }
+// ---- attendance ticks: grouped, sent a few at a time, kept on this device until Google confirms ----
+const TICKQ = {map: null, timer: 0, busy: false, again: false};
+async function tickQLoad(){ if (!TICKQ.map){ try{ TICKQ.map = (await kvGet("tickQueue")) || {}; }catch(e){ TICKQ.map = {}; } } return TICKQ.map; }
+function tickQSave(){ kvSet("tickQueue", TICKQ.map || {}).catch(() => {}); }
+// ticks still waiting to send win over what Google sent back, so nothing flickers off
+function overlayTicks(ws, ticks){
+  const out = {...(ticks || {})};
+  for (const t of Object.values(TICKQ.map || {})) if (t.ws === ws) out[t.id] = {...(out[t.id] || {}), [t.day]: t.val};
+  return out;
+}
+async function queueTick(ws, id, name, day, val){
+  await tickQLoad();
+  TICKQ.map[`${ws}|${id}|${day}`] = {ws, id, name, day, val, t: Date.now()};
+  tickQSave();
+  setStatus("Saving…");
+  clearTimeout(TICKQ.timer);
+  TICKQ.timer = setTimeout(flushTicks, 600);
+}
+async function flushTicks(){
+  await tickQLoad();
+  if (TICKQ.busy){ TICKQ.again = true; return; }
+  const work = Object.entries(TICKQ.map);
+  if (!work.length) return;
+  TICKQ.busy = true;
+  let failed = 0, pinStop = false;
+  const worker = async () => {
+    while (work.length && !pinStop){
+      const [k, t] = work.shift();
+      try{
+        await bgServer("setTick", t.ws, t.id, t.name, t.day, t.val);
+        if (TICKQ.map[k] && TICKQ.map[k].t === t.t) delete TICKQ.map[k];   // a newer tap on the same box stays queued
+      }catch(e){ failed++; if (e && e.code === "PIN") pinStop = true; }
+    }
+  };
+  await Promise.all([worker(), worker(), worker(), worker()]);
+  tickQSave();
+  TICKQ.busy = false;
+  const left = Object.keys(TICKQ.map).length;
+  if (TICKQ.again){ TICKQ.again = false; return flushTicks(); }
+  if (!left) setStatus("Saved", true);
+  else if (failed){ setStatus(`${left} tick${left === 1 ? "" : "s"} not sent yet. Safe on this device, trying again`); setTimeout(flushTicks, 15000); }
+  else flushTicks();
+}
 async function loadAttendance(){
   const ws = iso(A.week);
   A.loaded = ws; A.ticks = {}; A.ready = false;
@@ -1326,7 +1369,8 @@ async function loadAttendance(){
   try{
     const data = await server("getWeek", ws);
     if (A.loaded === ws){
-      A.ticks = data || {}; A.ready = true;
+      await tickQLoad();
+      A.ticks = overlayTicks(ws, data || {}); A.ready = true;
       cacheSet("week:" + ws, A.ticks);
       if (S.view === "attendance" && !pending) render();
       setStatus("Up to date", true);
@@ -1350,7 +1394,7 @@ $("view").addEventListener("click", async ev => {
     cacheSet("week:" + iso(A.week), A.ticks);
     render();
     const ws = iso(A.week);
-    queueSave(() => server("setTick", ws, id, lad ? lad.name : id, day, val));
+    queueTick(ws, id, lad ? lad.name : id, day, val);
   }
   if (w){ A.week = new Date(A.week); A.week.setDate(A.week.getDate() + 7*Number(w.dataset.week)); loadAttendance(); }
   if (d){ if (d.dataset.day === "week") A.mode = "week"; else { A.mode = "day"; A.day = Number(d.dataset.day); } render(); }
@@ -3046,7 +3090,7 @@ setInterval(async () => {
     if (S.view === "attendance"){
       const ws = iso(A.week);
       const t = await bgServer("getWeek", ws);
-      if (A.loaded === ws && !pending){ A.ticks = t || {}; cacheSet("week:" + ws, A.ticks); }
+      if (A.loaded === ws && !pending){ await tickQLoad(); A.ticks = overlayTicks(ws, t || {}); cacheSet("week:" + ws, A.ticks); }
     }
     if (["home", "attendance", "timesheet"].includes(S.view) && !(document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName))){ const sc = window.scrollY; render(); window.scrollTo(0, sc); }
   }catch(e){}
@@ -4656,6 +4700,7 @@ go((() => {
     setStatus("Up to date", true);
     askWho();
     refreshJobs().then(() => { if (S.rec.jobs.length) processQueue(); });
+    tickQLoad().then(() => flushTicks());
     bgServer("importNewTools").then(n => {
       if (n > 0){ setStatus(n + " new tool" + (n === 1 ? "" : "s") + " added", true); loadTools(true); }
     }).catch(() => {});
