@@ -2231,7 +2231,7 @@ async function loadRecords(kind, quiet){
     st.loadFailed = false;
     cacheSet("records:" + kind, st.list);
     // moveSiteRecords() was a one-off and is switched off
-    if (kind === "dayworks"){ unmoveLadderRecord(); seedVariations(); }
+    if (kind === "dayworks"){ unmoveLadderRecord(); seedVariations().then(patchWall70); }
   }catch(e){
     st.loadFailed = !st.list;
     if (!quiet) connectionTrouble();
@@ -2582,13 +2582,15 @@ async function unmoveLadderRecord(){
 // ================= one-off: variations written up by Claude, added once =================
 // Fixed IDs, so running on more than one device can't make duplicates. Photos sit in /variations.
 // Both days share one VO number (two daily records for one variation). Doru's full name and trade come from the lads list.
+const W70_LOC = "Wall 70, Grid B, at gridlines 9B and 10B (both ends of the wall)";
+const W70_WHY = "Breaking out hardened concrete at the wall ends was extra formwork work, not in NBF's scope or price. The engineers on site instructed it";
 const VO_SEEDS = [{
   key: "voSeedWall70", ids: ["dw-vo-wall70-d1", "dw-vo-wall70-d2"],
   photos: ["variations/wall70-breakout-1.jpg", "variations/wall70-breakout-2.jpg", "variations/wall70-breakout-3.jpg", "variations/wall70-breakout-4.jpg"],
   days: [["2026-10-07", "08:00", "13:00", "Day 1 of 2"], ["2026-10-08", "08:00", "13:00", "Day 2 of 2"]],
-  who: "doru", location: "Wall 70, Grid B, both ends of the wall",
+  who: "doru", location: W70_LOC,
   work: d => `Broke out hardened concrete at both ends of Wall 70, 300 mm down from the top of the wall, using a Kango breaker working from a MEWP. Concrete broken out down to the reinforcement. ${d}.`,
-  det: {x_zone: "", x_why: "Breaking out hardened concrete is not formwork and was not in NBF's scope or price. The engineers on site instructed it",
+  det: {x_zone: "", x_why: W70_WHY,
     x_drg: "SE-26028 Rev 01 (Wall 70 elevation), P09 Suitable for Construction, 18.09.26", x_how: "Verbal", x_by: "Site engineers", x_co: "JJ Rhatigan",
     x_qty: "Break out concrete 300 mm deep at 2 no. ends of Wall 70, full wall thickness", x_plant: "MEWP (scissor lift) 5 hrs; Kango breaker 5 hrs",
     x_status: "Not notified yet"},
@@ -2622,6 +2624,25 @@ async function seedVariations(){
     }
   }catch(e){}
   finally{ S.voSeeding = false; }
+}
+// one-off fix to the Wall 70 records already added: gridlines and wording (Jack, 9 Oct)
+async function patchWall70(){
+  try{
+    if (!RS("dayworks") || !RS("dayworks").list || await kvGet("voPatchWall70a")) return;
+    const K = KINDS.dayworks, all = mergedRecords("dayworks");
+    for (const id of VO_SEEDS[0].ids){
+      const r = all.find(x => x.id === id);
+      if (!r) continue;
+      const rec = {};
+      K.textFields.forEach(k => rec[k] = r[k] == null ? "" : r[k]);
+      ["chippies", "fixers", "operatives"].forEach(k => rec[k] = +r[k] || 0);
+      rec.location = W70_LOC;
+      rec.description = String(r.description || "").replace(/^Why it's extra:.*$/m, "Why it's extra: " + W70_WHY);
+      await queueRecordSave("dayworks", rec, [], []);
+    }
+    if (VO_SEEDS[0].ids.some(id => all.some(x => x.id === id))) await kvSet("voPatchWall70a", true);
+    if (S.view === "dayworks") render();
+  }catch(e){}
 }
 async function moveSiteRecords(){
   if (S.srMoving || !RS("dayworks").list) return;
