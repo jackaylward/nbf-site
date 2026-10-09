@@ -1861,7 +1861,6 @@ const DET_HEAD = "--- Record details ---";
 const ZONES = ["Zone 1", "Zone 2", "Zone 3", "Other / site-wide"];
 const HOW_INSTRUCTED = ["Verbal", "Email", "Site instruction", "RFI answer", "Drawing revision", "Other"];
 const CRANE_CAUSES = ["Crane in use by another trade", "Crane breakdown", "Crane taken off us by JJR", "No crane driver or banksman", "Too windy", "Access or scaffold not ready", "Area not ready", "Waiting on materials or steel", "Waiting on concrete", "Waiting on information or drawings", "Waiting on another trade", "Other"];
-const REC_STATUS = ["Not notified yet", "Notified", "Priced", "Agreed", "Paid", "Disputed"];
 // key, label stored in the block, which types use it
 const DET_FIELDS = [
   ["ref", "Ref", "both"],
@@ -1883,7 +1882,6 @@ const DET_FIELDS = [
   ["pstand", "Plant standing", "crane"],
   ["sign", "Signed off by JJR", "both"],
   ["notice", "Notice sent to JJR", "both"],
-  ["status", "Status", "both"],
   ["crane", "Crane", "daily"],
   ["cranen", "Crane note", "daily"],
   ["scaf", "Scaffolding", "daily"],
@@ -1999,7 +1997,6 @@ function dwExtra2Html(r){
       <label class="field">Materials used${inp("mats", "e.g. 2 sheets ply, 4 lengths 4x2")}</label>`}
       <label class="field">Signed off by JJR${inp("sign", "Name and time, e.g. P. Murphy 16:30")}</label>
       <label class="field">Notice sent to JJR${inp("notice", "e.g. Email 2 Oct 17:05 to site manager")}</label>
-      <label class="field">Status<select data-rf="x_status">${dwStrict(r) ? "" : `<option value="">Not set</option>`}${REC_STATUS.map(o => `<option${o === (r.x_status || (dwStrict(r) ? REC_STATUS[0] : "")) ? " selected" : ""}>${esc(o)}</option>`).join("")}</select></label>
     </div>`;
 }
 function namePickHtml(r){
@@ -2022,7 +2019,7 @@ const KINDS = {
       const now = new Date();
       const hh = String(now.getHours()).padStart(2,"0"), mm = String(Math.floor(now.getMinutes()/15)*15).padStart(2,"0");
       return {type: REC_TYPES[0], date: iso(now), start: `${hh}:${mm}`, end: "", location: "", description: "", chippies: 0, fixers: 0, operatives: 0, other: "",
-        _strict: true, x_ref: nextRef(REC_TYPES[0]), x_co: "JJ Rhatigan", x_status: REC_STATUS[0]};
+        _strict: true, x_ref: nextRef(REC_TYPES[0]), x_co: "JJ Rhatigan"};
     },
     missing(r){
       const miss = [];
@@ -2326,7 +2323,7 @@ function recordsHtml(kind){
       <div class="info">${K.rowTag ? `<span class="tag ${K.rowTag(r) === "Delay" ? "crane" : "var"}">${esc(K.rowTag(r))}</span>` : ""}<strong>${esc(K.rowTitle(r))}</strong>
         <span>${esc(K.rowSub(r))}</span>
         ${K.rowTitle(r) === String(workText(r.description)).split("\n")[0] ? "" : `<span>${esc(workText(r.description))}</span>`}
-        ${(() => { const st2 = parseDet(r.description).det.status; return st2 ? `<span class="small muted">Status: ${esc(st2)}</span>` : ""; })()}</div>
+        </div>
       ${(S.recThumbs[r.id] && S.recThumbs[r.id].length) ? `<div class="dwthumbs">${S.recThumbs[r.id].map(p => `<img src="${p}" alt="" loading="lazy" decoding="async">`).join("")}</div>` : (r.photos > 0 && !S.thumbsDone[r.id] ? `<div class="dwthumbs">${Array.from({length: Math.min(3, r.photos)}, () => '<span class="skel"></span>').join("")}</div>` : "")}
       <div class="dwside">${K.rowSide(r)}
         <span class="small muted">${r.photos || 0} photo${r.photos==1?"":"s"}</span>
@@ -2473,7 +2470,6 @@ $("view").addEventListener("click", async ev => {
       rec._strict = true; rec._isNew = true;
       if (!rec.x_ref) rec.x_ref = nextRef(rec.type);
       if (!rec.x_co) rec.x_co = "JJ Rhatigan";
-      if (!rec.x_status) rec.x_status = REC_STATUS[0];
     }
     await openRecForm(K, rec, true);
     if (draft && draft.rec){ st.form.added = draft.added || []; st.form.restored = true; render(); }
@@ -2644,8 +2640,7 @@ const VO_SEEDS = [{
   work: d => `Breaking out of hardened concrete at both ends of Wall 70 (gridlines 9B and 10B), to a depth of 300 mm below the top of the wall, using an electric breaker operated from a mobile elevating work platform (MEWP). Concrete removed to expose the existing reinforcement, as shown in the attached photographs. ${d}.`,
   det: {x_zone: "", x_why: W70_WHY,
     x_drg: "SE-26028 Rev 01 (Wall 70 elevation), P09 Suitable for Construction, 18.09.26", x_how: "Verbal", x_by: "Site engineers", x_co: "JJ Rhatigan",
-    x_qty: W70_QTY, x_plant: "MEWP (scissor lift), 10 hrs; electric breaker (Kango), 10 hrs",
-    x_status: "Not notified yet"},
+    x_qty: W70_QTY, x_plant: "MEWP (scissor lift), 10 hrs; electric breaker (Kango), 10 hrs"},
 }];
 async function seedVariations(){
   try{ if (S.voSeeding || !RS("dayworks") || !RS("dayworks").list || !(S.lads || []).length) return; }catch(e){ return; }
@@ -2709,8 +2704,7 @@ const DL_SEEDS = [{
   work: "Crane-dependent formwork activities in Zone 3 could not proceed for the full working day. The mobile crane was allocated to Zone 2 for the installation of precast slabs from 08:00 until the end of the working day and was not available to New Bridge Form. All Zone 3 lifts (wall shutters, reinforcement and materials) were therefore held up. This was the second consecutive day of lost crane access, following Monday 5 October 2026. The crane in use on the precast installation in Zone 2 is shown in the attached photographs, taken on the day.",
   det: {x_zone: "Zone 3", x_cause: "Crane in use by another trade",
     x_causeInfo: "Mobile crane allocated to precast slab installation in Zone 2 from 08:00 for the full day; not available to NBF for Zone 3",
-    x_co: "JJ Rhatigan", x_effect: "No crane lifts possible in Zone 3 for the full day. Second consecutive day affected (see also the delay of Monday 5 October 2026)",
-    x_status: "Not notified yet"},
+    x_co: "JJ Rhatigan", x_effect: "No crane lifts possible in Zone 3 for the full day. Second consecutive day affected (see also the delay of Monday 5 October 2026)"},
 }];
 async function seedCraneDelays(){
   try{ if (S.dlSeeding || !RS("dayworks") || !RS("dayworks").list) return; }catch(e){ return; }
@@ -2821,7 +2815,7 @@ async function moveSiteRecords(){
       for (const p of got){ const data = await srPhotoData(p); if (data) photos.push({name: `dw-${sr.id}-${p.name || photos.length}`, data}); }
       const rec = {id: "dw-" + sr.id, type: "Crane delay", date: sr.date, start: "", end: "", location: SR_MOVE_LOC[sr.id] || "See description",
         description: "", chippies: 0, fixers: 0, operatives: 0, other: ""};
-      rec.description = composeDet(capFirst(sr.description), {...rec, x_ref: nextRef("Crane delay"), x_cause: "Access or scaffold not ready", x_status: REC_STATUS[0]});
+      rec.description = composeDet(capFirst(sr.description), {...rec, x_ref: nextRef("Crane delay"), x_cause: "Access or scaffold not ready"});
       await queueRecordSave("dayworks", rec, photos, []);
     }
     await kvSet("srMovedToDelays", true);
@@ -3157,7 +3151,7 @@ async function dailyReportPdf(from, to, single, all){
       });
       y += 1;
     };
-    overview("Variations recorded", dayVars, r => { const d = parseDet(r.description).det; return `${d.ref || "Variation"}${r.location ? " (" + r.location + ")" : ""}: ${brief(r, 220)}${d.status ? " Status: " + d.status + "." : ""}`; });
+    overview("Variations recorded", dayVars, r => { const d = parseDet(r.description).det; return `${d.ref || "Variation"}${r.location ? " (" + r.location + ")" : ""}: ${brief(r, 220)}`; });
     overview("Crane delays recorded", dayCranes, r => { const d = parseDet(r.description).det; return `${d.ref || "Crane delay"}${d.zone ? " (" + d.zone + ")" : ""}: ${[d.cause, d.causeInfo].filter(Boolean).join(". ") || brief(r, 200)}${d.effect ? ". " + d.effect : ""}.`.replace(/\.\.$/, "."); });
     // photographs for the day, three across
     if (pics.length){
@@ -4757,7 +4751,7 @@ $("view").addEventListener("click", async ev => {
     for (const ph of (f.photos || [])){ const data = await srPhotoData(ph); if (data) photos.push({name: `dw-${f.id}-${ph.name || photos.length}`, data}); }
     const rec = {id: "dw-" + f.id, type: "Crane delay", date: f.date, start: "", end: "", location: SR_MOVE_LOC[f.id] || "",
       description: "", chippies: 0, fixers: 0, operatives: 0, other: ""};
-    rec.description = composeDet(capFirst(f.description), {...rec, x_ref: nextRef("Crane delay"), x_status: REC_STATUS[0]});
+    rec.description = composeDet(capFirst(f.description), {...rec, x_ref: nextRef("Crane delay")});
     await queueRecordSave("dayworks", rec, photos, []);
     S.sr.form = null; S.dwTab = "main";
     try{ localStorage.setItem("siteAppDwTab", "main"); }catch(e){}
