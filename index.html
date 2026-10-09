@@ -832,6 +832,12 @@ $("view").addEventListener("click", async ev => {
     if (!from || !to || to < from){ S.pdfOut = {key, state: "error", msg: "Pick a From date and a To date after it."}; render(); return; }
     return runPdf(key, () => easRange(from, to));
   }
+  if (key === "dayrep"){
+    const day = $("pdfTo").value;
+    RS("works").pdf = {from: $("pdfFrom").value, to: day};
+    if (!day){ S.pdfOut = {key, state: "error", msg: "Pick the day in the To box."}; render(); return; }
+    return runPdf(key, () => dailyReportPdf(day, day, true));
+  }
   if (key === "wkrep"){
     const from = $("pdfFrom").value, to = $("pdfTo").value;
     RS("works").pdf = {from, to};
@@ -2100,7 +2106,7 @@ const KINDS = {
       ${r.location ? `<tr><th>Working zone and level</th><td>${esc(r.location)}</td></tr>` : ""}
       ${(d => [["crane", "Crane"], ["scaf", "Scaffolding"], ["delay", "Delay / dependency"], ["need", "Holds up"], ["notes", "Notes"]].filter(([k]) => d[k]).map(([k, l]) => `<tr><th>${l}</th><td>${esc(d[k])}${k === "crane" && d.cranen ? " (" + esc(d.cranen) + ")" : ""}${k === "scaf" && d.scafn ? " (" + esc(d.scafn) + ")" : ""}</td></tr>`).join(""))(parseDet(r.description).det)}`,
     weekSummary: list => `${list.length} this week, ${list.filter(r => wdIssues(r).claim).length} with delays`,
-    pdfNote: "Weekly report: a PDF of every daily record between the dates, with the delays and dependencies pulled together. Records with photos: the older Google PDF.",
+    pdfNote: "Weekly report: a PDF of every daily record between the dates, with photographs and the delays and dependencies pulled together. Daily report: the same for the single day in the To box. Records with photos: the older Google PDF.",
   },
 };
 S.rec = {jobs: []};
@@ -2338,9 +2344,9 @@ function recordsHtml(kind){
   <div class="panel" style="margin-top:16px"><h2>Save a PDF to send</h2>
     <div class="formgrid"><label class="field">From<input type="date" id="pdfFrom" value="${esc(pdf.from)}"></label>
       <label class="field">To<input type="date" id="pdfTo" value="${esc(pdf.to)}"></label></div>
-    <div class="row-actions">${kind === "works" ? pdfBtn("wkrep", "Weekly report") : ""}${pdfBtn("records", kind === "works" ? "Records with photos" : "Save as PDF", `data-kind="${K.kind}"`)}${kind === "dayworks" ? pdfBtn("easAll", "Variations as EAS sheets") + pdfBtn("voAll", "Variation sheets (QS layout)") : ""}</div>
+    <div class="row-actions">${kind === "works" ? pdfBtn("wkrep", "Weekly report") + pdfBtn("dayrep", "Daily report") : ""}${pdfBtn("records", kind === "works" ? "Records with photos" : "Save as PDF", `data-kind="${K.kind}"`)}${kind === "dayworks" ? pdfBtn("easAll", "Variations as EAS sheets") + pdfBtn("voAll", "Variation sheets (QS layout)") : ""}</div>
     <p class="msg">${K.pdfNote}${kind === "dayworks" ? " EAS sheets: one Event Analysis Sheet for each variation between the dates (not delays), with photos. Variation sheets (optional): a cover sheet in the QS layout for each variation, with its EAS sheet and photos behind it." : ""}</p>
-    ${pdfResult("wkrep")}${pdfResult("records")}${pdfResult("easAll")}${pdfResult("voAll")}
+    ${pdfResult("wkrep")}${pdfResult("dayrep")}${pdfResult("records")}${pdfResult("easAll")}${pdfResult("voAll")}
   </div>`;
 }
 
@@ -2888,17 +2894,17 @@ function easDescription(r){
   }
   return out.filter(Boolean).map(s => s.replace(/\.\.$/, "."));
 }
-async function easPhotos(r){
-  const st = RS("dayworks");
-  const pics = {...(await getRecPhotos("dayworks", r.id))};
-  const job = kindJobs("dayworks").find(j => j.id === r.id && !j.del);
+async function easPhotos(r, kind, maxPx){
+  kind = kind || "dayworks";
+  const pics = {...(await getRecPhotos(kind, r.id))};
+  const job = kindJobs(kind).find(j => j.id === r.id && !j.del);
   if (job){ job.newPhotos.forEach(p => pics[p.name] = p.data); job.removed.forEach(n => delete pics[n]); }
   const out = [];
   for (const n of Object.keys(pics).sort()){
     const im = await loadImg(pics[n]);
     if (!im) continue;
     try{
-      const c = document.createElement("canvas"), s = Math.min(1, 1400 / Math.max(im.naturalWidth, im.naturalHeight));
+      const c = document.createElement("canvas"), s = Math.min(1, (maxPx || 1400) / Math.max(im.naturalWidth, im.naturalHeight));
       c.width = Math.round(im.naturalWidth * s); c.height = Math.round(im.naturalHeight * s);
       c.getContext("2d").drawImage(im, 0, 0, c.width, c.height);
       out.push({url: c.toDataURL("image/jpeg", 0.82), w: c.width, h: c.height});
@@ -3016,22 +3022,23 @@ async function easRange(from, to){
 
 // ================= Daily records weekly report =================
 const fmtDmy = s => { const d = fromIso(s); return d ? `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}` : (s || ""); };
-async function dailyReportPdf(from, to){
+async function dailyReportPdf(from, to, single){
   const recs = mergedRecords("works").filter(r => r.dateFrom <= to && (r.dateTo || r.dateFrom) >= from).sort((a, b) => a.dateFrom.localeCompare(b.dateFrom));
   if (!recs.length) throw new Error("No daily records for those dates.");
   const jsPDF = await loadJsPdf(), logo = await navyLogo();
   const NAVY = "#012060", PALE = "#DCE6F2", GREY = "#5A6478", LINE = "#D5DAE3", AMBER = "#FFF1D6", AMBERL = "#E0A100";
   const M = 15, W = 180, TOP = 34, BOT = 280;
   const doc = new jsPDF({unit: "mm", format: "a4"});
-  const name = `Daily records ${fmtDmy(from).replace(/\//g, "-")} to ${fmtDmy(to).replace(/\//g, "-")}.pdf`;
+  const name = single ? `Daily record ${fmtDmy(from).replace(/\//g, "-")}.pdf` : `Daily records ${fmtDmy(from).replace(/\//g, "-")} to ${fmtDmy(to).replace(/\//g, "-")}.pdf`;
   doc.setProperties({title: name.replace(/\.pdf$/, ""), author: "New Bridge Form"});
   const font = (st, sz, col) => { doc.setFont("helvetica", st); doc.setFontSize(sz); doc.setTextColor(col || "#000000"); };
-  const scope = `${fmtDmy(from)} to ${fmtDmy(to)}`;
+  const scope = single ? wdTitle({dateFrom: from}) : `${fmtDmy(from)} to ${fmtDmy(to)}`;
+  const repName = single ? "Daily Report" : "Weekly Daily Records";
   const header = () => {
     if (logo){ const lw = 38, lh = lw * logo.r; doc.addImage(logo.url, "PNG", M, 8, lw, lh, "nbflogo", "FAST"); }
     else { font("bold", 14, NAVY); doc.text("NEW BRIDGE FORM", M, 14); }
     font("normal", 8, GREY); doc.text(EAS_SITE, M, 8 + (logo ? 38 * logo.r : 7) + 4);
-    font("bold", 12, NAVY); doc.text("Weekly Daily Records", M + W, 12, {align: "right"});
+    font("bold", 12, NAVY); doc.text(repName, M + W, 12, {align: "right"});
     font("normal", 8.5, GREY); doc.text(scope, M + W, 17.5, {align: "right"});
     doc.setDrawColor(NAVY); doc.setLineWidth(0.5); doc.line(M, 28, M + W, 28);
   };
@@ -3040,7 +3047,7 @@ async function dailyReportPdf(from, to){
   const ensure = h => { if (y + h > BOT){ doc.addPage(); header(); y = TOP; } };
   const lines = (txt, w, sz, st) => { font(st || "normal", sz); return doc.splitTextToSize(String(txt), w); };
   // title
-  font("bold", 22, NAVY); doc.text("Daily Records", M, y + 6); y += 11;
+  font("bold", 22, NAVY); doc.text(single ? "Daily Report" : "Daily Records", M, y + 6); y += 11;
   font("normal", 10, GREY); doc.text(`${EAS_SITE}  ·  ${scope}`, M, y); y += 8;
   // numbers
   const days = [...new Set(recs.map(r => r.dateFrom))];
@@ -3059,7 +3066,7 @@ async function dailyReportPdf(from, to){
   });
   y += 27;
   // day by day
-  font("bold", 13, NAVY); doc.text("Day by day", M, y); y += 6;
+  font("bold", 13, NAVY); doc.text(single ? "Record" : "Day by day", M, y); y += 6;
   for (const day of days){
     const list = info.filter(x => x.r.dateFrom === day);
     ensure(14);
@@ -3092,13 +3099,29 @@ async function dailyReportPdf(from, to){
       }
       doc.setDrawColor(LINE); doc.setLineWidth(0.2); doc.line(M, y + 1, M + W, y + 1); y += 3;
     }
+    // photographs for the day, three across
+    const pics = [];
+    for (const {r} of list){ try{ pics.push(...await easPhotos(r, "works", 1000)); }catch(e){} }
+    if (pics.length){
+      ensure(56);
+      font("bold", 9.5, NAVY); doc.text(`Photographs (${pics.length})`, M, y + 3); y += 6;
+      const pw = 58, ph = 44, gap = 3;
+      pics.forEach((pc, k) => {
+        const col = k % 3;
+        if (col === 0 && k > 0) y += ph + gap;
+        ensure(ph + 2);
+        const sc = Math.min(pw / pc.w, ph / pc.h), w = pc.w * sc, h = pc.h * sc;
+        doc.addImage(pc.url, "JPEG", M + col * (pw + gap) + (pw - w) / 2, y + (ph - h) / 2, w, h);
+      });
+      y += ph + 4;
+    }
     y += 2;
   }
   // delay summary
   const delays = info.filter(x => x.i.claim && x.i.list.length);
   ensure(24);
   font("bold", 13, NAVY); doc.text("Delays and dependencies on JJ Rhatigan", M, y + 2); y += 6;
-  if (!delays.length){ font("normal", 9, GREY); doc.text("None recorded this week.", M, y + 3); y += 8; }
+  if (!delays.length){ font("normal", 9, GREY); doc.text(single ? "None recorded." : "None recorded this week.", M, y + 3); y += 8; }
   else {
     doc.setFillColor(NAVY); doc.rect(M, y, W, 7, "F");
     font("bold", 9, "#FFFFFF"); doc.text("Date", M + 2, y + 4.8); doc.text("What happened", M + 28, y + 4.8); y += 7;
@@ -3120,7 +3143,7 @@ async function dailyReportPdf(from, to){
   for (let p = 1; p <= n; p++){
     doc.setPage(p); font("normal", 7.5, GREY);
     doc.setDrawColor(LINE); doc.setLineWidth(0.2); doc.line(M, 285, M + W, 285);
-    doc.text("New Bridge Form · Weekly Daily Records · Prepared by Jack Aylward, New Bridge Form", M, 290);
+    doc.text(`New Bridge Form · ${repName} · Prepared by Jack Aylward, New Bridge Form`, M, 290);
     doc.text(`Page ${p} of ${n}`, M + W, 290, {align: "right"});
   }
   const blob = doc.output("blob");
