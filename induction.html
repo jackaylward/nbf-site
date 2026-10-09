@@ -304,11 +304,6 @@ async function makePdf(d, ref, sigData){
       doc.text(t, x+11, y+12.3); x += 11 + doc.getTextWidth(t) + 12; });
     doc.setDrawColor(...LINE); y += h;
   }
-  doc.setFillColor(...PALE); doc.setDrawColor(...LINE); doc.rect(LX,y,CW,25,"FD");
-  doc.setFont("helvetica","bold"); doc.setFontSize(6.4); doc.setTextColor(...NAVY);
-  doc.text("Proof of ID – original document to be verified and copy sent to office with this form.", LX+3, y+8);
-  doc.setFont("helvetica","bolditalic"); doc.text("Only a Passport or Birth Certificate (with additional photograph ID) can be accepted.", LX+3, y+15);
-  doc.text("Employees from outside the EU must also present a valid Work Permit.", LX+3, y+22); y += 25;
   R(LX,CW,[[1,"Job number",d.jobNumber],[1,"Start date",dmy(d.startDate)],[1.3,"Has employee worked for JBD before?",yn(d.workedBefore)]],20);
   R(LX,CW,[[1.3,"Induction completed by (inductor)",""],[1,"Signed (inductor)",""]],22);
   y += 4;
