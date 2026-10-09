@@ -3157,7 +3157,7 @@ async function dailyReportPdf(from, to, single, all){
       });
       y += 1;
     };
-    overview("Variations recorded", dayVars, r => { const d = parseDet(r.description).det; return `${d.ref || "Variation"}${r.location ? " (" + r.location + ")" : ""}: ${brief(r, 220)}${d.status ? " Status: " + d.status + "." : ""}`; });
+    overview("Variations recorded", dayVars, r => { const d = parseDet(r.description).det; return `${d.ref || "Variation"}${r.location ? " (" + r.location + ")" : ""}: ${brief(r, 220)}`; });
     overview("Crane delays recorded", dayCranes, r => { const d = parseDet(r.description).det; return `${d.ref || "Crane delay"}${d.zone ? " (" + d.zone + ")" : ""}: ${[d.cause, d.causeInfo].filter(Boolean).join(". ") || brief(r, 200)}${d.effect ? ". " + d.effect : ""}.`.replace(/\.\.$/, "."); });
     // photographs for the day, three across
     if (pics.length){
