@@ -2151,6 +2151,8 @@ async function queueRecordSave(kind, rec, newPhotos, removed){
   const old = await jobGet(key);
   const job = old || {key, kind, id: rec.id, ts: Date.now(), newPhotos: [], removed: []};
   job.kind = kind;
+  // Google's script rejects a record with no men, and daily records no longer ask for crew
+  if (kind === "works" && recMen(rec) < 1) rec = {...rec, operatives: 1};
   job.rec = rec;
   job.error = "";
   for (const p of newPhotos) job.newPhotos.push({name: p.name, data: p.data, sent: false});
@@ -2743,10 +2745,14 @@ async function seedDailyRecords(){
   try{ if (S.wdSeeding || !RS("works") || !RS("works").list) return; }catch(e){ return; }
   S.wdSeeding = true;
   try{
+    await refreshJobs();
+    let fixed = 0;
+    for (const j of kindJobs("works")) if (!j.del && j.rec && recMen(j.rec) < 1){ j.rec = {...j.rec, operatives: 1}; j.error = ""; await jobPut(j); fixed++; }
+    if (fixed){ await refreshJobs(); processQueue(); }
     for (const v of WD_SEEDS){
       if (await kvGet(v.key)) continue;
       if (mergedRecords("works").some(r => r.id === v.id)){ await kvSet(v.key, true); continue; }
-      const rec = {id: v.id, dateFrom: v.date, dateTo: v.date, location: v.location, description: "", chippies: 0, fixers: 0, operatives: 0, other: ""};
+      const rec = {id: v.id, dateFrom: v.date, dateTo: v.date, location: v.location, description: "", chippies: 0, fixers: 0, operatives: 1, other: ""};
       rec.description = composeDet(v.work, {...rec, ...v.det, type: "Daily"});
       await queueRecordSave("works", rec, [], []);
       await kvSet(v.key, true);
