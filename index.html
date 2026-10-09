@@ -832,6 +832,12 @@ $("view").addEventListener("click", async ev => {
     if (!from || !to || to < from){ S.pdfOut = {key, state: "error", msg: "Pick a From date and a To date after it."}; render(); return; }
     return runPdf(key, () => easRange(from, to));
   }
+  if (key === "vcrep"){
+    const from = $("pdfFrom").value, to = $("pdfTo").value;
+    RS("dayworks").pdf = {from, to};
+    if (!from || !to || to < from){ S.pdfOut = {key, state: "error", msg: "Pick a From date and a To date after it."}; render(); return; }
+    return runPdf(key, () => vcReportPdf(from, to));
+  }
   if (key === "allrep") return runPdf(key, () => dailyReportPdf("", "", false, true));
   if (key === "dayrep"){
     const day = $("pdfTo").value;
@@ -2059,7 +2065,7 @@ const KINDS = {
       <tr><th>Man-hours</th><td>${fmtH(r.manHours||0)}</td></tr>
       ${detRowsHtml(r)}`,
     weekSummary: list => `${fmtH(list.reduce((a,r)=>a+(r.manHours||0),0))} man-hours this week`,
-    pdfNote: "Includes every variation and delay between the dates, with photos.",
+    pdfNote: "Weekly report: totals, a summary table and every variation and crane delay between the dates in full, with photos. Save as PDF: every variation and delay between the dates, with photos.",
   },
   works: {
     kind: "works", prefix: "wd", one: "daily record", many: "daily records", One: "Daily record", Many: "Daily Records",
@@ -2342,9 +2348,9 @@ function recordsHtml(kind){
   <div class="panel" style="margin-top:16px"><h2>Save a PDF to send</h2>
     <div class="formgrid"><label class="field">From<input type="date" id="pdfFrom" value="${esc(pdf.from)}"></label>
       <label class="field">To<input type="date" id="pdfTo" value="${esc(pdf.to)}"></label></div>
-    <div class="row-actions">${kind === "works" ? pdfBtn("wkrep", "Weekly report") + pdfBtn("dayrep", "Daily report") + pdfBtn("allrep", "All days report") : ""}${kind === "works" ? "" : pdfBtn("records", "Save as PDF", `data-kind="${K.kind}"`)}${kind === "dayworks" ? pdfBtn("easAll", "Variations as EAS sheets") + pdfBtn("voAll", "Variation sheets (QS layout)") : ""}</div>
+    <div class="row-actions">${kind === "works" ? pdfBtn("wkrep", "Weekly report") + pdfBtn("dayrep", "Daily report") + pdfBtn("allrep", "All days report") : ""}${kind === "works" ? "" : pdfBtn("records", "Save as PDF", `data-kind="${K.kind}"`)}${kind === "dayworks" ? pdfBtn("vcrep", "Weekly variations and crane delays report") + pdfBtn("easAll", "Variations as EAS sheets") + pdfBtn("voAll", "Variation sheets (QS layout)") : ""}</div>
     <p class="msg">${K.pdfNote}${kind === "dayworks" ? " EAS sheets: one Event Analysis Sheet for each variation between the dates (not delays), with photos. Variation sheets (optional): a cover sheet in the QS layout for each variation, with its EAS sheet and photos behind it." : ""}</p>
-    ${pdfResult("wkrep")}${pdfResult("dayrep")}${pdfResult("allrep")}${pdfResult("records")}${pdfResult("easAll")}${pdfResult("voAll")}
+    ${pdfResult("vcrep")}${pdfResult("wkrep")}${pdfResult("dayrep")}${pdfResult("allrep")}${pdfResult("records")}${pdfResult("easAll")}${pdfResult("voAll")}
   </div>`;
 }
 
@@ -3205,6 +3211,138 @@ async function dailyReportPdf(from, to, single, all){
   doc.setFillColor(PALE); const note = lines("Crane and scaffolding are provided by JJ Rhatigan. Where either is taken, not erected or not ready, New Bridge Form cannot proceed and the time lost is recorded here as it happens.", W - 6, 8.5);
   doc.rect(M, y, W, note.length * 4 + 5, "F"); font("normal", 8.5, NAVY); note.forEach((l, k) => doc.text(l, M + 3, y + 5 + k * 4));
   // footer
+  const n = doc.getNumberOfPages();
+  for (let p = 1; p <= n; p++){
+    doc.setPage(p); font("normal", 7.5, GREY);
+    doc.setDrawColor(LINE); doc.setLineWidth(0.2); doc.line(M, 285, M + W, 285);
+    doc.text(`New Bridge Form · ${repName} · Prepared by Jack Aylward, New Bridge Form`, M, 290);
+    doc.text(`Page ${p} of ${n}`, M + W, 290, {align: "right"});
+  }
+  const blob = doc.output("blob");
+  let file = null;
+  try{ file = new File([blob], name, {type: "application/pdf"}); }catch(e){}
+  return {url: "", name, blobUrl: URL.createObjectURL(blob), file, note: "Made on this device. Download it or share it from here."};
+}
+
+// ================= Weekly variations and crane delays report =================
+// One PDF for the dates picked: totals, a summary table of each type, then every variation and crane delay
+// in full with its photographs. NBF style (logo top left, navy and pale blue, footer with page numbers). Made on the phone.
+async function vcReportPdf(from, to){
+  const all = mergedRecords("dayworks").filter(r => r.date >= from && r.date <= to)
+    .sort((a, b) => (a.date + (a.start || "")).localeCompare(b.date + (b.start || "")));
+  if (!all.length) throw new Error("No variations or crane delays for those dates.");
+  const nums = easNumbers();
+  const vars = all.filter(r => easType(r) === "Variation"), cranes = all.filter(r => easType(r) === "Crane delay");
+  const jsPDF = await loadJsPdf(), logo = await navyLogo();
+  const NAVY = "#012060", PALE = "#DCE6F2", GREY = "#5A6478", LINE = "#D5DAE3", ALT = "#F2F5FA";
+  const M = 15, W = 180, TOP = 34, BOT = 280;
+  const doc = new jsPDF({unit: "mm", format: "a4"});
+  const repName = "Weekly Variations and Crane Delays Report";
+  const scope = `${fmtDmy(from)} to ${fmtDmy(to)}`;
+  const name = `Variations and crane delays ${fmtDmy(from).replace(/\//g, "-")} to ${fmtDmy(to).replace(/\//g, "-")}.pdf`;
+  doc.setProperties({title: name.replace(/\.pdf$/, ""), author: "New Bridge Form"});
+  const font = (st, sz, col) => { doc.setFont("helvetica", st); doc.setFontSize(sz); doc.setTextColor(col || "#000000"); };
+  const lines = (txt, w, sz, st) => { font(st || "normal", sz); return doc.splitTextToSize(String(txt), w); };
+  const header = () => {
+    if (logo){ const lw = 38, lh = lw * logo.r; doc.addImage(logo.url, "PNG", M, 8, lw, lh, "nbflogo", "FAST"); }
+    else { font("bold", 14, NAVY); doc.text("NEW BRIDGE FORM", M, 14); }
+    font("normal", 8, GREY); doc.text(EAS_SITE, M, 8 + (logo ? 38 * logo.r : 7) + 4);
+    font("bold", 12, NAVY); doc.text(repName, M + W, 12, {align: "right"});
+    font("normal", 8.5, GREY); doc.text(scope, M + W, 17.5, {align: "right"});
+    doc.setDrawColor(NAVY); doc.setLineWidth(0.5); doc.line(M, 28, M + W, 28);
+  };
+  header();
+  let y = TOP;
+  const ensure = h => { if (y + h > BOT){ doc.addPage(); header(); y = TOP; } };
+  const hrsOf = r => dwHours(r), menOf = r => recMen(r), mhOf = r => Math.round(dwHours(r) * recMen(r) * 100) / 100;
+  const sum = (l, f) => Math.round(l.reduce((a, r) => a + f(r), 0) * 100) / 100;
+  const refOf = r => parseDet(r.description).det.ref || (nums[r.id] ? `${easType(r) === "Variation" ? "VO" : "CD"}-${String(nums[r.id]).padStart(3, "0")}` : "-");
+  const menTxt = r => [[+r.chippies, "carpenter"], [+r.fixers, "steel fixer"], [+r.operatives, "general operative"]]
+    .filter(([n]) => n > 0).map(([n, t]) => `${n} ${t}${n === 1 ? "" : "s"}`).join(", ");
+  // title and totals
+  font("bold", 20, NAVY); doc.text("Variations and Crane Delays", M, y + 6); y += 11;
+  font("normal", 10, GREY); doc.text(`${EAS_SITE}  ·  ${scope}`, M, y); y += 8;
+  const kpis = [[String(vars.length), "Variations", "Recorded this period"], [fmtH(sum(vars, mhOf)), "Variation man-hours", "Daywork basis"],
+    [String(cranes.length), "Crane delays", "Recorded this period"], [fmtH(sum(cranes, mhOf)), "Man-hours lost", "To crane delays"]];
+  const kw = (W - 9) / 4;
+  kpis.forEach(([v, l, n], i) => {
+    const x = M + i * (kw + 3), first = i === 0;
+    doc.setFillColor(first ? NAVY : PALE); doc.roundedRect(x, y, kw, 20, 2, 2, "F");
+    font("bold", 18, first ? "#FFFFFF" : NAVY); doc.text(v, x + 4, y + 9);
+    font("bold", 8, first ? "#FFFFFF" : NAVY); doc.text(l, x + 4, y + 14);
+    font("normal", 7, first ? PALE : GREY); doc.text(n, x + 4, y + 18);
+  });
+  y += 27;
+  // summary tables
+  const table = (title, list, cols, totals) => {
+    ensure(20); font("bold", 13, NAVY); doc.text(title, M, y + 2); y += 6;
+    if (!list.length){ font("normal", 9, GREY); doc.text("None recorded for these dates.", M, y + 3); y += 9; return; }
+    const head = () => { doc.setFillColor(NAVY); doc.rect(M, y, W, 7, "F"); font("bold", 8.5, "#FFFFFF");
+      let x = M; cols.forEach(c => { doc.text(c[0], c[2] ? x + c[1] - 2 : x + 2, y + 4.8, c[2] ? {align: "right"} : {}); x += c[1]; }); y += 7; };
+    head();
+    list.forEach((r, n) => {
+      const cells = cols.map(c => lines(c[3](r), c[1] - 4, 8.5));
+      const h = Math.max(...cells.map(c => c.length)) * 4 + 3;
+      if (y + h > BOT){ doc.addPage(); header(); y = TOP; head(); }
+      if (n % 2){ doc.setFillColor(ALT); doc.rect(M, y, W, h, "F"); }
+      let x = M; font("normal", 8.5, "#111111");
+      cells.forEach((ls, i) => { const c = cols[i]; ls.forEach((l, k) => doc.text(l, c[2] ? x + c[1] - 2 : x + 2, y + 4.2 + k * 4, c[2] ? {align: "right"} : {})); x += c[1]; });
+      doc.setDrawColor(LINE); doc.setLineWidth(0.2); doc.line(M, y + h, M + W, y + h); y += h;
+    });
+    ensure(8); doc.setFillColor(NAVY); doc.rect(M, y, W, 7, "F"); font("bold", 8.5, "#FFFFFF");
+    doc.text("Total", M + 2, y + 4.8); doc.text(totals, M + W - 2, y + 4.8, {align: "right"}); y += 11;
+  };
+  table("Variations", vars, [["Ref", 22, 0, r => refOf(r)], ["Date", 22, 0, r => fmtDmy(r.date)], ["Location", 56, 0, r => r.location || "-"],
+    ["Operatives", 50, 0, r => menTxt(r) || "-"], ["Man-hrs", 30, 1, r => fmtH(mhOf(r))]], `${fmtH(sum(vars, mhOf))} man-hours`);
+  table("Crane delays", cranes, [["Ref", 22, 0, r => refOf(r)], ["Date", 22, 0, r => fmtDmy(r.date)], ["Cause", 56, 0, r => { const d = parseDet(r.description).det; return [d.cause, d.zone].filter(Boolean).join(", ") || "-"; }],
+    ["Time lost", 50, 0, r => `${r.start || ""} to ${r.end || ""} (${fmtH(hrsOf(r))} hrs), ${menOf(r)} operative${menOf(r) === 1 ? "" : "s"}`], ["Man-hrs", 30, 1, r => fmtH(mhOf(r))]], `${fmtH(sum(cranes, mhOf))} man-hours lost`);
+  // each record in full, with its photographs
+  const detail = async (r) => {
+    const d = parseDet(r.description).det, crane = easType(r) === "Crane delay";
+    let pics = [];
+    try{ pics = await easPhotos(r, "dayworks", 1000); }catch(e){}
+    if (!pics.length && +r.photos > 0){
+      try{ delete RS("dayworks").photos[r.id]; pics = await easPhotos(r, "dayworks", 1000); }catch(e){}
+      if (!pics.length) throw new Error(`Couldn't load the photographs for ${refOf(r)}. Check your signal and try again.`);
+    }
+    ensure(30);
+    doc.setFillColor(NAVY); doc.rect(M, y, W, 8, "F");
+    font("bold", 10, "#FFFFFF"); doc.text(`${refOf(r)}  ·  ${crane ? "Crane delay" : "Variation"}  ·  ${fmtDmy(r.date)}`, M + 2, y + 5.4); y += 10;
+    const rows = [["Date and time", `${fmtDmy(r.date)}, ${r.start || ""} to ${r.end || ""} (${fmtH(hrsOf(r))} hrs)`], ["Location", r.location],
+      ["Operatives", [menTxt(r), r.other].filter(Boolean).join(": ") + (menOf(r) ? `. ${fmtH(mhOf(r))} man-hours.` : "")],
+      [crane ? "Work held up" : "Works carried out", capFirst(workText(r.description)).replace(/\.?\s*$/, ".") + (pics.length && !/photograph/i.test(workText(r.description)) ? " As shown in the attached photographs." : "")]];
+    if (crane){
+      rows.push(["Cause", [d.cause, d.causeInfo].filter(Boolean).join(". ")], ["Knock-on effect", d.effect], ["Delay confirmed by", [d.cby, d.co].filter(Boolean).join(", ")], ["Plant standing", d.pstand]);
+    } else {
+      rows.push(["Why it is extra", d.why], ["Instruction", [d.how, [d.by, d.co].filter(Boolean).join(", "), d.conf ? "confirmed by email " + d.conf : ""].filter(Boolean).join("; ")],
+        ["Drawing / RFI", d.drg], ["Specification", d.spec], ["Quantities", d.qty], ["Plant", d.plant], ["Materials", d.mats]);
+    }
+    rows.push(["Signed off by JJR", d.sign], ["Notice to JJR", d.notice]);
+    for (const [k, v] of rows.filter(([, v]) => String(v || "").trim())){
+      const ls = lines(v, W - 46, 9); ensure(ls.length * 4.2 + 2);
+      font("bold", 8.5, NAVY); doc.text(k, M + 2, y + 3.4);
+      font("normal", 9, "#111111"); ls.forEach((l, n) => doc.text(l, M + 44, y + 3.4 + n * 4.2)); y += ls.length * 4.2 + 1.6;
+    }
+    if (pics.length){
+      ensure(56); font("bold", 9.5, NAVY); doc.text(`Photographs (${pics.length})`, M, y + 3); y += 6;
+      const pw = 58, ph = 44, gap = 3;
+      pics.forEach((pc, k) => {
+        const col = k % 3;
+        if (col === 0 && k > 0) y += ph + gap;
+        ensure(ph + 2);
+        const sc = Math.min(pw / pc.w, ph / pc.h), w = pc.w * sc, h = pc.h * sc;
+        doc.addImage(pc.url, "JPEG", M + col * (pw + gap) + (pw - w) / 2, y + (ph - h) / 2, w, h);
+      });
+      y += ph + 3;
+    } else { font("normal", 8.5, GREY); ensure(6); doc.text("No photographs attached to this record yet.", M + 2, y + 3); y += 6; }
+    y += 5;
+  };
+  if (vars.length){ doc.addPage(); header(); y = TOP; font("bold", 15, NAVY); doc.text("Variations in detail", M, y + 4); y += 10; for (const r of vars) await detail(r); }
+  if (cranes.length){ doc.addPage(); header(); y = TOP; font("bold", 15, NAVY); doc.text("Crane delays in detail", M, y + 4); y += 10; for (const r of cranes) await detail(r); }
+  // reservation of rights
+  const note = lines("The variations above are valued on a daywork basis from the man-hours recorded. Rates are applied separately. Where these variations or crane delays cause disruption or prolongation to New Bridge Form's works, the extension of time and the associated loss and expense are not included here and are reserved; New Bridge Form will apply for them separately.", W - 6, 8.5);
+  ensure(note.length * 4 + 8);
+  doc.setFillColor(PALE); doc.rect(M, y, W, note.length * 4 + 5, "F"); font("normal", 8.5, NAVY); note.forEach((l, k) => doc.text(l, M + 3, y + 5 + k * 4));
   const n = doc.getNumberOfPages();
   for (let p = 1; p <= n; p++){
     doc.setPage(p); font("normal", 7.5, GREY);
