@@ -2,4 +2,4 @@
 window.SITE_APP_API = "https://script.google.com/macros/s/AKfycbyjZtfYdEpVttIrwIPOfdPaao0LR4MQT8Bu1gFi93XtCusF0RyPyZyelnfk3JfFqCtAlg/exec";
 
 // Site induction form: paste the induction Apps Script Web app URL (ends in /exec) between the quotes:
-window.INDUCTION_API = "";
+window.INDUCTION_API = "https://script.google.com/macros/s/AKfycbzHPPbGvsDZjLn_VBP3HkXhRqFpRkDmoPsYw1YtjlnHbWfhP95rZPbP5aIr6EO3cSm26g/exec";
