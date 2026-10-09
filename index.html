@@ -2640,7 +2640,7 @@ const VO_SEEDS = [{
   photos: ["variations/wall70-breakout-1.jpg", "variations/wall70-breakout-2.jpg", "variations/wall70-breakout-3.jpg", "variations/wall70-breakout-4.jpg"],
   days: [["2026-10-07", "08:00", "18:00", "Works carried out over two days: 5 hours on Wednesday 7 October 2026 and 5 hours on Thursday 8 October 2026 (10 hours in total)"]],
   who: "doru", location: W70_LOC,
-  work: d => `Breaking out of hardened concrete at both ends of Wall 70 (gridlines 9B and 10B), to a depth of 300 mm below the top of the wall, using an electric breaker operated from a mobile elevating work platform (MEWP). Concrete removed to expose the existing reinforcement. ${d}.`,
+  work: d => `Breaking out of hardened concrete at both ends of Wall 70 (gridlines 9B and 10B), to a depth of 300 mm below the top of the wall, using an electric breaker operated from a mobile elevating work platform (MEWP). Concrete removed to expose the existing reinforcement, as shown in the attached photographs. ${d}.`,
   det: {x_zone: "", x_why: W70_WHY,
     x_drg: "SE-26028 Rev 01 (Wall 70 elevation), P09 Suitable for Construction, 18.09.26", x_how: "Verbal", x_by: "Site engineers", x_co: "JJ Rhatigan",
     x_qty: W70_QTY, x_plant: "MEWP (scissor lift), 10 hrs; electric breaker (Kango), 10 hrs",
@@ -2705,7 +2705,7 @@ async function patchWall70(){
 const DL_SEEDS = [{
   key: "dlSeed20261006", id: "dw-dl-2026-10-06-precast", date: "2026-10-06", start: "08:00", copyFrom: "2026-10-05",
   photos: [1, 2, 3, 4, 5].map(n => `variations/crane-delay-2026-10-06-${n}.jpg`),
-  work: "Crane-dependent formwork activities in Zone 3 could not proceed for the full working day. The mobile crane was allocated to Zone 2 for the installation of precast slabs from 08:00 until the end of the working day and was not available to New Bridge Form. All Zone 3 lifts (wall shutters, reinforcement and materials) were therefore held up. This was the second consecutive day of lost crane access, following Monday 5 October 2026.",
+  work: "Crane-dependent formwork activities in Zone 3 could not proceed for the full working day. The mobile crane was allocated to Zone 2 for the installation of precast slabs from 08:00 until the end of the working day and was not available to New Bridge Form. All Zone 3 lifts (wall shutters, reinforcement and materials) were therefore held up. This was the second consecutive day of lost crane access, following Monday 5 October 2026. The crane in use on the precast installation in Zone 2 is shown in the attached photographs, taken on the day.",
   det: {x_zone: "Zone 3", x_cause: "Crane in use by another trade",
     x_causeInfo: "Mobile crane allocated to precast slab installation in Zone 2 from 08:00 for the full day; not available to NBF for Zone 3",
     x_co: "JJ Rhatigan", x_effect: "No crane lifts possible in Zone 3 for the full day. Second consecutive day affected (see also the delay of Monday 5 October 2026)",
@@ -2785,7 +2785,7 @@ async function seedDailyRecords(){
 // Keeps the ref, times, crew, photos and anything filled in on the phone; replaces only the wording fields.
 async function rewordSeeded(){
   try{
-    if (!RS("dayworks") || !RS("dayworks").list || await kvGet("rewordSeeded1")) return;
+    if (!RS("dayworks") || !RS("dayworks").list || await kvGet("rewordSeeded2")) return;
     const K = KINDS.dayworks, all = mergedRecords("dayworks"), w = VO_SEEDS[0], d = DL_SEEDS[0];
     const jobs = [["dw-vo-wall70-d1", w.work(w.days[0][3]), {x_why: w.det.x_why, x_qty: w.det.x_qty, x_plant: w.det.x_plant}],
       [d.id, d.work, {x_causeInfo: d.det.x_causeInfo, x_effect: d.det.x_effect}]];
@@ -2802,7 +2802,7 @@ async function rewordSeeded(){
       await queueRecordSave("dayworks", rec, [], []);
       done++;
     }
-    if (done === jobs.length) await kvSet("rewordSeeded1", true);
+    if (done === jobs.length) await kvSet("rewordSeeded2", true);
     if (done && S.view === "dayworks") render();
   }catch(e){}
 }
