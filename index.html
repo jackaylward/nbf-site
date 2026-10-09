@@ -2734,12 +2734,12 @@ async function seedCraneDelays(){
   finally{ S.dlSeeding = false; }
 }
 const WD_SEEDS = [{
-  key: "wdSeed20261009", id: "wd-seed-2026-10-09", date: "2026-10-09",
+  key: "wdSeed20261009", rev: "wdSeed20261009r2", id: "wd-seed-2026-10-09", date: "2026-10-09",
   location: "Zone 1 first floor, Zone 3 ground floor",
-  work: "Pouring 5 columns in Zone 1, first floor. Pouring the lift shaft in Zone 3, ground floor (walls 45, 12, 11 and 49 make up the lift shaft). The lads could not start the works for the first floor screed concrete pour in Zone 2 because the Zone 2 ground floor scaffolding is not finished.",
-  det: {x_scaf: "Not erected or not ready", x_scafn: "Zone 2 ground floor scaffolding not finished",
-    x_delay: "Zone 2 ground floor scaffolding not finished by JJ Rhatigan, so the lads cannot begin works for the screed pour",
-    x_need: "first floor screed concrete pour, Zone 2", x_claim: "Yes"},
+  work: "Concrete pour to five (5 no.) columns, first floor, Zone 1. Concrete pour to the lift shaft walls (Walls 11, 12, 45 and 49), ground floor, Zone 3.",
+  det: {x_scaf: "Not erected or not ready", x_scafn: "Zone 2 ground floor scaffolding incomplete",
+    x_delay: "Scaffolding to the Zone 2 ground floor is incomplete. NBF cannot commence preparatory works for the first floor screed concrete pour in Zone 2 until the scaffolding has been completed and handed over by JJ Rhatigan",
+    x_need: "First floor screed concrete pour, Zone 2", x_claim: "Yes"},
 }];
 async function seedDailyRecords(){
   try{ if (S.wdSeeding || !RS("works") || !RS("works").list) return; }catch(e){ return; }
@@ -2750,12 +2750,24 @@ async function seedDailyRecords(){
     for (const j of kindJobs("works")) if (!j.del && j.rec && recMen(j.rec) < 1){ j.rec = {...j.rec, operatives: 1}; j.error = ""; await jobPut(j); fixed++; }
     if (fixed){ await refreshJobs(); processQueue(); }
     for (const v of WD_SEEDS){
+      const have = mergedRecords("works").find(r => r.id === v.id);
+      if (have && !(await kvGet(v.rev))){
+        // reworded record: replace the works text and the delay wording, keep anything added on the phone
+        const p = parseDet(have.description), kept = {};
+        Object.entries(p.det).forEach(([k, val]) => { if (val && !["scaf", "scafn", "delay", "need", "claim"].includes(k)) kept["x_" + k] = val; });
+        const rec = {id: have.id, dateFrom: have.dateFrom, dateTo: have.dateTo || have.dateFrom, location: v.location, description: "", chippies: +have.chippies || 0, fixers: +have.fixers || 0, operatives: +have.operatives || 0, other: have.other || ""};
+        rec.description = composeDet(v.work, {...rec, ...kept, ...v.det, type: "Daily"});
+        await queueRecordSave("works", rec, [], []);
+        await kvSet(v.key, true); await kvSet(v.rev, true);
+        if (S.view === "works") render();
+        continue;
+      }
       if (await kvGet(v.key)) continue;
-      if (mergedRecords("works").some(r => r.id === v.id)){ await kvSet(v.key, true); continue; }
+      if (have){ await kvSet(v.key, true); await kvSet(v.rev, true); continue; }
       const rec = {id: v.id, dateFrom: v.date, dateTo: v.date, location: v.location, description: "", chippies: 0, fixers: 0, operatives: 1, other: ""};
       rec.description = composeDet(v.work, {...rec, ...v.det, type: "Daily"});
       await queueRecordSave("works", rec, [], []);
-      await kvSet(v.key, true);
+      await kvSet(v.key, true); await kvSet(v.rev, true);
       setStatus("Daily record for Fri 9 Oct added", true);
       if (S.view === "works") render();
     }
@@ -3219,7 +3231,7 @@ const TALK_SEEDS = [{
   key: "tbSeedTbt003", id: "tb-seed-tbt003", pdf: "toolbox-talks/NBF-TBT-003_Waste_Segregation_PPE_Housekeeping_signed.pdf",
   rec: {date: "2026-10-06", ref: "NBF-TBT-003", title: "Waste Segregation, PPE and Housekeeping", deliveredBy: "Jack Aylward",
     points: ["Timber goes in the timber skip, steel in the steel skip. Never mix them.", "Take nails and screws out of timber, or bend them over, before it goes in the skip.", "Do not overfill skips, and never throw waste from a deck into a skip.", "Wear hard hat, hi-vis, boots, Level 3 cut gloves and safety glasses at all times.", "Sort waste as you go and keep walkways, stairs and skip areas clear."],
-    notes: "Signed by the lads on 07/10/2026. Signed sheet is page 3 of the PDF."},
+    notes: "Signed by the operatives on 07/10/2026. Signed sheet is page 3 of the PDF."},
 }];
 async function seedTalks(){
   const st = S.talks;
