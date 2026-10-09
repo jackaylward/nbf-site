@@ -1894,7 +1894,7 @@ function wdIssues(r){
   const d = parseDet(r.description).det, out = [];
   if (wdBad(d.crane)) out.push("Crane: " + d.crane.replace(/^Not available: /, "not available, ") + (d.cranen ? " (" + d.cranen + ")" : ""));
   if (wdBad(d.scaf)) out.push("Scaffolding: " + d.scaf.toLowerCase() + (d.scafn ? " (" + d.scafn + ")" : ""));
-  if (d.delay) out.push(d.delay + (d.need ? ", holds up " + d.need : ""));
+  if (d.delay) out.push(d.delay.replace(/\.?\s*$/, ".") + (d.need ? " Holds up: " + d.need + "." : ""));
   return {list: out, claim: out.length > 0 || d.claim === "Yes", det: d};
 }
 const detTypeKey = type => type === "Crane delay" ? "crane" : type === "Daily" ? "daily" : "var";
