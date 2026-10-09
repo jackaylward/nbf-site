@@ -832,6 +832,7 @@ $("view").addEventListener("click", async ev => {
     if (!from || !to || to < from){ S.pdfOut = {key, state: "error", msg: "Pick a From date and a To date after it."}; render(); return; }
     return runPdf(key, () => easRange(from, to));
   }
+  if (key === "allrep") return runPdf(key, () => dailyReportPdf("", "", false, true));
   if (key === "dayrep"){
     const day = $("pdfTo").value;
     RS("works").pdf = {from: $("pdfFrom").value, to: day};
@@ -2106,7 +2107,7 @@ const KINDS = {
       ${r.location ? `<tr><th>Working zone and level</th><td>${esc(r.location)}</td></tr>` : ""}
       ${(d => [["crane", "Crane"], ["scaf", "Scaffolding"], ["delay", "Delay / dependency"], ["need", "Holds up"], ["notes", "Notes"]].filter(([k]) => d[k]).map(([k, l]) => `<tr><th>${l}</th><td>${esc(d[k])}${k === "crane" && d.cranen ? " (" + esc(d.cranen) + ")" : ""}${k === "scaf" && d.scafn ? " (" + esc(d.scafn) + ")" : ""}</td></tr>`).join(""))(parseDet(r.description).det)}`,
     weekSummary: list => `${list.length} this week, ${list.filter(r => wdIssues(r).claim).length} with delays`,
-    pdfNote: "Weekly report: a PDF of every daily record between the dates, with photographs and the delays and dependencies pulled together. Daily report: the same for the single day in the To box.",
+    pdfNote: "Weekly report: a PDF of every daily record between the dates, with photographs and the delays and dependencies pulled together. Daily report: the same for the single day in the To box. All days report: every day recorded so far. Each day also carries an overview of attendance, variations and crane delays.",
   },
 };
 S.rec = {jobs: []};
@@ -2344,9 +2345,9 @@ function recordsHtml(kind){
   <div class="panel" style="margin-top:16px"><h2>Save a PDF to send</h2>
     <div class="formgrid"><label class="field">From<input type="date" id="pdfFrom" value="${esc(pdf.from)}"></label>
       <label class="field">To<input type="date" id="pdfTo" value="${esc(pdf.to)}"></label></div>
-    <div class="row-actions">${kind === "works" ? pdfBtn("wkrep", "Weekly report") + pdfBtn("dayrep", "Daily report") : ""}${kind === "works" ? "" : pdfBtn("records", "Save as PDF", `data-kind="${K.kind}"`)}${kind === "dayworks" ? pdfBtn("easAll", "Variations as EAS sheets") + pdfBtn("voAll", "Variation sheets (QS layout)") : ""}</div>
+    <div class="row-actions">${kind === "works" ? pdfBtn("wkrep", "Weekly report") + pdfBtn("dayrep", "Daily report") + pdfBtn("allrep", "All days report") : ""}${kind === "works" ? "" : pdfBtn("records", "Save as PDF", `data-kind="${K.kind}"`)}${kind === "dayworks" ? pdfBtn("easAll", "Variations as EAS sheets") + pdfBtn("voAll", "Variation sheets (QS layout)") : ""}</div>
     <p class="msg">${K.pdfNote}${kind === "dayworks" ? " EAS sheets: one Event Analysis Sheet for each variation between the dates (not delays), with photos. Variation sheets (optional): a cover sheet in the QS layout for each variation, with its EAS sheet and photos behind it." : ""}</p>
-    ${pdfResult("wkrep")}${pdfResult("dayrep")}${pdfResult("records")}${pdfResult("easAll")}${pdfResult("voAll")}
+    ${pdfResult("wkrep")}${pdfResult("dayrep")}${pdfResult("allrep")}${pdfResult("records")}${pdfResult("easAll")}${pdfResult("voAll")}
   </div>`;
 }
 
@@ -3022,18 +3023,42 @@ async function easRange(from, to){
 
 // ================= Daily records weekly report =================
 const fmtDmy = s => { const d = fromIso(s); return d ? `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}` : (s || ""); };
-async function dailyReportPdf(from, to, single){
+// the week's attendance as {ladId: {mon: true, ...}} for the Monday given, from Google or, failing that, this phone's copy
+async function wdWeekTicks(mon){
+  try{ const d = await server("getWeek", mon); if (d) return d; }catch(e){}
+  try{ return await cacheGet("week:" + mon); }catch(e){ return null; }
+}
+async function dailyReportPdf(from, to, single, all){
+  if (all){
+    const ds = mergedRecords("works").map(r => r.dateFrom).filter(Boolean).sort();
+    if (!ds.length) throw new Error("No daily records yet.");
+    from = ds[0]; to = ds[ds.length - 1];
+  }
   const recs = mergedRecords("works").filter(r => r.dateFrom <= to && (r.dateTo || r.dateFrom) >= from).sort((a, b) => a.dateFrom.localeCompare(b.dateFrom));
   if (!recs.length) throw new Error("No daily records for those dates.");
+  const dws = mergedRecords("dayworks").filter(r => r.date >= from && r.date <= to).sort((a, b) => (a.date + (a.start || "")).localeCompare(b.date + (b.start || "")));
+  const vars = dws.filter(r => easType(r) === "Variation"), cranes = dws.filter(r => easType(r) === "Crane delay");
+  // attendance for each week in the range (head count by trade for each day)
+  const attByDay = {};
+  const weeks = [...new Set([...recs.map(r => r.dateFrom), ...dws.map(r => r.date)].map(d => iso(mondayOf(fromIso(d)))))];
+  for (const mon of weeks){
+    const t = await wdWeekTicks(mon);
+    if (!t) continue;
+    DAYS.forEach((dk, n) => {
+      const dt = fromIso(mon); dt.setDate(dt.getDate() + n);
+      const day = iso(dt), here = (S.lads || []).filter(l => t[l.id] && t[l.id][dk]);
+      if (here.length) attByDay[day] = here;
+    });
+  }
   const jsPDF = await loadJsPdf(), logo = await navyLogo();
   const NAVY = "#012060", PALE = "#DCE6F2", GREY = "#5A6478", LINE = "#D5DAE3", AMBER = "#FFF1D6", AMBERL = "#E0A100";
   const M = 15, W = 180, TOP = 34, BOT = 280;
   const doc = new jsPDF({unit: "mm", format: "a4"});
-  const name = single ? `Daily record ${fmtDmy(from).replace(/\//g, "-")}.pdf` : `Daily records ${fmtDmy(from).replace(/\//g, "-")} to ${fmtDmy(to).replace(/\//g, "-")}.pdf`;
+  const name = all ? `Daily records, all days to ${fmtDmy(to).replace(/\//g, "-")}.pdf` : single ? `Daily record ${fmtDmy(from).replace(/\//g, "-")}.pdf` : `Daily records ${fmtDmy(from).replace(/\//g, "-")} to ${fmtDmy(to).replace(/\//g, "-")}.pdf`;
   doc.setProperties({title: name.replace(/\.pdf$/, ""), author: "New Bridge Form"});
   const font = (st, sz, col) => { doc.setFont("helvetica", st); doc.setFontSize(sz); doc.setTextColor(col || "#000000"); };
   const scope = single ? wdTitle({dateFrom: from}) : `${fmtDmy(from)} to ${fmtDmy(to)}`;
-  const repName = single ? "Daily Report" : "Weekly Daily Records";
+  const repName = single ? "Daily Report" : all ? "Daily Report, All Days" : "Weekly Daily Report";
   const header = () => {
     if (logo){ const lw = 38, lh = lw * logo.r; doc.addImage(logo.url, "PNG", M, 8, lw, lh, "nbflogo", "FAST"); }
     else { font("bold", 14, NAVY); doc.text("NEW BRIDGE FORM", M, 14); }
@@ -3050,12 +3075,11 @@ async function dailyReportPdf(from, to, single){
   font("bold", 22, NAVY); doc.text(single ? "Daily Report" : "Daily Records", M, y + 6); y += 11;
   font("normal", 10, GREY); doc.text(`${EAS_SITE}  ·  ${scope}`, M, y); y += 8;
   // numbers
-  const days = [...new Set(recs.map(r => r.dateFrom))];
+  const days = [...new Set([...recs.map(r => r.dateFrom), ...dws.map(r => r.date)])].sort();
   const info = recs.map(r => ({r, i: wdIssues(r)}));
   const delayDays = new Set(info.filter(x => x.i.claim).map(x => x.r.dateFrom)).size;
-  const craneDays = new Set(info.filter(x => wdBad(x.i.det.crane)).map(x => x.r.dateFrom)).size;
-  const scafDays = new Set(info.filter(x => wdBad(x.i.det.scaf)).map(x => x.r.dateFrom)).size;
-  const kpis = [[days.length, "Days recorded", ""], [delayDays, "Days with a delay", "Possible claim"], [craneDays, "Crane not available", "Days"], [scafDays, "Scaffold not ready", "Days"]];
+  const craneDays = cranes.length, scafDays = vars.length;
+  const kpis = [[days.length, "Days recorded", ""], [delayDays, "Days with a delay", "Possible claim"], [scafDays, "Variations", "Recorded"], [craneDays, "Crane delays", "Recorded"]];
   const kw = (W - 9) / 4;
   kpis.forEach(([v, l, n], i) => {
     const x = M + i * (kw + 3), first = i === 0;
@@ -3071,11 +3095,29 @@ async function dailyReportPdf(from, to, single){
   for (const day of days){
     const list = info.filter(x => x.r.dateFrom === day);
     const pics = [];
-    for (const {r} of list){ try{ pics.push(...await easPhotos(r, "works", 1000)); }catch(e){} }
+    for (const {r} of list){
+      let got = [];
+      try{ got = await easPhotos(r, "works", 1000); }catch(e){}
+      if (!got.length && +r.photos > 0){
+        // the photo list may have failed to load earlier: ask Google again before giving up
+        try{ delete RS("works").photos[r.id]; got = await easPhotos(r, "works", 1000); }catch(e){}
+        if (!got.length) throw new Error(`Couldn't load the photographs for ${fmtDmy(day)}. Check your signal and try again.`);
+      }
+      pics.push(...got);
+    }
     picCount[day] = pics.length;
     ensure(14);
     doc.setFillColor(PALE); doc.rect(M, y, W, 7, "F");
-    font("bold", 10, NAVY); doc.text(niceYmd(day).replace(/\d\d$/, "") + fromIso(day).getFullYear(), M + 2, y + 4.8); y += 9;
+    font("bold", 10, NAVY); doc.text(wdTitle({dateFrom: day}), M + 2, y + 4.8); y += 9;
+    const here = attByDay[day];
+    if (here){
+      const byTrade = {}; here.forEach(l => { const t = hcTrade(l); byTrade[t] = (byTrade[t] || 0) + 1; });
+      const txt = `${here.length} operative${here.length === 1 ? "" : "s"} on site (${Object.entries(byTrade).map(([t, c]) => `${c} ${t.toLowerCase()}`).join(", ")}).`;
+      const ls = lines(txt, W - 46, 9); ensure(ls.length * 4.2 + 2);
+      font("bold", 8.5, NAVY); doc.text("Attendance", M + 2, y + 3.4);
+      font("normal", 9, "#111111"); ls.forEach((l, n) => doc.text(l, M + 44, y + 3.4 + n * 4.2)); y += ls.length * 4.2 + 1.6;
+    }
+    if (!list.length){ font("normal", 9, GREY); ensure(6); doc.text("No daily record was entered for this day.", M + 2, y + 3.4); y += 6; }
     for (const {r, i} of list){
       const d = i.det;
       const rows = [];
@@ -3103,6 +3145,20 @@ async function dailyReportPdf(from, to, single){
       }
       doc.setDrawColor(LINE); doc.setLineWidth(0.2); doc.line(M, y + 1, M + W, y + 1); y += 3;
     }
+    // variations and crane delays recorded for the day, as an overview
+    const dayVars = vars.filter(r => r.date === day), dayCranes = cranes.filter(r => r.date === day);
+    const brief = (r, n) => { const t = String(workText(r.description) || "").replace(/\s+/g, " ").trim(); return t.length > n ? t.slice(0, n).replace(/\s+\S*$/, "") + "..." : t; };
+    const overview = (title, recs2, f) => {
+      if (!recs2.length) return;
+      ensure(10); font("bold", 9.5, NAVY); doc.text(title, M + 2, y + 3.4); y += 6;
+      recs2.forEach(r => {
+        const ls = lines(f(r), W - 8, 9); ensure(ls.length * 4.2 + 2);
+        font("normal", 9, "#111111"); ls.forEach((l, n) => doc.text(l, M + 6, y + 3.4 + n * 4.2)); y += ls.length * 4.2 + 1.4;
+      });
+      y += 1;
+    };
+    overview("Variations recorded", dayVars, r => { const d = parseDet(r.description).det; return `${d.ref || "Variation"}${r.location ? " (" + r.location + ")" : ""}: ${brief(r, 220)}${d.status ? " Status: " + d.status + "." : ""}`; });
+    overview("Crane delays recorded", dayCranes, r => { const d = parseDet(r.description).det; return `${d.ref || "Crane delay"}${d.zone ? " (" + d.zone + ")" : ""}: ${[d.cause, d.causeInfo].filter(Boolean).join(". ") || brief(r, 200)}${d.effect ? ". " + d.effect : ""}.`.replace(/\.\.$/, "."); });
     // photographs for the day, three across
     if (pics.length){
       ensure(62);
@@ -3121,19 +3177,21 @@ async function dailyReportPdf(from, to, single){
     y += 2;
   }
   // delay summary
-  const delays = info.filter(x => x.i.claim && x.i.list.length);
+  const delays = [...info.filter(x => x.i.claim && x.i.list.length).map(({r, i}) => ({day: r.dateFrom, text: i.list.map(t => t.replace(/\.?\s*$/, ".")).join(" ")})),
+    ...cranes.map(r => { const d = parseDet(r.description).det; return {day: r.date, text: `Crane delay ${d.ref || ""}: ${[d.cause, d.causeInfo].filter(Boolean).join(". ")}${d.effect ? ". " + d.effect : ""}.`.replace(/\s+:/, ":").replace(/\.\.$/, ".")}; })]
+    .sort((a, b) => a.day.localeCompare(b.day));
   ensure(24);
   font("bold", 13, NAVY); doc.text("Delays and dependencies on JJ Rhatigan", M, y + 2); y += 6;
-  if (!delays.length){ font("normal", 9, GREY); doc.text(single ? "None recorded." : "None recorded this week.", M, y + 3); y += 8; }
+  if (!delays.length){ font("normal", 9, GREY); doc.text("None recorded.", M, y + 3); y += 8; }
   else {
     doc.setFillColor(NAVY); doc.rect(M, y, W, 7, "F");
     font("bold", 9, "#FFFFFF"); doc.text("Date", M + 2, y + 4.8); doc.text("What happened", M + 28, y + 4.8); y += 7;
-    delays.forEach(({r, i}, n) => {
-      const ls = lines(i.list.map(t => t.replace(/\.?\s*$/, ".")).join(" ") + (picCount[r.dateFrom] ? " Photographs for " + fmtDmy(r.dateFrom) + " are included in this report." : ""), W - 32, 9);
+    delays.forEach(({day, text}, n) => {
+      const ls = lines(text + (picCount[day] ? " Photographs for " + fmtDmy(day) + " are included in this report." : ""), W - 32, 9);
       const h = ls.length * 4.2 + 3;
       ensure(h);
       if (n % 2) { doc.setFillColor("#F2F5FA"); doc.rect(M, y, W, h, "F"); }
-      font("normal", 9, "#111111"); doc.text(fmtDmy(r.dateFrom), M + 2, y + 4.2);
+      font("normal", 9, "#111111"); doc.text(fmtDmy(day), M + 2, y + 4.2);
       ls.forEach((l, k) => doc.text(l, M + 28, y + 4.2 + k * 4.2)); y += h;
     });
     y += 3;
