@@ -139,11 +139,11 @@ input:focus,textarea:focus{outline:2px solid var(--navy);outline-offset:0}
 <p class="small" style="text-align:center;margin-top:10px">New Bridge Form · Patrician Secondary School, Newbridge</p>
 </form>
 </main>
-<script src="config.js"></script>
+<script src="config.js?v=2"></script>
 <script>
 "use strict";
 const $ = id => document.getElementById(id);
-const API = String(window.INDUCTION_API || "").trim();
+let API = String(window.INDUCTION_API || "").trim();
 const YN = [["Yes","YES"],["No","NO"]];
 const HEALTH = [["disabilities","Disabilities"],["asthma","Asthma"],["heart","Heart conditions"],["eye","Eye conditions"],["epilepsy","Epilepsy"],["allergies","Allergies"],["lung","Lung conditions"],["hearing","Hearing conditions"],["back","Back problems"],["havs","History of hand arm vibration syndrome"]];
 const MED = [["medication","Are you currently taking any medication?"]];
@@ -400,6 +400,9 @@ $("form").addEventListener("submit", async ev => {
   showMsg("");
   const d = collect(), problem = validate(d);
   if (problem){ showMsg(problem); return; }
+  if (!API){
+    try{ const t = await (await fetch("config.js?nocache="+Date.now(), {cache:"no-store"})).text(); const m = /INDUCTION_API\s*=\s*"([^"]+)"/.exec(t); if (m) API = m[1]; }catch(e){}
+  }
   if (!API){ showMsg("This form is not connected yet. Please tell your supervisor."); return; }
   busy = true; const b = $("submit"); b.disabled = true; b.textContent = "Submitting...";
   try{
