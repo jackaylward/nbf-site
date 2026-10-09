@@ -1594,6 +1594,8 @@ $("view").addEventListener("change", async ev => {
   }
   if (el.id === "tsWeek"){
     if (!el.value) return;
+    const mon = fromIso(el.value);   // the week always starts on a Monday
+    if (mon) el.value = iso(mondayOf(mon));
     setStatus("Saving…");
     try{ setLadData(await server("setWeekStart", el.value)); setStatus("Week starting saved", true); }
     catch(e){ setStatus(errText(e, "Couldn't save the date")); }
@@ -1624,7 +1626,7 @@ $("view").addEventListener("click", ev => {
 });
 $("view").addEventListener("click", async ev => {
   if (S.view !== "timesheet" || ev.target.id !== "newWeek") return;
-  const cur = fromIso(S.tsWeek) || mondayOf(new Date());
+  const cur = mondayOf(fromIso(S.tsWeek) || new Date());
   const next = new Date(cur); next.setDate(next.getDate() + 7);
   const ok = await ask(`Start a new week from ${nice(next)}? This week is saved to Past weeks first, then everyone's hours and notes are cleared.`, "Save and start new week", true);
   if (!ok) return;
