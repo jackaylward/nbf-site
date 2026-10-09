@@ -2984,6 +2984,36 @@ async function loadTalks(){
     cacheSet("talks", st.list);
   }catch(e){ connectionTrouble(); }
   if (S.view === "talks" && st.view === "list") render();
+  seedTalks();
+}
+// one-off: talks written up by Claude, added once. Fixed id, PDF sits in /toolbox-talks.
+const TALK_SEEDS = [{
+  key: "tbSeedTbt003", id: "tb-seed-tbt003", pdf: "toolbox-talks/NBF-TBT-003_Waste_Segregation_PPE_Housekeeping_signed.pdf",
+  rec: {date: "2026-10-06", ref: "NBF-TBT-003", title: "Waste Segregation, PPE and Housekeeping", deliveredBy: "Jack Aylward",
+    points: ["Timber goes in the timber skip, steel in the steel skip. Never mix them.", "Take nails and screws out of timber, or bend them over, before it goes in the skip.", "Do not overfill skips, and never throw waste from a deck into a skip.", "Wear hard hat, hi-vis, boots, Level 3 cut gloves and safety glasses at all times.", "Sort waste as you go and keep walkways, stairs and skip areas clear."],
+    notes: "Signed by the lads on 07/10/2026. Signed sheet is page 3 of the PDF."},
+}];
+async function seedTalks(){
+  const st = S.talks;
+  if (S.talkSeeding || !st.list) return;
+  S.talkSeeding = true;
+  try{
+    for (const v of TALK_SEEDS){
+      if (await kvGet(v.key)) continue;
+      if (st.list.some(t => t.id === v.id || t.ref === v.rec.ref)){ await kvSet(v.key, true); continue; }
+      const blob = await (await fetch(v.pdf)).blob();
+      if (!blob.size) continue;
+      const data = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(blob); });
+      const got = await server("uploadTalkPdf", v.id, data, v.pdf.split("/").pop());
+      const saved = await server("saveTalk", {...v.rec, id: v.id, pdf: got.url, pdfName: got.name});
+      st.list = [saved].concat(st.list.filter(x => x.id !== saved.id)).sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+      cacheSet("talks", st.list);
+      await kvSet(v.key, true);
+      setStatus("Toolbox talk " + v.rec.ref + " added", true);
+      if (S.view === "talks" && st.view === "list") render();
+    }
+  }catch(e){}
+  finally{ S.talkSeeding = false; }
 }
 
 function talksHtml(){
