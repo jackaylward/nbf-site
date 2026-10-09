@@ -2106,7 +2106,7 @@ const KINDS = {
       ${r.location ? `<tr><th>Working zone and level</th><td>${esc(r.location)}</td></tr>` : ""}
       ${(d => [["crane", "Crane"], ["scaf", "Scaffolding"], ["delay", "Delay / dependency"], ["need", "Holds up"], ["notes", "Notes"]].filter(([k]) => d[k]).map(([k, l]) => `<tr><th>${l}</th><td>${esc(d[k])}${k === "crane" && d.cranen ? " (" + esc(d.cranen) + ")" : ""}${k === "scaf" && d.scafn ? " (" + esc(d.scafn) + ")" : ""}</td></tr>`).join(""))(parseDet(r.description).det)}`,
     weekSummary: list => `${list.length} this week, ${list.filter(r => wdIssues(r).claim).length} with delays`,
-    pdfNote: "Weekly report: a PDF of every daily record between the dates, with photographs and the delays and dependencies pulled together. Daily report: the same for the single day in the To box. Records with photos: the older Google PDF.",
+    pdfNote: "Weekly report: a PDF of every daily record between the dates, with photographs and the delays and dependencies pulled together. Daily report: the same for the single day in the To box.",
   },
 };
 S.rec = {jobs: []};
@@ -2344,7 +2344,7 @@ function recordsHtml(kind){
   <div class="panel" style="margin-top:16px"><h2>Save a PDF to send</h2>
     <div class="formgrid"><label class="field">From<input type="date" id="pdfFrom" value="${esc(pdf.from)}"></label>
       <label class="field">To<input type="date" id="pdfTo" value="${esc(pdf.to)}"></label></div>
-    <div class="row-actions">${kind === "works" ? pdfBtn("wkrep", "Weekly report") + pdfBtn("dayrep", "Daily report") : ""}${pdfBtn("records", kind === "works" ? "Records with photos" : "Save as PDF", `data-kind="${K.kind}"`)}${kind === "dayworks" ? pdfBtn("easAll", "Variations as EAS sheets") + pdfBtn("voAll", "Variation sheets (QS layout)") : ""}</div>
+    <div class="row-actions">${kind === "works" ? pdfBtn("wkrep", "Weekly report") + pdfBtn("dayrep", "Daily report") : ""}${kind === "works" ? "" : pdfBtn("records", "Save as PDF", `data-kind="${K.kind}"`)}${kind === "dayworks" ? pdfBtn("easAll", "Variations as EAS sheets") + pdfBtn("voAll", "Variation sheets (QS layout)") : ""}</div>
     <p class="msg">${K.pdfNote}${kind === "dayworks" ? " EAS sheets: one Event Analysis Sheet for each variation between the dates (not delays), with photos. Variation sheets (optional): a cover sheet in the QS layout for each variation, with its EAS sheet and photos behind it." : ""}</p>
     ${pdfResult("wkrep")}${pdfResult("dayrep")}${pdfResult("records")}${pdfResult("easAll")}${pdfResult("voAll")}
   </div>`;
