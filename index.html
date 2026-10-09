@@ -2273,7 +2273,7 @@ async function loadRecords(kind, quiet){
     cacheSet("records:" + kind, st.list);
     // moveSiteRecords() was a one-off and is switched off
     if (kind === "works") seedDailyRecords();
-    if (kind === "dayworks"){ unmoveLadderRecord(); seedVariations().then(patchWall70).then(seedCraneDelays); }
+    if (kind === "dayworks"){ unmoveLadderRecord(); seedVariations().then(patchWall70).then(seedCraneDelays).then(rewordSeeded); }
   }catch(e){
     st.loadFailed = !st.list;
     if (!quiet) connectionTrouble();
@@ -2626,17 +2626,17 @@ async function unmoveLadderRecord(){
 // Fixed IDs, so running on more than one device can't make duplicates. Photos sit in /variations.
 // Both days share one VO number (two daily records for one variation). Doru's full name and trade come from the lads list.
 const W70_LOC = "Wall 70, Grid B, at gridlines 9B and 10B (both ends of the wall)";
-const W70_WHY = "Breaking out hardened concrete at the wall ends was extra formwork work, not in NBF's scope or price. The engineers on site instructed it";
-const W70_QTY = "Break out concrete, 300 mm deep x 200 mm wall: 0.36 m at gridline 9B + 1.10 m at gridline 10B = 1.46 m run, 0.09 m3";
+const W70_WHY = "Breaking out of hardened concrete at the wall ends is additional formwork work, outside the scope and price of the NBF Sub-Contract. Instructed verbally by the site engineers";
+const W70_QTY = "Breaking out concrete, 300 mm deep x 200 mm wall thickness: 0.36 m at gridline 9B + 1.10 m at gridline 10B = 1.46 m, total 0.09 m3";
 const VO_SEEDS = [{
   key: "voSeedWall70", ids: ["dw-vo-wall70-d1"],
   photos: ["variations/wall70-breakout-1.jpg", "variations/wall70-breakout-2.jpg", "variations/wall70-breakout-3.jpg", "variations/wall70-breakout-4.jpg"],
-  days: [["2026-10-07", "08:00", "18:00", "5 hrs on Wed 7 Oct and 5 hrs on Thu 8 Oct, 10 hrs in total"]],
+  days: [["2026-10-07", "08:00", "18:00", "Works carried out over two days: 5 hours on Wednesday 7 October 2026 and 5 hours on Thursday 8 October 2026 (10 hours in total)"]],
   who: "doru", location: W70_LOC,
-  work: d => `Broke out hardened concrete at both ends of Wall 70, 300 mm down from the top of the wall, using a Kango breaker working from a MEWP. Concrete broken out down to the reinforcement. ${d}.`,
+  work: d => `Breaking out of hardened concrete at both ends of Wall 70 (gridlines 9B and 10B), to a depth of 300 mm below the top of the wall, using an electric breaker operated from a mobile elevating work platform (MEWP). Concrete removed to expose the existing reinforcement. ${d}.`,
   det: {x_zone: "", x_why: W70_WHY,
     x_drg: "SE-26028 Rev 01 (Wall 70 elevation), P09 Suitable for Construction, 18.09.26", x_how: "Verbal", x_by: "Site engineers", x_co: "JJ Rhatigan",
-    x_qty: W70_QTY, x_plant: "MEWP (scissor lift) 10 hrs; Kango breaker 10 hrs",
+    x_qty: W70_QTY, x_plant: "MEWP (scissor lift), 10 hrs; electric breaker (Kango), 10 hrs",
     x_status: "Not notified yet"},
 }];
 async function seedVariations(){
@@ -2698,10 +2698,10 @@ async function patchWall70(){
 const DL_SEEDS = [{
   key: "dlSeed20261006", id: "dw-dl-2026-10-06-precast", date: "2026-10-06", start: "08:00", copyFrom: "2026-10-05",
   photos: [1, 2, 3, 4, 5].map(n => `variations/crane-delay-2026-10-06-${n}.jpg`),
-  work: "NBF could not use the crane in Zone 3 for the whole day. The mobile crane was set up in Zone 2 installing the precast slabs from 08:00 until the end of the day, so none of our crane lifts in Zone 3 (wall shutters, steel and materials) could go ahead. This is the second day running, the same as Monday 5 October.",
+  work: "Crane-dependent formwork activities in Zone 3 could not proceed for the full working day. The mobile crane was allocated to Zone 2 for the installation of precast slabs from 08:00 until the end of the working day and was not available to New Bridge Form. All Zone 3 lifts (wall shutters, reinforcement and materials) were therefore held up. This was the second consecutive day of lost crane access, following Monday 5 October 2026.",
   det: {x_zone: "Zone 3", x_cause: "Crane in use by another trade",
-    x_causeInfo: "Mobile crane installing precast slabs in Zone 2 from 08:00 all day, not available to NBF for Zone 3",
-    x_co: "JJ Rhatigan", x_effect: "No crane lifts possible in Zone 3 all day. Second day in a row (also Mon 5 Oct)",
+    x_causeInfo: "Mobile crane allocated to precast slab installation in Zone 2 from 08:00 for the full day; not available to NBF for Zone 3",
+    x_co: "JJ Rhatigan", x_effect: "No crane lifts possible in Zone 3 for the full day. Second consecutive day affected (see also the delay of Monday 5 October 2026)",
     x_status: "Not notified yet"},
 }];
 async function seedCraneDelays(){
@@ -2773,6 +2773,31 @@ async function seedDailyRecords(){
     }
   }catch(e){}
   finally{ S.wdSeeding = false; }
+}
+// one-off (Jack, 9 Oct): reword the Wall 70 variation and the 6 Oct crane delay already in the app to the precise wording above.
+// Keeps the ref, times, crew, photos and anything filled in on the phone; replaces only the wording fields.
+async function rewordSeeded(){
+  try{
+    if (!RS("dayworks") || !RS("dayworks").list || await kvGet("rewordSeeded1")) return;
+    const K = KINDS.dayworks, all = mergedRecords("dayworks"), w = VO_SEEDS[0], d = DL_SEEDS[0];
+    const jobs = [["dw-vo-wall70-d1", w.work(w.days[0][3]), {x_why: w.det.x_why, x_qty: w.det.x_qty, x_plant: w.det.x_plant}],
+      [d.id, d.work, {x_causeInfo: d.det.x_causeInfo, x_effect: d.det.x_effect}]];
+    let done = 0;
+    for (const [id, work, over] of jobs){
+      const r = all.find(x => x.id === id);
+      if (!r) continue;
+      const rec = {};
+      K.textFields.forEach(k => rec[k] = r[k] == null ? "" : r[k]);
+      ["chippies", "fixers", "operatives"].forEach(k => rec[k] = +r[k] || 0);
+      const kept = {};
+      Object.entries(parseDet(r.description).det).forEach(([k, val]) => { if (val) kept["x_" + k] = val; });
+      rec.description = composeDet(work, {...rec, ...kept, ...over});
+      await queueRecordSave("dayworks", rec, [], []);
+      done++;
+    }
+    if (done === jobs.length) await kvSet("rewordSeeded1", true);
+    if (done && S.view === "dayworks") render();
+  }catch(e){}
 }
 async function moveSiteRecords(){
   if (S.srMoving || !RS("dayworks").list) return;
