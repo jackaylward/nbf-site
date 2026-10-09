@@ -3129,7 +3129,7 @@ const pourName = id => id[0] === "C" ? id : "Wall " + ((PLAN.names || {})[id] ||
 function pourSize(id){
   const parts = PLAN.els.filter(e => e.i === id); if (!parts.length) return null;
   if (id[0] === "C") return {len: parts[0].w / 1000, thk: parts[0].d, area: parts[0].w * parts[0].d / 1e6};
-  const len = parts.reduce((a, e) => a + Math.max(e.w, e.d), 0) / 1000, thk = Math.round(Math.min(parts[0].w, parts[0].d) / 5) * 5;
+  const len = parts.reduce((a, e) => a + Math.max(e.w, e.d), 0) / 1000, main = parts.reduce((a, e) => Math.max(e.w, e.d) > Math.max(a.w, a.d) ? e : a, parts[0]), thk = Math.round(Math.min(main.w, main.d) / 5) * 5;
   return {len, thk, area: len * thk / 1000};
 }
 const num = v => { const n = parseFloat(String(v == null ? "" : v).replace(",", ".")); return isFinite(n) && n > 0 ? n : null; };
@@ -3429,19 +3429,13 @@ function navyLogo(){
   });
 }
 const dmy = s => { const d = fromIso(s); return d ? d.toLocaleDateString("en-GB", {day:"2-digit", month:"2-digit", year:"2-digit"}) : ""; };
-async function pourPdf(btn){
-  const sz = S.pourSize || "a3";
-  if (sz !== "a4") return pourSheet(btn, sz, btn && btn.hasAttribute("data-pprint"));
-  if (btn){ btn.disabled = true; btn.textContent = "Making PDF…"; }
-  try{
-    const [jsPDF, logo] = await Promise.all([loadJsPdf(), navyLogo()]);
-    const P = S.pours || {}, NAVY = [1, 32, 96], today = new Date();
-    const doc = new jsPDF({orientation: "portrait", unit: "mm", format: "a3"});
-    const W = 297, H = 420, M = 12;
+// A3 plan page: the wall layout coloured by pour state, with number tags, dates and concrete. Used by the plan PDF and the report
+function drawPlanA3(doc, logo, P, today, title){
+    const NAVY = [1, 32, 96], W = 297, H = 420, M = 12;
     // header
     if (logo) doc.addImage(logo.url, "PNG", M, M, 60, 60 * logo.r);
     doc.setTextColor(...NAVY); doc.setFont("helvetica", "bold"); doc.setFontSize(20);
-    doc.text("Pour record", W - M, M + 7, {align: "right"});
+    doc.text(title, W - M, M + 7, {align: "right"});
     doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(90);
     doc.text(`Patrician Secondary School, Newbridge. Ground floor Phase 01`, W - M, M + 13, {align: "right"});
     doc.text(`Printed ${today.toLocaleDateString("en-GB")}  |  Walls from OCSC SE-10211 / SE-10212 Rev 01`, W - M, M + 18, {align: "right"});
@@ -3497,6 +3491,18 @@ async function pourPdf(btn){
     doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(110);
     doc.text("Tags show the wall number, the pour date and the concrete. * = estimated from the drawing size and pour height (door openings left out); others are docket figures.", M, ky + 7);
     doc.text("Plan is for recording pours only. Do not set out from it; use the OCSC drawings.", M, ky + 11);
+    return {tot, anyEst, ids, poured, tdy};
+}
+async function pourPdf(btn){
+  const sz = S.pourSize || "a3";
+  if (sz !== "a4") return pourSheet(btn, sz, btn && btn.hasAttribute("data-pprint"));
+  if (btn){ btn.disabled = true; btn.textContent = "Making PDF…"; }
+  try{
+    const [jsPDF, logo] = await Promise.all([loadJsPdf(), navyLogo()]);
+    const P = S.pours || {}, NAVY = [1, 32, 96], today = new Date();
+    const doc = new jsPDF({orientation: "portrait", unit: "mm", format: "a3"});
+    const M = 12;
+    const {tot, anyEst, ids} = drawPlanA3(doc, logo, P, today, "Pour record");
     // schedule pages (A4)
     const rows = ids.filter(id => pourState(P[id])).sort((a, b) => (P[a].date || "").localeCompare(P[b].date || "") || parseInt(a.slice(1)) - parseInt(b.slice(1)));
     const cols = [["Wall", 16], ["Where", 52], ["Status", 22], ["Pour date", 20], ["Length m", 17], ["Thick mm", 17], ["Height m", 16], ["Concrete m3", 22]];
@@ -3739,7 +3745,10 @@ async function pourReport(btn){
       for (const ph of (S.pourPhotos[id] || [])){ const q = await photoForReport(ph.data); if (q) pics[id].push(q); }
     }
     say("Building the PDF…");
-    const doc = new jsPDF({orientation: "portrait", unit: "mm", format: "a4"});
+    // page 1: the plan drawing (A3), then A4 pages: one schedule table with the dimensions, then a compact photo grid
+    const doc = new jsPDF({orientation: "portrait", unit: "mm", format: "a3"});
+    const dims = [[297, 420]];
+    drawPlanA3(doc, logo, P, today, "Pour report");
     const W = 210, H = 297, M = 14, CW = W - 2 * M;
     let y = 0;
     const brand = (title, sub) => {
@@ -3748,69 +3757,68 @@ async function pourReport(btn){
       doc.setFont("helvetica", "normal"); doc.setFontSize(8.5); doc.setTextColor(90); if (sub) doc.text(sub, W - M, M + 11, {align: "right"});
       doc.setDrawColor(...NAVY); doc.setLineWidth(0.5); doc.line(M, M + 16, W - M, M + 16); y = M + 22;
     };
-    const newPage = () => { doc.addPage("a4", "portrait"); brand("Pour report", "Patrician Secondary School, Newbridge"); };
+    const newPage = (title) => { doc.addPage("a4", "portrait"); dims.push([W, H]); brand(title || "Pour report", "Patrician Secondary School, Newbridge"); };
     const need = h => { if (y + h > H - 16) newPage(); };
-    // cover + overview
-    brand("Pour report", "Patrician Secondary School, Newbridge. Ground floor Phase 01");
+    newPage("Pour schedule");
+    let tot = 0, anyEst = false;
+    poured.forEach(id => { const v = pourVol(id, P[id]); if (v){ tot += v.v; anyEst = anyEst || v.est; } });
     doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.setTextColor(...NAVY);
-    doc.text(`${poured.length} of ${PLAN_IDS.length} walls and columns poured`, M, y); y += 5.5;
-    doc.setFont("helvetica", "normal"); doc.setFontSize(8.5); doc.setTextColor(80);
-    doc.text(`Walls from OCSC key plans SE-10211 / SE-10212 Rev 01. Concrete marked * is estimated from the drawing size and pour height (door openings left out); other figures are docket figures.`, M, y, {maxWidth: CW}); y += 9;
-    const cols = [["Wall", 16], ["Where", 74], ["Poured", 24], ["Height m", 20], ["Concrete m3", 24], ["Photos", 18]];
+    doc.text(`${poured.length} of ${PLAN_IDS.length} walls and columns poured. Total concrete ${m3(tot)} m3${anyEst ? "*" : ""}`, M, y); y += 5.5;
+    doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(80);
+    const intro = doc.splitTextToSize(`Length and thickness are from the OCSC key plans SE-10211 / SE-10212 Rev 01 (within about 20 mm; door openings are not taken out of the length). Height is the pour height recorded on site. Concrete marked * is estimated from length x thickness x pour height (door openings left out); other figures are docket figures.`, CW);
+    doc.text(intro, M, y); y += intro.length * 3.6 + 3;
+    const cols = [["Wall", 14], ["Where", 57], ["Poured", 21], ["Length m", 18], ["Thick mm", 17], ["Height m", 17], ["Concrete m3", 22], ["Photos", 16]];
     const th = () => { need(20); doc.setFillColor(...NAVY); doc.rect(M, y, CW, 6.5, "F"); doc.setFont("helvetica", "bold"); doc.setFontSize(8); doc.setTextColor(255);
       let x = M + 2; cols.forEach(([c, w]) => { doc.text(c, x, y + 4.5); x += w; }); y += 6.5; };
     th();
+    const vname = id => { const r = (RS("dayworks").list ? mergedRecords("dayworks") : []).find(x => x.id === id); return r ? variationLabel(id) : ""; };
     poured.forEach((id, i) => {
-      if (y + 6.4 > H - 16){ newPage(); th(); }
-      const p = P[id], v = pourVol(id, p);
-      if (i % 2 === 0){ doc.setFillColor(220, 230, 242); doc.rect(M, y, CW, 6.2, "F"); }
-      const cells = [pourName(id).replace("Wall ", "").replace(" / ", "/") + (id[0] === "W" && /[b-g]$/.test(id) ? id.slice(-1) : ""), id[0] === "C" ? (PLAN.els.find(e => e.i === id) || {}).r : pourWhere(id), dmy(p.date) + (pourState(p) === "today" ? " (today)" : ""), num(p.height) ? String(num(p.height)) : "", v ? m3(v.v) + (v.est ? "*" : "") : "", String((pics[id] || []).length || (p.photos || []).length || "")];
+      const p = P[id], v = pourVol(id, p), s = pourSize(id), st = pourState(p), isC = id[0] === "C";
+      const vari = p.variation ? vname(p.variation) : "", note = String(p.notes || "").replace(/\s+/g, " ").slice(0, 150);
+      const extra = [vari && `Variation: ${vari}`, note && `Notes: ${note}`].filter(Boolean).join("   ");
+      const rh = extra ? 10.4 : 6.2;
+      if (y + rh > H - 16){ newPage("Pour schedule (cont.)"); th(); }
+      if (i % 2 === 0){ doc.setFillColor(220, 230, 242); doc.rect(M, y, CW, rh, "F"); }
+      const cells = [pourName(id).replace("Wall ", "").replace(" / ", "/") + (id[0] === "W" && /[b-g]$/.test(id) ? id.slice(-1) : ""), isC ? (PLAN.els.find(e => e.i === id) || {}).r : pourWhere(id), dmy(p.date) + (st === "today" ? " (today)" : ""),
+        s ? s.len.toFixed(2) : "", s ? String(s.thk) : "", num(p.height) ? String(num(p.height)) : "", v ? m3(v.v) + (v.est ? "*" : "") : "", String((pics[id] || []).length || (p.photos || []).length || "")];
       let x = M + 2;
       cells.forEach((c, j) => { doc.setFont("helvetica", j === 0 ? "bold" : "normal"); doc.setFontSize(8); doc.setTextColor(j === 0 ? 1 : 30, j === 0 ? 32 : 30, j === 0 ? 96 : 30);
         doc.text(doc.splitTextToSize(String(c || ""), cols[j][1] - 3)[0] || "", x, y + 4.3); x += cols[j][1]; });
-      y += 6.2;
+      if (extra){ doc.setFontSize(7); doc.setTextColor(100); doc.text(doc.splitTextToSize(extra, CW - 18)[0], M + 16, y + 8.6); }
+      y += rh;
     });
+    need(12); doc.setDrawColor(...NAVY); doc.setLineWidth(0.4); doc.line(M, y + 1, W - M, y + 1);
+    doc.setFont("helvetica", "bold"); doc.setFontSize(9.5); doc.setTextColor(...NAVY);
+    doc.text(`${poured.length} poured`, M + 2, y + 6.5); doc.text(`Total concrete: ${m3(tot)} m3${anyEst ? "*" : ""}`, W - M - 2, y + 6.5, {align: "right"}); y += 10;
     if (left.length){
-      need(24); y += 5; doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.setTextColor(...NAVY);
+      need(24); y += 3; doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.setTextColor(...NAVY);
       const txt = doc.splitTextToSize(`Not poured yet (${left.length}): ` + left.map(pourName).map(t => t.replace("Wall ", "")).join(", "), CW);
       doc.text(txt, M, y); y += txt.length * 4.2;
     }
-    // one section per element
-    for (const id of poured){
-      const p = P[id], v = pourVol(id, p), s = pourSize(id), st = pourState(p), list = pics[id] || [];
-      doc.addPage("a4", "portrait"); brand("Pour report", "Patrician Secondary School, Newbridge");
-      doc.setFillColor(...NAVY); doc.rect(M, y, CW, 10, "F");
-      doc.setFont("helvetica", "bold"); doc.setFontSize(14); doc.setTextColor(255); doc.text(pourName(id), M + 3, y + 7);
-      doc.setFontSize(10); doc.text(`${st === "today" ? "Poured today" : "Poured"} ${dmy(p.date)}`, W - M - 3, y + 6.6, {align: "right"}); y += 14;
-      doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(90); doc.text(doc.splitTextToSize((id[0] === "C" ? (PLAN.els.find(e => e.i === id) || {}).r : pourWhere(id)) || "", CW), M, y); y += 7;
-      const rows = [["Type", id[0] === "C" ? "Column" : "Wall"],
-        ["Size", s ? (id[0] === "C" ? `${Math.round(s.len * 1000)} x ${s.thk} mm` : `about ${s.len.toFixed(2)} m long, ${s.thk} mm thick`) : ""],
-        ["Pour height", num(p.height) ? `${num(p.height)} m` : "Not recorded"],
-        ["Concrete", v ? `${m3(v.v)} m3${v.est ? " (estimate from the drawing)" : " (docket figure)"}` : "Not recorded"],
-        ["Variation", p.variation ? variationLabel(p.variation) : "None"],
-        ["Recorded by", [p.by, p.updated].filter(Boolean).join(", ") || ""]];
-      rows.forEach(([k, val], i) => { if (i % 2 === 0){ doc.setFillColor(240, 244, 250); doc.rect(M, y - 4, CW, 6.4, "F"); }
-        doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.setTextColor(...NAVY); doc.text(k, M + 2, y); doc.setFont("helvetica", "normal"); doc.setTextColor(30); doc.text(String(val), M + 36, y, {maxWidth: CW - 40}); y += 6.4; });
-      if (p.notes){ y += 2; doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.setTextColor(...NAVY); doc.text("Notes", M, y); y += 5; doc.setFont("helvetica", "normal"); doc.setTextColor(30);
-        const t = doc.splitTextToSize(String(p.notes), CW); doc.text(t, M, y); y += t.length * 4.3 + 2; }
-      y += 3; doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.setTextColor(...NAVY); doc.text(list.length ? `Photos (${list.length})` : "Photos", M, y); y += 4;
-      if (!list.length){ doc.setFont("helvetica", "normal"); doc.setTextColor(110); doc.text((p.photos || []).length ? "The photos couldn't be loaded for this report." : "No photos added.", M, y + 3); continue; }
-      const bw = (CW - 4) / 2, bh = 68;
-      for (let i = 0; i < list.length; i += 2){
-        if (y + bh > H - 16){ newPage(); }
-        for (let j = 0; j < 2 && i + j < list.length; j++){
-          const q = list[i + j], k = Math.min(bw / q.w, bh / q.h), w = q.w * k, h = q.h * k, x0 = M + j * (bw + 4);
+    // photos: three across, each captioned with its wall and pour date
+    const shots = []; poured.forEach(id => (pics[id] || []).forEach(q => shots.push({id, q})));
+    const noPics = poured.filter(id => (P[id].photos || []).length && !(pics[id] || []).length);
+    if (shots.length || noPics.length){
+      newPage("Pour photos");
+      const gap = 4, bw = (CW - 2 * gap) / 3, bh = 44, rowH = bh + 8;
+      for (let i = 0; i < shots.length; i += 3){
+        if (y + rowH > H - 16) newPage("Pour photos (cont.)");
+        for (let j = 0; j < 3 && i + j < shots.length; j++){
+          const {id, q} = shots[i + j], k = Math.min(bw / q.w, bh / q.h), w = q.w * k, h = q.h * k, x0 = M + j * (bw + gap);
           doc.addImage(q.url, "JPEG", x0 + (bw - w) / 2, y + (bh - h) / 2, w, h);
+          doc.setFont("helvetica", "bold"); doc.setFontSize(7.5); doc.setTextColor(...NAVY); doc.text(`${pourName(id)}  ${dmy(P[id].date)}`, x0, y + bh + 4);
         }
-        y += bh + 3;
+        y += rowH;
       }
+      if (noPics.length){ need(10); doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(110); doc.text(`Photos couldn't be loaded for: ${noPics.map(pourName).map(t => t.replace("Wall ", "")).join(", ")}.`, M, y + 3); }
     }
-    // footers
+    // footers (the plan page is A3, the rest A4)
     const total = doc.getNumberOfPages();
     for (let i = 1; i <= total; i++){
+      const [pw, ph] = dims[i - 1];
       doc.setPage(i); doc.setFont("helvetica", "normal"); doc.setFontSize(7.5); doc.setTextColor(120);
-      doc.text(`Printed ${today.toLocaleDateString("en-GB", {weekday: "short", day: "2-digit", month: "long", year: "numeric"})}, ${today.toLocaleTimeString("en-GB", {hour: "2-digit", minute: "2-digit"})}`, M, H - 8);
-      doc.text(`Page ${i} of ${total}`, W - M, H - 8, {align: "right"});
+      doc.text(`Printed ${today.toLocaleDateString("en-GB", {weekday: "short", day: "2-digit", month: "long", year: "numeric"})}, ${today.toLocaleTimeString("en-GB", {hour: "2-digit", minute: "2-digit"})}`, M, ph - 8);
+      doc.text(`Page ${i} of ${total}`, pw - M, ph - 8, {align: "right"});
     }
     const name = `Pour report ${today.toISOString().slice(0, 10)}.pdf`;
     const blob = doc.output("blob"), url = URL.createObjectURL(blob), a = document.createElement("a");
