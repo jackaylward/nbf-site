@@ -2630,7 +2630,7 @@ async function unmoveLadderRecord(){
 // Fixed IDs, so running on more than one device can't make duplicates. Photos sit in /variations.
 // Both days share one VO number (two daily records for one variation). Doru's full name and trade come from the lads list.
 const W70_LOC = "Wall 70, Grid B, at gridlines 9B and 10B (both ends of the wall)";
-const W70_WHY = "Breaking out of hardened concrete at the wall ends is additional formwork work, outside the scope and price of the NBF Sub-Contract. Instructed verbally by the site engineers";
+const W70_WHY = "Breaking out of hardened concrete at the wall ends is additional formwork work, outside NBF's agreed scope and price. Instructed verbally by the site engineers";
 const W70_QTY = "Breaking out concrete, 300 mm deep x 200 mm wall thickness: 0.36 m at gridline 9B + 1.10 m at gridline 10B = 1.46 m, total 0.09 m3";
 const VO_SEEDS = [{
   key: "voSeedWall70", ids: ["dw-vo-wall70-d1"],
@@ -2648,7 +2648,7 @@ const VO_SEEDS = [{
   who: "victor", location: "Ground floor, Zone 3: end of Wall 44 at its junction with Wall 17 (Grid F, between gridlines 6 and 7)",
   work: d => `Fabrication and fixing of an additional reinforced concrete column cage at the end of Wall 44, at its junction with Wall 17 (Grid F, between gridlines 6 and 7), ground floor, Zone 3. Work carried out by the steel fixing foreman, Victor Gudumac, as shown in the attached photograph. ${d}.`,
   det: {x_zone: "Zone 3",
-    x_why: "This column is not shown on the structural drawings. The Wall 17 sheet (SE-26005 Rev 00, 16.09.26) and the Wall 44 sheet (SE-26034 Rev 01, 11.08.26) show no column at this junction; the only column on the Wall 17 sheet is C1, between gridlines H and I at gridline 5. The additional reinforcement is outside the scope and price of the NBF Sub-Contract",
+    x_why: "This column is not shown on the structural drawings. The Wall 17 sheet (SE-26005 Rev 00, 16.09.26) and the Wall 44 sheet (SE-26034 Rev 01, 11.08.26) show no column at this junction; the only column on the Wall 17 sheet is C1, between gridlines H and I at gridline 5. The additional reinforcement is outside NBF's agreed scope and price",
     x_drg: "SE-26005 Rev 00 (Walls 17 and 18, 16.09.26) and SE-26034 Rev 01 (Walls 43, 44 and 49, 11.08.26): no column shown at the Wall 44 / Wall 17 junction",
     x_co: "JJ Rhatigan", x_qty: "1 no. additional column reinforcement cage, fabricated and fixed in position"},
 }];
@@ -2790,10 +2790,11 @@ async function seedDailyRecords(){
 // Keeps the ref, times, crew, photos and anything filled in on the phone; replaces only the wording fields.
 async function rewordSeeded(){
   try{
-    if (!RS("dayworks") || !RS("dayworks").list || await kvGet("rewordSeeded2")) return;
+    if (!RS("dayworks") || !RS("dayworks").list || await kvGet("rewordSeeded3")) return;
     const K = KINDS.dayworks, all = mergedRecords("dayworks"), w = VO_SEEDS[0], d = DL_SEEDS[0];
     const jobs = [["dw-vo-wall70-d1", w.work(w.days[0][3]), {x_why: w.det.x_why, x_qty: w.det.x_qty, x_plant: w.det.x_plant}],
-      [d.id, d.work, {x_causeInfo: d.det.x_causeInfo, x_effect: d.det.x_effect}]];
+      [d.id, d.work, {x_causeInfo: d.det.x_causeInfo, x_effect: d.det.x_effect}],
+      [VO_SEEDS[1].ids[0], VO_SEEDS[1].work(VO_SEEDS[1].days[0][3]), {x_why: VO_SEEDS[1].det.x_why}]];
     let done = 0;
     for (const [id, work, over] of jobs){
       const r = all.find(x => x.id === id);
@@ -2807,7 +2808,7 @@ async function rewordSeeded(){
       await queueRecordSave("dayworks", rec, [], []);
       done++;
     }
-    if (done === jobs.length) await kvSet("rewordSeeded2", true);
+    if (done) await kvSet("rewordSeeded3", true);
     if (done && S.view === "dayworks") render();
   }catch(e){}
 }
