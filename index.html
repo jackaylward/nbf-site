@@ -3075,7 +3075,7 @@ async function dailyReportPdf(from, to, single, all){
   font("bold", 22, NAVY); doc.text(single ? "Daily Report" : "Daily Records", M, y + 6); y += 11;
   font("normal", 10, GREY); doc.text(`${EAS_SITE}  ·  ${scope}`, M, y); y += 8;
   // numbers
-  const days = [...new Set([...recs.map(r => r.dateFrom), ...dws.map(r => r.date)])].sort();
+  const days = [...new Set([...recs.map(r => r.dateFrom), ...dws.map(r => r.date)])].sort().reverse();
   const info = recs.map(r => ({r, i: wdIssues(r)}));
   const delayDays = new Set(info.filter(x => x.i.claim).map(x => x.r.dateFrom)).size;
   const craneDays = cranes.length, scafDays = vars.length;
@@ -3179,7 +3179,7 @@ async function dailyReportPdf(from, to, single, all){
   // delay summary
   const delays = [...info.filter(x => x.i.claim && x.i.list.length).map(({r, i}) => ({day: r.dateFrom, text: i.list.map(t => t.replace(/\.?\s*$/, ".")).join(" ")})),
     ...cranes.map(r => { const d = parseDet(r.description).det; return {day: r.date, text: `Crane delay ${d.ref || ""}: ${[d.cause, d.causeInfo].filter(Boolean).join(". ")}${d.effect ? ". " + d.effect : ""}.`.replace(/\s+:/, ":").replace(/\.\.$/, ".")}; })]
-    .sort((a, b) => a.day.localeCompare(b.day));
+    .sort((a, b) => b.day.localeCompare(a.day));
   ensure(24);
   font("bold", 13, NAVY); doc.text("Delays and dependencies on JJ Rhatigan", M, y + 2); y += 6;
   if (!delays.length){ font("normal", 9, GREY); doc.text("None recorded.", M, y + 3); y += 8; }
