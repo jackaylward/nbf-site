@@ -2641,6 +2641,16 @@ const VO_SEEDS = [{
   det: {x_zone: "", x_why: W70_WHY,
     x_drg: "SE-26028 Rev 01 (Wall 70 elevation), P09 Suitable for Construction, 18.09.26", x_how: "Verbal", x_by: "Site engineers", x_co: "JJ Rhatigan",
     x_qty: W70_QTY, x_plant: "MEWP (scissor lift), 10 hrs; electric breaker (Kango), 10 hrs"},
+}, {
+  // Fri 9 Oct: additional column cage at the Wall 44 / Wall 17 junction, not shown on the drawings (checked SE-26005 and SE-26034)
+  key: "voSeedCol4417", ids: ["dw-vo-col-w44-w17"], photos: [], trade: "Fixer", whoName: "Victor Gudumac",
+  days: [["2026-10-09", "14:00", "15:00", "Duration: 1 hour on Friday 9 October 2026"]],
+  who: "victor", location: "Ground floor, Zone 3: end of Wall 44 at its junction with Wall 17 (Grid F, between gridlines 6 and 7)",
+  work: d => `Fabrication and fixing of an additional reinforced concrete column cage at the end of Wall 44, at its junction with Wall 17 (Grid F, between gridlines 6 and 7), ground floor, Zone 3. Work carried out by the steel fixing foreman, Victor Gudumac, as shown in the attached photograph. ${d}.`,
+  det: {x_zone: "Zone 3",
+    x_why: "This column is not shown on the structural drawings. The Wall 17 sheet (SE-26005 Rev 00, 16.09.26) and the Wall 44 sheet (SE-26034 Rev 01, 11.08.26) show no column at this junction; the only column on the Wall 17 sheet is C1, between gridlines H and I at gridline 5. The additional reinforcement is outside the scope and price of the NBF Sub-Contract",
+    x_drg: "SE-26005 Rev 00 (Walls 17 and 18, 16.09.26) and SE-26034 Rev 01 (Walls 43, 44 and 49, 11.08.26): no column shown at the Wall 44 / Wall 17 junction",
+    x_co: "JJ Rhatigan", x_qty: "1 no. additional column reinforcement cage, fabricated and fixed in position"},
 }];
 async function seedVariations(){
   try{ if (S.voSeeding || !RS("dayworks") || !RS("dayworks").list || !(S.lads || []).length) return; }catch(e){ return; }
@@ -2651,7 +2661,7 @@ async function seedVariations(){
       const have = new Set(mergedRecords("dayworks").map(r => r.id));
       if (v.ids.every(id => have.has(id))){ await kvSet(v.key, true); continue; }
       const lad = (S.lads || []).find(l => l && l.name && l.name.toLowerCase().startsWith(v.who));
-      const trade = lad ? easTradeShort(lad.trade) : "GO";
+      const trade = v.trade || (lad ? easTradeShort(lad.trade) : "GO");
       const ref = nextRef("Variation");
       const photos = [];
       for (const [i, src] of v.photos.entries()){ const data = await srPhotoData({data: src}); if (data) photos.push({name: `${v.ids[0]}-p${i + 1}`, data}); }
@@ -2661,7 +2671,7 @@ async function seedVariations(){
         if (have.has(id)) continue;
         const rec = {id, type: "Variation", date, start, end, location: v.location, description: "",
           chippies: trade === "Carp" ? 1 : 0, fixers: trade === "Fixer" ? 1 : 0, operatives: trade === "Carp" || trade === "Fixer" ? 0 : 1,
-          other: lad ? lad.name : "Doru"};
+          other: lad ? lad.name : (v.whoName || "Doru")};
         rec.description = composeDet(v.work(day), {...rec, ...v.det, x_ref: ref});
         await queueRecordSave("dayworks", rec, i === 0 ? photos : [], []);
       }
