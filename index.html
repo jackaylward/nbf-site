@@ -596,6 +596,7 @@ function setLadData(d){
   S.agencyList = d.agencies || [];
   const b = buildLads(d);
   S.lads = b.lads; S.agencies = b.agencies;
+  if (typeof seedVariations === "function") seedVariations();
 }
 const AG_PALETTE = ["#012060","#1F6FB2","#2E7D4F","#7B3FA0","#B03A5B","#2F6F7A","#9A6700","#4B5563","#9C2F6B","#2F5D8A"];
 const agSlot = a => (S.agencyList || []).findIndex(x => x.toLowerCase() === String(a).toLowerCase());
@@ -2230,7 +2231,7 @@ async function loadRecords(kind, quiet){
     st.loadFailed = false;
     cacheSet("records:" + kind, st.list);
     // moveSiteRecords() was a one-off and is switched off
-    if (kind === "dayworks") unmoveLadderRecord();
+    if (kind === "dayworks"){ unmoveLadderRecord(); seedVariations(); }
   }catch(e){
     st.loadFailed = !st.list;
     if (!quiet) connectionTrouble();
@@ -2577,6 +2578,50 @@ async function unmoveLadderRecord(){
     await refreshJobs();
     if (S.view === "dayworks") render();
   }catch(e){}
+}
+// ================= one-off: variations written up by Claude, added once =================
+// Fixed IDs, so running on more than one device can't make duplicates. Photos sit in /variations.
+// Both days share one VO number (two daily records for one variation). Doru's full name and trade come from the lads list.
+const VO_SEEDS = [{
+  key: "voSeedWall70", ids: ["dw-vo-wall70-d1", "dw-vo-wall70-d2"],
+  photos: ["variations/wall70-breakout-1.jpg", "variations/wall70-breakout-2.jpg", "variations/wall70-breakout-3.jpg", "variations/wall70-breakout-4.jpg"],
+  days: [["2026-10-07", "08:00", "13:00", "Day 1 of 2"], ["2026-10-08", "08:00", "13:00", "Day 2 of 2"]],
+  who: "doru", location: "Wall 70, Grid B, both ends of the wall",
+  work: d => `Broke out hardened concrete at both ends of Wall 70, 300 mm down from the top of the wall, using a Kango breaker working from a MEWP. Concrete broken out down to the reinforcement. ${d}.`,
+  det: {x_zone: "", x_why: "Breaking out hardened concrete is not formwork and was not in NBF's scope or price. The engineers on site instructed it",
+    x_drg: "SE-26028 Rev 01 (Wall 70 elevation), P09 Suitable for Construction, 18.09.26", x_how: "Verbal", x_by: "Site engineers", x_co: "JJ Rhatigan",
+    x_qty: "Break out concrete 300 mm deep at 2 no. ends of Wall 70, full wall thickness", x_plant: "MEWP (scissor lift) 5 hrs; Kango breaker 5 hrs",
+    x_status: "Not notified yet"},
+}];
+async function seedVariations(){
+  try{ if (S.voSeeding || !RS("dayworks") || !RS("dayworks").list || !(S.lads || []).length) return; }catch(e){ return; }
+  S.voSeeding = true;
+  try{
+    for (const v of VO_SEEDS){
+      if (await kvGet(v.key)) continue;
+      const have = new Set(mergedRecords("dayworks").map(r => r.id));
+      if (v.ids.every(id => have.has(id))){ await kvSet(v.key, true); continue; }
+      const lad = (S.lads || []).find(l => l && l.name && l.name.toLowerCase().startsWith(v.who));
+      const trade = lad ? easTradeShort(lad.trade) : "GO";
+      const ref = nextRef("Variation");
+      const photos = [];
+      for (const [i, src] of v.photos.entries()){ const data = await srPhotoData({data: src}); if (data) photos.push({name: `${v.ids[0]}-p${i + 1}`, data}); }
+      if (photos.length < v.photos.length) continue;   // try again next load
+      for (const [i, [date, start, end, day]] of v.days.entries()){
+        const id = v.ids[i];
+        if (have.has(id)) continue;
+        const rec = {id, type: "Variation", date, start, end, location: v.location, description: "",
+          chippies: trade === "Carp" ? 1 : 0, fixers: trade === "Fixer" ? 1 : 0, operatives: trade === "Carp" || trade === "Fixer" ? 0 : 1,
+          other: lad ? lad.name : "Doru"};
+        rec.description = composeDet(v.work(day), {...rec, ...v.det, x_ref: ref});
+        await queueRecordSave("dayworks", rec, i === 0 ? photos : [], []);
+      }
+      await kvSet(v.key, true);
+      setStatus(`Variation ${ref} added`, true);
+      if (S.view === "dayworks") render();
+    }
+  }catch(e){}
+  finally{ S.voSeeding = false; }
 }
 async function moveSiteRecords(){
   if (S.srMoving || !RS("dayworks").list) return;
