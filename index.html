@@ -2269,6 +2269,7 @@ async function loadRecords(kind, quiet){
     st.loadFailed = false;
     cacheSet("records:" + kind, st.list);
     // moveSiteRecords() was a one-off and is switched off
+    if (kind === "works") seedDailyRecords();
     if (kind === "dayworks"){ unmoveLadderRecord(); seedVariations().then(patchWall70).then(seedCraneDelays); }
   }catch(e){
     st.loadFailed = !st.list;
@@ -2728,6 +2729,31 @@ async function seedCraneDelays(){
     }
   }catch(e){}
   finally{ S.dlSeeding = false; }
+}
+const WD_SEEDS = [{
+  key: "wdSeed20261009", id: "wd-seed-2026-10-09", date: "2026-10-09",
+  location: "Zone 1 first floor, Zone 3 ground floor",
+  work: "Pouring 5 columns in Zone 1, first floor. Pouring the lift shaft in Zone 3, ground floor (walls 45, 12, 11 and 49 make up the lift shaft). The lads could not start the works for the first floor screed concrete pour in Zone 2 because the Zone 2 ground floor scaffolding is not finished.",
+  det: {x_scaf: "Not erected or not ready", x_scafn: "Zone 2 ground floor scaffolding not finished",
+    x_delay: "Zone 2 ground floor scaffolding not finished by JJ Rhatigan, so the lads cannot begin works for the screed pour",
+    x_need: "first floor screed concrete pour, Zone 2", x_claim: "Yes"},
+}];
+async function seedDailyRecords(){
+  try{ if (S.wdSeeding || !RS("works") || !RS("works").list) return; }catch(e){ return; }
+  S.wdSeeding = true;
+  try{
+    for (const v of WD_SEEDS){
+      if (await kvGet(v.key)) continue;
+      if (mergedRecords("works").some(r => r.id === v.id)){ await kvSet(v.key, true); continue; }
+      const rec = {id: v.id, dateFrom: v.date, dateTo: v.date, location: v.location, description: "", chippies: 0, fixers: 0, operatives: 0, other: ""};
+      rec.description = composeDet(v.work, {...rec, ...v.det, type: "Daily"});
+      await queueRecordSave("works", rec, [], []);
+      await kvSet(v.key, true);
+      setStatus("Daily record for Fri 9 Oct added", true);
+      if (S.view === "works") render();
+    }
+  }catch(e){}
+  finally{ S.wdSeeding = false; }
 }
 async function moveSiteRecords(){
   if (S.srMoving || !RS("dayworks").list) return;
