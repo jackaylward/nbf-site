@@ -2231,7 +2231,7 @@ async function loadRecords(kind, quiet){
     st.loadFailed = false;
     cacheSet("records:" + kind, st.list);
     // moveSiteRecords() was a one-off and is switched off
-    if (kind === "dayworks"){ unmoveLadderRecord(); seedVariations().then(patchWall70); }
+    if (kind === "dayworks"){ unmoveLadderRecord(); seedVariations().then(patchWall70).then(seedCraneDelays); }
   }catch(e){
     st.loadFailed = !st.list;
     if (!quiet) connectionTrouble();
@@ -2648,6 +2648,47 @@ async function patchWall70(){
     await kvSet("voPatchWall70b", true);
     if (S.view === "dayworks") render();
   }catch(e){}
+}
+// ================= one-off: crane delays written up by Claude, added once =================
+// Tue 6 Oct: mobile crane on precast slabs in Zone 2 all day. Crew, end time and location are copied from
+// Monday's delay (5 Oct) on the phone, so the two match. Fixed ID, so no duplicates across phones.
+const DL_SEEDS = [{
+  key: "dlSeed20261006", id: "dw-dl-2026-10-06-precast", date: "2026-10-06", start: "08:00", copyFrom: "2026-10-05",
+  photos: [1, 2, 3, 4, 5].map(n => `variations/crane-delay-2026-10-06-${n}.jpg`),
+  work: "NBF could not use the crane in Zone 3 for the whole day. The mobile crane was set up in Zone 2 installing the precast slabs from 08:00 until the end of the day, so none of our crane lifts in Zone 3 (wall shutters, steel and materials) could go ahead. This is the second day running, the same as Monday 5 October.",
+  det: {x_zone: "Zone 3", x_cause: "Crane in use by another trade",
+    x_causeInfo: "Mobile crane installing precast slabs in Zone 2 from 08:00 all day, not available to NBF for Zone 3",
+    x_co: "JJ Rhatigan", x_effect: "No crane lifts possible in Zone 3 all day. Second day in a row (also Mon 5 Oct)",
+    x_status: "Not notified yet"},
+}];
+async function seedCraneDelays(){
+  try{ if (S.dlSeeding || !RS("dayworks") || !RS("dayworks").list) return; }catch(e){ return; }
+  S.dlSeeding = true;
+  try{
+    for (const v of DL_SEEDS){
+      if (await kvGet(v.key)) continue;
+      const all = mergedRecords("dayworks");
+      if (all.some(r => r.id === v.id)){ await kvSet(v.key, true); continue; }
+      const mon = all.filter(r => r.type === "Crane delay" && r.date === v.copyFrom).sort((a, b) => (+b.chippies + +b.fixers + +b.operatives) - (+a.chippies + +a.fixers + +a.operatives))[0];
+      const md = mon ? parseDet(mon.description).det : {};
+      const photos = [];
+      for (const [i, src] of v.photos.entries()){ const data = await srPhotoData({data: src}); if (data) photos.push({name: `${v.id}-p${i + 1}`, data}); }
+      if (photos.length < v.photos.length) continue;   // try again next load
+      const rec = {id: v.id, type: "Crane delay", date: v.date, start: v.start, end: (mon && mon.end) || "17:00",
+        location: (mon && mon.location) || "Zone 3", description: "",
+        chippies: mon ? +mon.chippies || 0 : 0, fixers: mon ? +mon.fixers || 0 : 0, operatives: mon ? +mon.operatives || 0 : 0,
+        other: (mon && mon.other) || ""};
+      const det = {...v.det};
+      if (md.cby) det.x_cby = md.cby;
+      if (md.pstand) det.x_pstand = md.pstand;
+      rec.description = composeDet(v.work, {...rec, ...det, x_ref: nextRef("Crane delay")});
+      await queueRecordSave("dayworks", rec, photos, []);
+      await kvSet(v.key, true);
+      setStatus("Crane delay for Tue 6 Oct added", true);
+      if (S.view === "dayworks") render();
+    }
+  }catch(e){}
+  finally{ S.dlSeeding = false; }
 }
 async function moveSiteRecords(){
   if (S.srMoving || !RS("dayworks").list) return;
