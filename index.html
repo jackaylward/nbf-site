@@ -3067,8 +3067,12 @@ async function dailyReportPdf(from, to, single){
   y += 27;
   // day by day
   font("bold", 13, NAVY); doc.text(single ? "Record" : "Day by day", M, y); y += 6;
+  const picCount = {};
   for (const day of days){
     const list = info.filter(x => x.r.dateFrom === day);
+    const pics = [];
+    for (const {r} of list){ try{ pics.push(...await easPhotos(r, "works", 1000)); }catch(e){} }
+    picCount[day] = pics.length;
     ensure(14);
     doc.setFillColor(PALE); doc.rect(M, y, W, 7, "F");
     font("bold", 10, NAVY); doc.text(niceYmd(day).replace(/\d\d$/, "") + fromIso(day).getFullYear(), M + 2, y + 4.8); y += 9;
@@ -3076,7 +3080,7 @@ async function dailyReportPdf(from, to, single){
       const d = i.det;
       const rows = [];
       if (r.location) rows.push(["Working zone and level", r.location]);
-      const work = workText(r.description); if (work) rows.push(["Works done", work]);
+      const work = workText(r.description); if (work) rows.push(["Works done", work.replace(/\.?\s*$/, ".") + (pics.length ? " As shown in the photographs below." : "")]);
       if (d.crane) rows.push(["Crane", d.crane + (d.cranen ? ": " + d.cranen : "")]);
       if (d.scaf) rows.push(["Scaffolding", d.scaf + (d.scafn ? ": " + d.scafn : "")]);
       if (d.notes) rows.push(["Notes", d.notes]);
@@ -3090,7 +3094,7 @@ async function dailyReportPdf(from, to, single){
         y += ls.length * 4.2 + 1.6;
       }
       if (d.delay || d.need || i.claim){
-        const txt = [d.delay ? "Delay or dependency: " + d.delay : "", d.need ? "Holds up: " + d.need : "", !d.delay && i.list.length ? i.list.join(". ") : ""].filter(Boolean);
+        const txt = [d.delay ? "Delay or dependency: " + d.delay + (pics.length ? " (as shown in the photographs below)" : "") : "", d.need ? "Holds up: " + d.need : "", !d.delay && i.list.length ? i.list.map(t => t.replace(/\.?\s*$/, ".")).join(" ") : ""].filter(Boolean);
         const ls = txt.flatMap(t => lines(t, W - 8, 9, "bold"));
         const bh = ls.length * 4.2 + 4;
         ensure(bh + 2);
@@ -3100,11 +3104,10 @@ async function dailyReportPdf(from, to, single){
       doc.setDrawColor(LINE); doc.setLineWidth(0.2); doc.line(M, y + 1, M + W, y + 1); y += 3;
     }
     // photographs for the day, three across
-    const pics = [];
-    for (const {r} of list){ try{ pics.push(...await easPhotos(r, "works", 1000)); }catch(e){} }
     if (pics.length){
-      ensure(56);
+      ensure(62);
       font("bold", 9.5, NAVY); doc.text(`Photographs (${pics.length})`, M, y + 3); y += 6;
+      font("normal", 8.5, GREY); doc.text(`The works and site conditions recorded for ${fmtDmy(day)} are shown in the photographs below.`, M, y + 1); y += 5;
       const pw = 58, ph = 44, gap = 3;
       pics.forEach((pc, k) => {
         const col = k % 3;
@@ -3126,7 +3129,7 @@ async function dailyReportPdf(from, to, single){
     doc.setFillColor(NAVY); doc.rect(M, y, W, 7, "F");
     font("bold", 9, "#FFFFFF"); doc.text("Date", M + 2, y + 4.8); doc.text("What happened", M + 28, y + 4.8); y += 7;
     delays.forEach(({r, i}, n) => {
-      const ls = lines(i.list.join(". "), W - 32, 9);
+      const ls = lines(i.list.map(t => t.replace(/\.?\s*$/, ".")).join(" ") + (picCount[r.dateFrom] ? " Photographs for " + fmtDmy(r.dateFrom) + " are included in this report." : ""), W - 32, 9);
       const h = ls.length * 4.2 + 3;
       ensure(h);
       if (n % 2) { doc.setFillColor("#F2F5FA"); doc.rect(M, y, W, h, "F"); }
