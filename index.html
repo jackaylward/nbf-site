@@ -2584,15 +2584,16 @@ async function unmoveLadderRecord(){
 // Both days share one VO number (two daily records for one variation). Doru's full name and trade come from the lads list.
 const W70_LOC = "Wall 70, Grid B, at gridlines 9B and 10B (both ends of the wall)";
 const W70_WHY = "Breaking out hardened concrete at the wall ends was extra formwork work, not in NBF's scope or price. The engineers on site instructed it";
+const W70_QTY = "Break out concrete, 300 mm deep x 200 mm wall: 0.36 m at gridline 9B + 1.10 m at gridline 10B = 1.46 m run, 0.09 m3";
 const VO_SEEDS = [{
-  key: "voSeedWall70", ids: ["dw-vo-wall70-d1", "dw-vo-wall70-d2"],
+  key: "voSeedWall70", ids: ["dw-vo-wall70-d1"],
   photos: ["variations/wall70-breakout-1.jpg", "variations/wall70-breakout-2.jpg", "variations/wall70-breakout-3.jpg", "variations/wall70-breakout-4.jpg"],
-  days: [["2026-10-07", "08:00", "13:00", "Day 1 of 2"], ["2026-10-08", "08:00", "13:00", "Day 2 of 2"]],
+  days: [["2026-10-07", "08:00", "18:00", "5 hrs on Wed 7 Oct and 5 hrs on Thu 8 Oct, 10 hrs in total"]],
   who: "doru", location: W70_LOC,
   work: d => `Broke out hardened concrete at both ends of Wall 70, 300 mm down from the top of the wall, using a Kango breaker working from a MEWP. Concrete broken out down to the reinforcement. ${d}.`,
   det: {x_zone: "", x_why: W70_WHY,
     x_drg: "SE-26028 Rev 01 (Wall 70 elevation), P09 Suitable for Construction, 18.09.26", x_how: "Verbal", x_by: "Site engineers", x_co: "JJ Rhatigan",
-    x_qty: "Break out concrete 300 mm deep at 2 no. ends of Wall 70, full wall thickness", x_plant: "MEWP (scissor lift) 5 hrs; Kango breaker 5 hrs",
+    x_qty: W70_QTY, x_plant: "MEWP (scissor lift) 10 hrs; Kango breaker 10 hrs",
     x_status: "Not notified yet"},
 }];
 async function seedVariations(){
@@ -2625,22 +2626,26 @@ async function seedVariations(){
   }catch(e){}
   finally{ S.voSeeding = false; }
 }
-// one-off fix to the Wall 70 records already added: gridlines and wording (Jack, 9 Oct)
+// one-off fix (Jack, 9 Oct): Wall 70 becomes one variation (day 2 merged into day 1, day 2 deleted),
+// with gridlines 9B and 10B, lengths, m3 and the wording. Keeps the VO number and the photos on day 1.
 async function patchWall70(){
   try{
-    if (!RS("dayworks") || !RS("dayworks").list || await kvGet("voPatchWall70a")) return;
-    const K = KINDS.dayworks, all = mergedRecords("dayworks");
-    for (const id of VO_SEEDS[0].ids){
-      const r = all.find(x => x.id === id);
-      if (!r) continue;
-      const rec = {};
-      K.textFields.forEach(k => rec[k] = r[k] == null ? "" : r[k]);
-      ["chippies", "fixers", "operatives"].forEach(k => rec[k] = +r[k] || 0);
-      rec.location = W70_LOC;
-      rec.description = String(r.description || "").replace(/^Why it's extra:.*$/m, "Why it's extra: " + W70_WHY);
-      await queueRecordSave("dayworks", rec, [], []);
-    }
-    if (VO_SEEDS[0].ids.some(id => all.some(x => x.id === id))) await kvSet("voPatchWall70a", true);
+    if (!RS("dayworks") || !RS("dayworks").list || await kvGet("voPatchWall70b")) return;
+    const K = KINDS.dayworks, v = VO_SEEDS[0], all = mergedRecords("dayworks");
+    const r = all.find(x => x.id === "dw-vo-wall70-d1");
+    if (!r) return;
+    const [date, start, end, day] = v.days[0];
+    const rec = {};
+    K.textFields.forEach(k => rec[k] = r[k] == null ? "" : r[k]);
+    ["chippies", "fixers", "operatives"].forEach(k => rec[k] = +r[k] || 0);
+    Object.assign(rec, {date, start, end, location: W70_LOC});
+    // keep anything already filled in on the phone (sign-off, notice, status), but replace the why, quantities and plant
+    const kept = {};
+    Object.entries(parseDet(r.description).det).forEach(([k, val]) => { if (val && !["why", "qty", "plant"].includes(k)) kept["x_" + k] = val; });
+    rec.description = composeDet(v.work(day), {...rec, ...v.det, ...kept, x_ref: kept.x_ref || nextRef("Variation")});
+    await queueRecordSave("dayworks", rec, [], []);
+    if (all.some(x => x.id === "dw-vo-wall70-d2")) await queueRecordDelete("dayworks", "dw-vo-wall70-d2");
+    await kvSet("voPatchWall70b", true);
     if (S.view === "dayworks") render();
   }catch(e){}
 }
