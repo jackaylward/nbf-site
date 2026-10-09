@@ -388,7 +388,7 @@ input[readonly],textarea[readonly]{background:var(--soft);color:var(--muted);cur
   <button data-view="timesheet"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Timesheet</button>
   <button data-view="dayworks"><svg viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/></svg>Variations</button>
   <button data-view="pours"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="1"/><path d="M3 10h8v11M11 10V3M15 14h6"/></svg>Pours</button>
-  <button data-view="works"><svg viewBox="0 0 24 24"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9"/></svg><span>Works<span class="lg"> Done</span></span></button>
+  <button data-view="works"><svg viewBox="0 0 24 24"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9"/></svg><span>Daily<span class="lg"> records</span></span></button>
   <button data-view="talks"><svg viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><path d="M13 3v6h6M8 14h8M8 17h5"/></svg>Talks</button>
   <button data-view="tools"><svg viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 0 0 5 5L21 13l-8 8-3-3 5.3-5.3a4 4 0 0 0-5-5L9 6l2-2z"/><path d="M3 21l6-6"/></svg>Tools</button>
   <button data-view="cabinet"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M12 3v18M9 11v2M15 11v2"/></svg>Cabinet</button>
@@ -417,7 +417,7 @@ const DAYS = ["mon","tue","wed","thu","fri","sat"];
 const DAY_LABEL = ["Mon","Tue","Wed","Thu","Fri","Sat"];
 const STATUSES = ["In store","On site","With a lad","In repair","Off hired","Missing"];
 const TICK_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
-const VIEW_TITLES = {home:"Home", attendance:"Attendance", timesheet:"Timesheet", dayworks:"Variations", pours:"Pours", works:"Works Done", talks:"Toolbox Talks", tools:"Tools", cabinet:"Cabinet", pdfedit:"PDF Editor"};
+const VIEW_TITLES = {home:"Home", attendance:"Attendance", timesheet:"Timesheet", dayworks:"Variations", pours:"Pours", works:"Daily Records", talks:"Toolbox Talks", tools:"Tools", cabinet:"Cabinet", pdfedit:"PDF Editor"};
 
 // ================= helpers =================
 const $ = id => document.getElementById(id);
@@ -832,6 +832,12 @@ $("view").addEventListener("click", async ev => {
     if (!from || !to || to < from){ S.pdfOut = {key, state: "error", msg: "Pick a From date and a To date after it."}; render(); return; }
     return runPdf(key, () => easRange(from, to));
   }
+  if (key === "wkrep"){
+    const from = $("pdfFrom").value, to = $("pdfTo").value;
+    RS("works").pdf = {from, to};
+    if (!from || !to || to < from){ S.pdfOut = {key, state: "error", msg: "Pick a From date and a To date after it."}; render(); return; }
+    return runPdf(key, () => dailyReportPdf(from, to));
+  }
   if (key === "record" || key === "records"){
     const kind = b.dataset.kind;
     if (kindJobs(kind).length){
@@ -888,7 +894,7 @@ function homeHtml(){
     <button class="card" data-go="dayworks"><h3>Variations this week</h3>
       <div class="big">${dwWeek ? dwWeek.length : skelNum()}</div>
       <p>${dwWeek ? `${fmtH(dwWeek.reduce((a,r)=>a+(r.manHours||0),0))} man-hours` : skelLine(60)}${waitingDw ? `, <span class="pill amber">${waitingDw} waiting to send</span>` : ""}</p></button>
-    <button class="card" data-go="works"><h3>Works done this week</h3>
+    <button class="card" data-go="works"><h3>Daily records this week</h3>
       <div class="big">${wdWeek ? wdWeek.length : skelNum()}</div>
       <p>${wdWeek ? `${wdWeek.reduce((a,r)=>a+(r.men||0),0)} men across the entries` : skelLine(60)}${waitingWd ? `, <span class="pill amber">${waitingWd} waiting to send</span>` : ""}</p></button>
     <button class="card" data-go="tools"><h3>Tools</h3>
@@ -1871,8 +1877,26 @@ const DET_FIELDS = [
   ["sign", "Signed off by JJR", "both"],
   ["notice", "Notice sent to JJR", "both"],
   ["status", "Status", "both"],
+  ["crane", "Crane", "daily"],
+  ["cranen", "Crane note", "daily"],
+  ["scaf", "Scaffolding", "daily"],
+  ["scafn", "Scaffolding note", "daily"],
+  ["delay", "Delay / dependency on JJR", "daily"],
+  ["need", "Holds up", "daily"],
+  ["claim", "Flag for delay claim", "daily"],
 ];
-const detTypeKey = type => type === "Crane delay" ? "crane" : "var";
+const WD_CRANE = ["Available to us", "Not available: taken by JJR", "Not available: used by another trade", "Not available: breakdown", "Not needed today"];
+const WD_SCAF = ["Ready and in use", "Partly ready", "Not erected or not ready", "Not needed today"];
+const wdBad = v => /^Not available|^Not erected|^Partly/.test(v || "");
+// anything on a daily record that could support a delay claim
+function wdIssues(r){
+  const d = parseDet(r.description).det, out = [];
+  if (wdBad(d.crane)) out.push("Crane: " + d.crane.replace(/^Not available: /, "not available, ") + (d.cranen ? " (" + d.cranen + ")" : ""));
+  if (wdBad(d.scaf)) out.push("Scaffolding: " + d.scaf.toLowerCase() + (d.scafn ? " (" + d.scafn + ")" : ""));
+  if (d.delay) out.push(d.delay + (d.need ? ", holds up " + d.need : ""));
+  return {list: out, claim: out.length > 0 || d.claim === "Yes", det: d};
+}
+const detTypeKey = type => type === "Crane delay" ? "crane" : type === "Daily" ? "daily" : "var";
 const detFieldsFor = type => DET_FIELDS.filter(f => f[2] === "both" || f[2] === detTypeKey(type));
 function parseDet(desc){
   const s = String(desc || "");
@@ -2032,8 +2056,8 @@ const KINDS = {
     pdfNote: "Includes every variation and delay between the dates, with photos.",
   },
   works: {
-    kind: "works", prefix: "wd", one: "works entry", many: "works entries", One: "Works done", Many: "Works Done",
-    newLabel: "Add works done", textFields: ["id","dateFrom","dateTo","location","description","other"],
+    kind: "works", prefix: "wd", one: "daily record", many: "daily records", One: "Daily record", Many: "Daily Records",
+    newLabel: "Add daily record", textFields: ["id","dateFrom","dateTo","location","description","other"],
     sortKey: r => (r.dateFrom||"") + (r.dateTo||""), groupKey: r => r.dateFrom,
     blank: () => ({dateFrom: iso(new Date()), dateTo: iso(new Date()), location: "", description: "", chippies: 0, fixers: 0, operatives: 0, other: ""}),
     missing(r){
@@ -2041,26 +2065,40 @@ const KINDS = {
       if (!fromIso(r.dateFrom)) miss.push("start date");
       if (r.dateTo && !fromIso(r.dateTo)) miss.push("end date");
       if (fromIso(r.dateFrom) && fromIso(r.dateTo) && r.dateTo < r.dateFrom) miss.push("an end date on or after the start date");
-      if (!String(r.description||"").trim()) miss.push("description of works");
-      if (recMen(r) < 1) miss.push("at least one man");
+      if (!String(r.description||"").trim() && !r.x_delay && !r.x_crane && !r.x_scaf) miss.push("works done, or a crane, scaffold or delay note");
       return miss;
     },
     derive: r => ({days: wdDays(r), men: recMen(r)}),
     inRange: (r, a, b) => r.dateFrom <= b && (r.dateTo || r.dateFrom) >= a,
-    calc(r){ const d = wdDays(r), men = recMen(r); return d ? `Over <b>${d} day${d===1?"":"s"}</b> with <b>${men} men</b>` : "Pick the dates"; },
+    calc(r){ const men = recMen(r); return fromIso(r.dateFrom) ? `<b>${men} men</b> on ${esc(niceYmd(r.dateFrom))}` : "Pick the date"; },
     dateFields: r => `
-      <label class="field">Start date<input type="date" data-rf="dateFrom" value="${esc(r.dateFrom)}"></label>
-      <label class="field">End date<input type="date" data-rf="dateTo" value="${esc(r.dateTo)}"></label>`,
-    locationLabel: "Location (optional)", locationRequired: false,
+      <label class="field">Date<input type="date" data-rf="dateFrom" value="${esc(r.dateFrom)}"></label>`,
+    locationLabel: "Zone and level (optional)", locationPlaceholder: "e.g. Zone 1, first floor",
+    descLabel: () => "Works done today", descPlaceholder: () => "e.g. Poured columns C3 and C4 in Zone 1, first floor",
+    namesLabel: () => "Names (optional)",
+    extraHtml: r => {
+      const sel = (k, opts) => `<select data-rf="x_${k}"><option value="">Not recorded</option>${opts.map(o => `<option${o === r["x_" + k] ? " selected" : ""}>${esc(o)}</option>`).join("")}</select>`;
+      const inp = (k, ph) => `<input data-rf="x_${k}" maxlength="200" value="${esc(r["x_" + k] || "")}" placeholder="${esc(ph)}">`;
+      return `<div class="formgrid" style="margin-top:10px">
+        <label class="field">Crane${sel("crane", WD_CRANE)}</label>
+        <label class="field">Crane note${inp("cranen", "e.g. on precast slabs all day")}</label>
+        <label class="field">Scaffolding${sel("scaf", WD_SCAF)}</label>
+        <label class="field">Scaffolding note${inp("scafn", "e.g. Zone 2 not finished")}</label></div>
+        <label class="field" style="margin-top:10px">Delay or dependency on JJ Rhatigan<textarea data-rf="x_delay" maxlength="600" rows="2" placeholder="e.g. Zone 2 scaffold not finished">${esc(r.x_delay || "")}</textarea></label>
+        <div class="formgrid"><label class="field">What it holds up${inp("need", "e.g. first floor screed slab pour, Zone 2, next Wednesday")}</label>
+        <label class="field">Flag for delay claim<select data-rf="x_claim"><option value="">Automatic</option><option${r.x_claim === "Yes" ? " selected" : ""}>Yes</option></select></label></div>`;
+    },
+    rowTag: r => wdIssues(r).claim ? "Delay" : "",
     rowTitle: r => r.location || String(r.description||"").split("\n")[0],
     rowSub: r => `${r.dateFrom === (r.dateTo||r.dateFrom) ? shortYmd(r.dateFrom) : shortYmd(r.dateFrom) + " – " + shortYmd(r.dateTo)}, ${menText(r)}`,
     rowSide: r => `<b>${r.men || 0}</b><span class="small muted">men</span>`,
     detailRows: r => `
-      <tr><th>Dates</th><td>${r.dateFrom === (r.dateTo||r.dateFrom) ? esc(niceYmd(r.dateFrom)) : `${esc(niceYmd(r.dateFrom))} to ${esc(niceYmd(r.dateTo))} (${r.days||wdDays(r)} days)`}</td></tr>
-      ${r.location ? `<tr><th>Location</th><td>${esc(r.location)}</td></tr>` : ""}
-      <tr><th>Men</th><td>${esc(menText(r))} (${r.men||recMen(r)} total)</td></tr>`,
-    weekSummary: list => `${list.length} this week`,
-    pdfNote: "Includes every works done entry between the dates, with photos.",
+      <tr><th>Date</th><td>${r.dateFrom === (r.dateTo||r.dateFrom) ? esc(niceYmd(r.dateFrom)) : `${esc(niceYmd(r.dateFrom))} to ${esc(niceYmd(r.dateTo))}`}</td></tr>
+      ${r.location ? `<tr><th>Zone and level</th><td>${esc(r.location)}</td></tr>` : ""}
+      <tr><th>Men</th><td>${esc(menText(r))} (${r.men||recMen(r)} total)</td></tr>
+      ${(d => [["crane", "Crane"], ["scaf", "Scaffolding"], ["delay", "Delay / dependency"], ["need", "Holds up"]].filter(([k]) => d[k]).map(([k, l]) => `<tr><th>${l}</th><td>${esc(d[k])}${k === "crane" && d.cranen ? " (" + esc(d.cranen) + ")" : ""}${k === "scaf" && d.scafn ? " (" + esc(d.scafn) + ")" : ""}</td></tr>`).join(""))(parseDet(r.description).det)}`,
+    weekSummary: list => `${list.length} this week, ${list.filter(r => wdIssues(r).claim).length} with delays`,
+    pdfNote: "Weekly report: a PDF of every daily record between the dates, with the delays and dependencies pulled together. Records with photos: the older Google PDF.",
   },
 };
 S.rec = {jobs: []};
@@ -2295,9 +2333,9 @@ function recordsHtml(kind){
   <div class="panel" style="margin-top:16px"><h2>Save a PDF to send</h2>
     <div class="formgrid"><label class="field">From<input type="date" id="pdfFrom" value="${esc(pdf.from)}"></label>
       <label class="field">To<input type="date" id="pdfTo" value="${esc(pdf.to)}"></label></div>
-    <div class="row-actions">${pdfBtn("records", "Save as PDF", `data-kind="${K.kind}"`)}${kind === "dayworks" ? pdfBtn("easAll", "Variations as EAS sheets") + pdfBtn("voAll", "Variation sheets (QS layout)") : ""}</div>
+    <div class="row-actions">${kind === "works" ? pdfBtn("wkrep", "Weekly report") : ""}${pdfBtn("records", kind === "works" ? "Records with photos" : "Save as PDF", `data-kind="${K.kind}"`)}${kind === "dayworks" ? pdfBtn("easAll", "Variations as EAS sheets") + pdfBtn("voAll", "Variation sheets (QS layout)") : ""}</div>
     <p class="msg">${K.pdfNote}${kind === "dayworks" ? " EAS sheets: one Event Analysis Sheet for each variation between the dates (not delays), with photos. Variation sheets (optional): a cover sheet in the QS layout for each variation, with its EAS sheet and photos behind it." : ""}</p>
-    ${pdfResult("records")}${pdfResult("easAll")}${pdfResult("voAll")}
+    ${pdfResult("wkrep")}${pdfResult("records")}${pdfResult("easAll")}${pdfResult("voAll")}
   </div>`;
 }
 
@@ -2312,7 +2350,7 @@ async function openRecForm(K, rec, isNew){
   const st = RS(K.kind);
   const existing = isNew ? [] : Object.keys(await getRecPhotos(K.kind, rec.id));
   rec = {...rec};
-  if (K.kind === "dayworks" && !isNew){
+  if ((K.kind === "dayworks" || K.kind === "works") && !isNew){
     // pull the labelled details back out of the description so they can be edited
     const p = parseDet(rec.description);
     rec.description = p.work;
@@ -2541,6 +2579,7 @@ $("view").addEventListener("submit", async ev => {
     rec.other = namesList(rec.other).join(", ");
     rec.description = composeDet(rec.description, rec);
   }
+  if (K.kind === "works") rec.description = composeDet(rec.description, {...rec, type: "Daily"});
   // the new detail fields only travel inside the description
   for (const k of Object.keys(rec)) if (k.startsWith("x_") || k.startsWith("_")) delete rec[k];
   $("recSave").disabled = true; $("recMsg").textContent = "Saving on this device…";
@@ -2902,6 +2941,121 @@ async function easOne(id){
 async function easRange(from, to){
   const list = easSorted(mergedRecords("dayworks").filter(r => r.date >= from && r.date <= to && easType(r) === "Variation"));
   return makeEasPdf(list, `EAS - Variations ${easDate(from).replace(/\//g, "-")} to ${easDate(to).replace(/\//g, "-")}.pdf`);
+}
+
+// ================= Daily records weekly report =================
+const fmtDmy = s => { const d = fromIso(s); return d ? `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}` : (s || ""); };
+async function dailyReportPdf(from, to){
+  const recs = mergedRecords("works").filter(r => r.dateFrom <= to && (r.dateTo || r.dateFrom) >= from).sort((a, b) => a.dateFrom.localeCompare(b.dateFrom));
+  if (!recs.length) throw new Error("No daily records for those dates.");
+  const jsPDF = await loadJsPdf(), logo = await navyLogo();
+  const NAVY = "#012060", PALE = "#DCE6F2", GREY = "#5A6478", LINE = "#D5DAE3", AMBER = "#FFF1D6", AMBERL = "#E0A100";
+  const M = 15, W = 180, TOP = 34, BOT = 280;
+  const doc = new jsPDF({unit: "mm", format: "a4"});
+  const name = `Daily records ${fmtDmy(from).replace(/\//g, "-")} to ${fmtDmy(to).replace(/\//g, "-")}.pdf`;
+  doc.setProperties({title: name.replace(/\.pdf$/, ""), author: "New Bridge Form"});
+  const font = (st, sz, col) => { doc.setFont("helvetica", st); doc.setFontSize(sz); doc.setTextColor(col || "#000000"); };
+  const scope = `${fmtDmy(from)} to ${fmtDmy(to)}`;
+  const header = () => {
+    if (logo){ const lw = 38, lh = lw * logo.r; doc.addImage(logo.url, "PNG", M, 8, lw, lh, "nbflogo", "FAST"); }
+    else { font("bold", 14, NAVY); doc.text("NEW BRIDGE FORM", M, 14); }
+    font("normal", 8, GREY); doc.text(EAS_SITE, M, 8 + (logo ? 38 * logo.r : 7) + 4);
+    font("bold", 12, NAVY); doc.text("Weekly Daily Records", M + W, 12, {align: "right"});
+    font("normal", 8.5, GREY); doc.text(scope, M + W, 17.5, {align: "right"});
+    doc.setDrawColor(NAVY); doc.setLineWidth(0.5); doc.line(M, 28, M + W, 28);
+  };
+  header();
+  let y = TOP;
+  const ensure = h => { if (y + h > BOT){ doc.addPage(); header(); y = TOP; } };
+  const lines = (txt, w, sz, st) => { font(st || "normal", sz); return doc.splitTextToSize(String(txt), w); };
+  // title
+  font("bold", 22, NAVY); doc.text("Daily Records", M, y + 6); y += 11;
+  font("normal", 10, GREY); doc.text(`${EAS_SITE}  ·  ${scope}`, M, y); y += 8;
+  // numbers
+  const days = [...new Set(recs.map(r => r.dateFrom))];
+  const info = recs.map(r => ({r, i: wdIssues(r)}));
+  const delayDays = new Set(info.filter(x => x.i.claim).map(x => x.r.dateFrom)).size;
+  const craneDays = new Set(info.filter(x => wdBad(x.i.det.crane)).map(x => x.r.dateFrom)).size;
+  const scafDays = new Set(info.filter(x => wdBad(x.i.det.scaf)).map(x => x.r.dateFrom)).size;
+  const kpis = [[days.length, "Days recorded", ""], [delayDays, "Days with a delay", "Possible claim"], [craneDays, "Crane not available", "Days"], [scafDays, "Scaffold not ready", "Days"]];
+  const kw = (W - 9) / 4;
+  kpis.forEach(([v, l, n], i) => {
+    const x = M + i * (kw + 3), first = i === 0;
+    doc.setFillColor(first ? NAVY : PALE); doc.roundedRect(x, y, kw, 20, 2, 2, "F");
+    font("bold", 18, first ? "#FFFFFF" : NAVY); doc.text(String(v), x + 4, y + 9);
+    font("bold", 8, first ? "#FFFFFF" : NAVY); doc.text(l, x + 4, y + 14);
+    if (n){ font("normal", 7, first ? "#DCE6F2" : GREY); doc.text(n, x + 4, y + 18); }
+  });
+  y += 27;
+  // day by day
+  font("bold", 13, NAVY); doc.text("Day by day", M, y); y += 6;
+  for (const day of days){
+    const list = info.filter(x => x.r.dateFrom === day);
+    ensure(14);
+    doc.setFillColor(PALE); doc.rect(M, y, W, 7, "F");
+    font("bold", 10, NAVY); doc.text(niceYmd(day).replace(/\d\d$/, "") + fromIso(day).getFullYear(), M + 2, y + 4.8); y += 9;
+    for (const {r, i} of list){
+      const d = i.det;
+      const rows = [];
+      if (r.location) rows.push(["Where", r.location]);
+      const work = workText(r.description); if (work) rows.push(["Works done", work]);
+      const crew = menText(r); if (crew) rows.push(["Crew", `${crew} (${r.men || recMen(r)} men)`]);
+      if (d.crane) rows.push(["Crane", d.crane + (d.cranen ? ": " + d.cranen : "")]);
+      if (d.scaf) rows.push(["Scaffolding", d.scaf + (d.scafn ? ": " + d.scafn : "")]);
+      const blocks = rows.map(([k, v]) => [k, lines(v, W - 34, 9)]);
+      const h = blocks.reduce((a, [, ls]) => a + ls.length * 4.2 + 1.6, 0);
+      ensure(Math.min(h, 40));
+      for (const [k, ls] of blocks){
+        ensure(ls.length * 4.2 + 2);
+        font("bold", 8.5, NAVY); doc.text(k, M + 2, y + 3.4);
+        font("normal", 9, "#111111"); ls.forEach((l, n) => doc.text(l, M + 32, y + 3.4 + n * 4.2));
+        y += ls.length * 4.2 + 1.6;
+      }
+      if (d.delay || d.need || i.claim){
+        const txt = [d.delay ? "Delay or dependency: " + d.delay : "", d.need ? "Holds up: " + d.need : "", !d.delay && i.list.length ? i.list.join(". ") : ""].filter(Boolean);
+        const ls = txt.flatMap(t => lines(t, W - 8, 9, "bold"));
+        const bh = ls.length * 4.2 + 4;
+        ensure(bh + 2);
+        doc.setFillColor(AMBER); doc.setDrawColor(AMBERL); doc.setLineWidth(0.3); doc.rect(M, y, W, bh, "FD");
+        font("bold", 9, "#7A4B00"); ls.forEach((l, n) => doc.text(l, M + 3, y + 5 + n * 4.2)); y += bh + 2;
+      }
+      doc.setDrawColor(LINE); doc.setLineWidth(0.2); doc.line(M, y + 1, M + W, y + 1); y += 3;
+    }
+    y += 2;
+  }
+  // delay summary
+  const delays = info.filter(x => x.i.claim && x.i.list.length);
+  ensure(24);
+  font("bold", 13, NAVY); doc.text("Delays and dependencies on JJ Rhatigan", M, y + 2); y += 6;
+  if (!delays.length){ font("normal", 9, GREY); doc.text("None recorded this week.", M, y + 3); y += 8; }
+  else {
+    doc.setFillColor(NAVY); doc.rect(M, y, W, 7, "F");
+    font("bold", 9, "#FFFFFF"); doc.text("Date", M + 2, y + 4.8); doc.text("What happened", M + 28, y + 4.8); y += 7;
+    delays.forEach(({r, i}, n) => {
+      const ls = lines(i.list.join(". "), W - 32, 9);
+      const h = ls.length * 4.2 + 3;
+      ensure(h);
+      if (n % 2) { doc.setFillColor("#F2F5FA"); doc.rect(M, y, W, h, "F"); }
+      font("normal", 9, "#111111"); doc.text(fmtDmy(r.dateFrom), M + 2, y + 4.2);
+      ls.forEach((l, k) => doc.text(l, M + 28, y + 4.2 + k * 4.2)); y += h;
+    });
+    y += 3;
+  }
+  ensure(16);
+  doc.setFillColor(PALE); const note = lines("Crane and scaffolding are provided by JJ Rhatigan. Where either is taken, not erected or not ready, New Bridge Form cannot proceed and the time lost is recorded here as it happens.", W - 6, 8.5);
+  doc.rect(M, y, W, note.length * 4 + 5, "F"); font("normal", 8.5, NAVY); note.forEach((l, k) => doc.text(l, M + 3, y + 5 + k * 4));
+  // footer
+  const n = doc.getNumberOfPages();
+  for (let p = 1; p <= n; p++){
+    doc.setPage(p); font("normal", 7.5, GREY);
+    doc.setDrawColor(LINE); doc.setLineWidth(0.2); doc.line(M, 285, M + W, 285);
+    doc.text("New Bridge Form · Weekly Daily Records · Prepared by Jack Aylward, New Bridge Form", M, 290);
+    doc.text(`Page ${p} of ${n}`, M + W, 290, {align: "right"});
+  }
+  const blob = doc.output("blob");
+  let file = null;
+  try{ file = new File([blob], name, {type: "application/pdf"}); }catch(e){}
+  return {url: "", name, blobUrl: URL.createObjectURL(blob), file, note: "Made on this device. Download it or share it from here."};
 }
 
 // ================= Variation (VO) sheets =================
