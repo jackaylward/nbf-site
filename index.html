@@ -1884,6 +1884,7 @@ const DET_FIELDS = [
   ["delay", "Delay / dependency on JJR", "daily"],
   ["need", "Holds up", "daily"],
   ["claim", "Flag for delay claim", "daily"],
+  ["notes", "Notes", "daily"],
 ];
 const WD_CRANE = ["Available to us", "Not available: taken by JJR", "Not available: used by another trade", "Not available: breakdown", "Not needed today"];
 const WD_SCAF = ["Ready and in use", "Partly ready", "Not erected or not ready", "Not needed today"];
@@ -2075,7 +2076,8 @@ const KINDS = {
       <label class="field">Date<input type="date" data-rf="dateFrom" value="${esc(r.dateFrom)}"></label>`,
     locationLabel: "Zone and level (optional)", locationPlaceholder: "e.g. Zone 1, first floor",
     descLabel: () => "Works done today", descPlaceholder: () => "e.g. Poured columns C3 and C4 in Zone 1, first floor",
-    namesLabel: () => "Names (optional)",
+    noMen: true,
+    extra2Html: r => `<label class="field" style="margin-top:10px">Notes<textarea data-rf="x_notes" maxlength="1000" rows="3" placeholder="Anything else that happened today">${esc(r.x_notes || "")}</textarea></label>`,
     extraHtml: r => {
       const sel = (k, opts) => `<select data-rf="x_${k}"><option value="">Not recorded</option>${opts.map(o => `<option${o === r["x_" + k] ? " selected" : ""}>${esc(o)}</option>`).join("")}</select>`;
       const inp = (k, ph) => `<input data-rf="x_${k}" maxlength="200" value="${esc(r["x_" + k] || "")}" placeholder="${esc(ph)}">`;
@@ -2090,13 +2092,12 @@ const KINDS = {
     },
     rowTag: r => wdIssues(r).claim ? "Delay" : "",
     rowTitle: r => r.location || String(r.description||"").split("\n")[0],
-    rowSub: r => `${r.dateFrom === (r.dateTo||r.dateFrom) ? shortYmd(r.dateFrom) : shortYmd(r.dateFrom) + " – " + shortYmd(r.dateTo)}, ${menText(r)}`,
-    rowSide: r => `<b>${r.men || 0}</b><span class="small muted">men</span>`,
+    rowSub: r => `${r.dateFrom === (r.dateTo||r.dateFrom) ? shortYmd(r.dateFrom) : shortYmd(r.dateFrom) + " – " + shortYmd(r.dateTo)}`,
+    rowSide: r => "",
     detailRows: r => `
       <tr><th>Date</th><td>${r.dateFrom === (r.dateTo||r.dateFrom) ? esc(niceYmd(r.dateFrom)) : `${esc(niceYmd(r.dateFrom))} to ${esc(niceYmd(r.dateTo))}`}</td></tr>
       ${r.location ? `<tr><th>Zone and level</th><td>${esc(r.location)}</td></tr>` : ""}
-      <tr><th>Men</th><td>${esc(menText(r))} (${r.men||recMen(r)} total)</td></tr>
-      ${(d => [["crane", "Crane"], ["scaf", "Scaffolding"], ["delay", "Delay / dependency"], ["need", "Holds up"]].filter(([k]) => d[k]).map(([k, l]) => `<tr><th>${l}</th><td>${esc(d[k])}${k === "crane" && d.cranen ? " (" + esc(d.cranen) + ")" : ""}${k === "scaf" && d.scafn ? " (" + esc(d.scafn) + ")" : ""}</td></tr>`).join(""))(parseDet(r.description).det)}`,
+      ${(d => [["crane", "Crane"], ["scaf", "Scaffolding"], ["delay", "Delay / dependency"], ["need", "Holds up"], ["notes", "Notes"]].filter(([k]) => d[k]).map(([k, l]) => `<tr><th>${l}</th><td>${esc(d[k])}${k === "crane" && d.cranen ? " (" + esc(d.cranen) + ")" : ""}${k === "scaf" && d.scafn ? " (" + esc(d.scafn) + ")" : ""}</td></tr>`).join(""))(parseDet(r.description).det)}`,
     weekSummary: list => `${list.length} this week, ${list.filter(r => wdIssues(r).claim).length} with delays`,
     pdfNote: "Weekly report: a PDF of every daily record between the dates, with the delays and dependencies pulled together. Records with photos: the older Google PDF.",
   },
@@ -2392,14 +2393,14 @@ function recFormHtml(K){
     <datalist id="recLocs">${locs.map(l=>`<option value="${esc(l)}">`).join("")}</datalist>
     ${K.extraHtml ? K.extraHtml(r) : ""}
     <label class="field" style="margin-top:10px">${K.descLabel ? K.descLabel(r) : "Description of works"}<textarea data-rf="description" maxlength="3000" rows="4" placeholder="${esc(K.descPlaceholder ? K.descPlaceholder(r) : "What was done")}">${esc(r.description)}</textarea></label>
-    <div class="formgrid">
+    ${K.noMen ? "" : `<div class="formgrid">
       <label class="field">Chippies<input type="number" min="0" inputmode="numeric" data-rf="chippies" value="${esc(r.chippies)}"></label>
       <label class="field">Fixers<input type="number" min="0" inputmode="numeric" data-rf="fixers" value="${esc(r.fixers)}"></label>
       <label class="field">General operatives<input type="number" min="0" inputmode="numeric" data-rf="operatives" value="${esc(r.operatives)}"></label>
       <label class="field">${K.namesLabel ? K.namesLabel(r) : "Names (optional)"}<input data-rf="other" maxlength="300" value="${esc(r.other)}" placeholder="Who did it, separated by commas"></label>
-    </div>
+    </div>`}
     ${K.namePick ? namePickHtml(r) : ""}
-    <p class="dwcalc" id="recCalc">${K.calc(r)}</p>
+    ${K.noMen ? "" : `<p class="dwcalc" id="recCalc">${K.calc(r)}</p>`}
     ${K.extra2Html ? K.extra2Html(r) : ""}
     <h3 style="margin:14px 0 6px">Photos (${photosNow.length})</h3>
     <div class="dwphotos">
@@ -3025,9 +3026,9 @@ async function dailyReportPdf(from, to){
       const rows = [];
       if (r.location) rows.push(["Where", r.location]);
       const work = workText(r.description); if (work) rows.push(["Works done", work]);
-      const crew = menText(r); if (crew) rows.push(["Crew", `${crew} (${r.men || recMen(r)} men)`]);
       if (d.crane) rows.push(["Crane", d.crane + (d.cranen ? ": " + d.cranen : "")]);
       if (d.scaf) rows.push(["Scaffolding", d.scaf + (d.scafn ? ": " + d.scafn : "")]);
+      if (d.notes) rows.push(["Notes", d.notes]);
       const blocks = rows.map(([k, v]) => [k, lines(v, W - 34, 9)]);
       const h = blocks.reduce((a, [, ls]) => a + ls.length * 4.2 + 1.6, 0);
       ensure(Math.min(h, 40));
