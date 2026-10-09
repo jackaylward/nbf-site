@@ -1,0 +1,421 @@
+<!doctype html>
+<html lang="en-IE"><head><meta charset="utf-8"><meta name="robots" content="noindex,nofollow">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Site Induction Form - New Bridge Form</title>
+<style>
+:root{--navy:#012060;--pale:#DCE6F2;--line:#C9D5E8;--grey:#5b6577;--red:#b00020}
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#f4f6fa;color:#1b2333;font-size:16px;line-height:1.35}
+header{background:#fff;border-bottom:3px solid var(--navy);padding:14px 16px}
+header img{height:40px;display:block}
+header .site{font-size:12px;color:var(--grey);margin-top:4px}
+main{max-width:720px;margin:0 auto;padding:16px}
+h1{color:var(--navy);font-size:1.5rem;margin:6px 0 4px;text-transform:uppercase;letter-spacing:.04em}
+.lead{color:var(--grey);font-size:.92rem;margin:0 0 14px}
+.notice{background:var(--pale);border-radius:10px;padding:12px 14px;font-size:.9rem;color:var(--navy);margin-bottom:16px}
+section{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:16px}
+h2{margin:0 0 12px;font-size:1rem;color:#fff;background:var(--navy);padding:8px 12px;border-radius:8px;text-transform:uppercase;letter-spacing:.05em}
+.f{margin-bottom:12px}
+label,.lab{display:block;font-weight:bold;color:var(--navy);font-size:.88rem;margin-bottom:4px}
+.req::after{content:" *";color:var(--red)}
+input[type=text],input[type=tel],input[type=date],textarea{width:100%;font:inherit;padding:11px;border:1px solid var(--line);border-radius:8px;background:#fff}
+textarea{min-height:70px;resize:vertical}
+input:focus,textarea:focus{outline:2px solid var(--navy);outline-offset:0}
+.yn{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #eef2f8}
+.yn:last-child{border-bottom:0}
+.yn .q{flex:1;font-size:.95rem}
+.seg{display:flex;gap:6px;flex:none}
+.seg label{margin:0;font-weight:bold}
+.seg input{position:absolute;opacity:0;pointer-events:none}
+.seg span{display:inline-block;min-width:58px;text-align:center;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--navy);font-size:.9rem}
+.seg input:checked+span{background:var(--navy);color:#fff;border-color:var(--navy)}
+.seg input:focus-visible+span{outline:2px solid var(--navy);outline-offset:2px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:520px){.row2{grid-template-columns:1fr}}
+.tr{border-top:1px solid #eef2f8;padding:10px 0}
+.tr .n{font-size:.95rem;margin-bottom:6px;color:var(--navy);font-weight:bold}
+.tr .g{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.tr input[type=text]{flex:1;min-width:130px}
+.decl{font-size:.88rem;color:#333;margin:0 0 12px}
+.chk{display:flex;gap:10px;align-items:flex-start;font-weight:normal;color:#1b2333;font-size:.92rem}
+.chk input{width:22px;height:22px;flex:none;margin-top:1px}
+#sigwrap{border:1px dashed var(--navy);border-radius:8px;background:#fff;position:relative}
+#sig{display:block;width:100%;height:170px;touch-action:none;border-radius:8px}
+#sigclear{margin-top:6px;background:none;border:1px solid var(--line);border-radius:8px;padding:8px 12px;color:var(--navy);font:inherit;font-size:.85rem}
+.btn{width:100%;font:inherit;font-weight:bold;font-size:1.05rem;color:#fff;background:var(--navy);border:0;border-radius:10px;padding:15px;margin-top:4px}
+.btn:disabled{opacity:.6}
+.err{color:var(--red);font-size:.85rem;margin-top:4px;display:none}
+.bad .err{display:block}
+.bad input[type=text],.bad input[type=tel],.bad input[type=date],.bad textarea,.bad #sigwrap{border-color:var(--red)}
+#msg{margin:12px 0;padding:12px;border-radius:10px;display:none;font-size:.95rem}
+#msg.bad2{display:block;background:#fdecee;color:var(--red)}
+#done{display:none;text-align:center;padding:30px 16px}
+#done h1{font-size:1.3rem}
+.small{font-size:.8rem;color:var(--grey)}
+</style></head><body>
+<header><img src="induction-logo.png" alt="New Bridge Form"><div class="site">Patrician Secondary School, Newbridge</div></header>
+<main>
+<div id="done">
+  <h1>Thank you</h1>
+  <p>Your site induction personal information form has been submitted.</p>
+  <p class="small">Reference: <b id="doneRef"></b></p>
+  <p>Please report to your inductor or site supervisor. You may now close this page.</p>
+</div>
+<form id="form" novalidate autocomplete="on">
+<h1>Site Induction Form</h1>
+<p class="lead">Personal information and health declaration. Please complete every section. Fields marked * are required.</p>
+<div class="notice"><b>How your information is used:</b> The details you enter are collected by New Bridge Form solely for site induction, safety and emergency purposes on Patrician Secondary School, Newbridge. They are held securely and shared only with the site management team where required for those purposes.</div>
+
+<section id="s-personal"><h2>Personal Details</h2>
+  <div class="f" data-k="name"><label class="req" for="name">Full name</label><input type="text" id="name" autocomplete="name"><div class="err">Please enter your full name.</div></div>
+  <div class="row2">
+    <div class="f"><label for="dob">Date of birth</label><input type="date" id="dob" autocomplete="bday"></div>
+    <div class="f" data-k="mobile"><label class="req" for="mobile">Mobile number</label><input type="tel" id="mobile" autocomplete="tel"><div class="err">Please enter your mobile number.</div></div>
+  </div>
+  <div class="f"><label for="address">Home address</label><textarea id="address" autocomplete="street-address"></textarea></div>
+  <div class="f"><label for="company">Company name (for sub-contractors / agency)</label><input type="text" id="company" autocomplete="organization"></div>
+  <div class="row2">
+    <div class="f"><label for="nationality">Nationality</label><input type="text" id="nationality"></div>
+    <div class="f"><label for="startDate">Start date</label><input type="date" id="startDate"></div>
+  </div>
+  <div class="f" data-k="inductionType"><div class="lab req">Type of induction</div>
+    <div class="seg" id="g-inductionType" style="flex-wrap:wrap"></div><div class="err">Please select the type of induction.</div></div>
+  <div class="f"><label for="jobNumber">Job number (if known)</label><input type="text" id="jobNumber"></div>
+  <div class="yn"><div class="q">Have you worked for JBD before?</div><div class="seg" id="g-workedBefore"></div></div>
+  <p class="small">Proof of ID: the original document (passport, or birth certificate with additional photographic ID) must be verified by your inductor. Employees from outside the EU must also present a valid work permit.</p>
+</section>
+
+<section id="s-kin"><h2>Next of Kin Details</h2>
+  <div class="f" data-k="kinName"><label class="req" for="kinName">Name</label><input type="text" id="kinName"><div class="err">Please enter your next of kin's name.</div></div>
+  <div class="f"><label for="kinRel">Relationship</label><input type="text" id="kinRel"></div>
+  <div class="row2">
+    <div class="f"><label for="kinHome">Home telephone number</label><input type="tel" id="kinHome"></div>
+    <div class="f" data-k="kinEmergency"><label class="req" for="kinEmergency">Emergency telephone number</label><input type="tel" id="kinEmergency"><div class="err">Please enter an emergency telephone number.</div></div>
+  </div>
+</section>
+
+<section id="s-health"><h2>Health and Capability</h2>
+  <div id="healthList"></div>
+  <div class="f" style="margin-top:10px"><label for="healthOther">Other (please specify)</label><input type="text" id="healthOther"></div>
+  <div class="f"><label for="healthDetails">If yes to any of the above, please provide details</label><textarea id="healthDetails"></textarea></div>
+  <div id="medList"></div>
+  <div class="row2" style="margin-top:10px">
+    <div class="f"><label for="medFor">If yes, what for?</label><input type="text" id="medFor"></div>
+    <div class="f"><label for="medWhere">Where is your medication kept?</label><input type="text" id="medWhere"></div>
+  </div>
+  <div id="gpList"></div>
+  <div class="row2" style="margin-top:10px">
+    <div class="f"><label for="gpLast">Date you last visited your GP</label><input type="date" id="gpLast"></div>
+    <div class="f"><label for="gpName">GP name</label><input type="text" id="gpName"></div>
+  </div>
+  <div class="f"><label for="gpTel">GP telephone number</label><input type="tel" id="gpTel"></div>
+  <div class="lab" style="margin-top:14px">Are you aware of any reasons why you cannot work under the following conditions?</div>
+  <div id="condList"></div>
+  <div class="f" style="margin-top:10px"><label for="condOther">Other (please detail)</label><input type="text" id="condOther"></div>
+  <div id="driveList"></div>
+  <p class="small">If you hold a valid UK driving licence, a Data Protection Mandate form must be completed and returned to the office before consent can be given to drive a company vehicle. Convictions information is required for insurance purposes.</p>
+</section>
+
+<section id="s-training"><h2>Training</h2>
+  <p class="small" style="margin-top:0">Proof of any previous training will be required before it is added to your record. Copies of certificates need to be sent to the health and safety department.</p>
+  <div class="f"><label for="cscsNo">CSCS / CPCS registration number</label><input type="text" id="cscsNo"></div>
+  <div id="trainList"></div>
+  <div class="f" style="margin-top:10px"><label for="trainOther">Other training (please detail, with expiry dates)</label><textarea id="trainOther"></textarea></div>
+</section>
+
+<section id="s-decl"><h2>Declaration</h2>
+  <p class="decl">I confirm I have been instructed and understand the contents of the general information for the site Health and Safety and will use my best endeavours to comply with the instructions given. I also confirm that should I observe or encounter any unsafe condition I will report the details to my supervisor so that immediate and appropriate corrective action can be taken. I am aware of the contents and understand the risk assessments / method statements applicable to my work activity and will comply with their requirements. I also confirm JBD have my express written permission to obtain any information concerning any training I may undertake during my employment.</p>
+  <div class="f" data-k="agree"><label class="chk"><input type="checkbox" id="agree"><span>I confirm that I have read and agree to the declaration above, and that the information I have given is accurate.</span></label><div class="err">Please confirm the declaration.</div></div>
+  <div class="f" data-k="sig"><div class="lab req">Signed (inductee)</div>
+    <div id="sigwrap"><canvas id="sig"></canvas></div>
+    <button type="button" id="sigclear">Clear signature</button>
+    <div class="err">Please sign in the box above using your finger.</div></div>
+  <div class="f"><label for="signDate">Date</label><input type="date" id="signDate"></div>
+</section>
+
+<input type="text" id="hp" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;height:0;opacity:0">
+<div id="msg"></div>
+<button class="btn" id="submit" type="submit">Submit form</button>
+<p class="small" style="text-align:center;margin-top:10px">New Bridge Form · Patrician Secondary School, Newbridge</p>
+</form>
+</main>
+<script src="config.js"></script>
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const API = String(window.INDUCTION_API || "").trim();
+const YN = [["Yes","YES"],["No","NO"]];
+const HEALTH = [["disabilities","Disabilities"],["asthma","Asthma"],["heart","Heart conditions"],["eye","Eye conditions"],["epilepsy","Epilepsy"],["allergies","Allergies"],["lung","Lung conditions"],["hearing","Hearing conditions"],["back","Back problems"],["havs","History of hand arm vibration syndrome"]];
+const MED = [["medication","Are you currently taking any medication?"]];
+const GP = [["gpPermission","Do we have permission to contact your GP?"]];
+const COND = [["atHeight","At height"],["belowGround","Below ground"],["confined","In confined spaces"],["breathing","Wearing breathing apparatus"]];
+const DRIVE = [["licence","Do you hold a valid UK driving licence?"],["companyVehicles","Will you be driving company vehicles?"],["convicted","Have you been convicted of a driving offence within the past 5 years?"]];
+const TRAIN = [["cscs","CSCS card"],["cpcs","CPCS card"],["sssts","SSSTS (2 day site supervisor course)"],["firstAid","First aid"],["manual","Manual handling"],["abrasive","Abrasive wheels"],["confinedT","Confined spaces"],["cable","Cable avoidance"],["hav","Hand arm vibration"],["roads","New roads and street works card"]];
+function seg(id, opts){
+  const g = $(id); if (!g) return;
+  const name = id.replace(/^g-/,"");
+  g.innerHTML = opts.map(([v,t]) => `<label><input type="radio" name="${name}" value="${v}"><span>${t}</span></label>`).join("");
+}
+function ynList(el, items){
+  $(el).innerHTML = items.map(([k,t]) => `<div class="yn" data-k="${k}"><div class="q">${t}</div><div class="seg" id="g-${k}"></div></div>`).join("");
+  items.forEach(([k]) => seg("g-"+k, YN));
+}
+ynList("healthList", HEALTH); ynList("medList", MED); ynList("gpList", GP); ynList("condList", COND); ynList("driveList", DRIVE);
+seg("g-workedBefore", YN);
+seg("g-inductionType", [["Initial induction","Initial induction"],["New site","New site"],["Site visitor","Site visitor"]]);
+$("trainList").innerHTML = TRAIN.map(([k,t]) => `<div class="tr"><div class="n">${t}</div><div class="g"><div class="seg" id="g-t_${k}"></div><input type="text" id="x_${k}" placeholder="Expiry date" aria-label="${t} expiry date"></div></div>`).join("");
+TRAIN.forEach(([k]) => seg("g-t_"+k, YN));
+const rad = n => { const r = document.querySelector(`input[name="${n}"]:checked`); return r ? r.value : ""; };
+const val = id => ($(id).value || "").trim();
+const today = () => { const d = new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); };
+const dmy = s => { const m = /^(\d{4})-(\d\d)-(\d\d)$/.exec(s||""); return m ? `${m[3]}/${m[2]}/${m[1]}` : (s||""); };
+$("signDate").value = today();
+
+// signature pad
+const cv = $("sig"), cx = cv.getContext("2d");
+let drawing = false, signed = false, last = null;
+let lastW = 0;
+function sizeCanvas(){
+  const w0 = cv.getBoundingClientRect().width; if (w0 === lastW) return; lastW = w0;
+  const keep = signed ? cv.toDataURL() : null;
+  const r = cv.getBoundingClientRect(), ratio = Math.max(1, window.devicePixelRatio || 1);
+  cv.width = Math.round(r.width*ratio); cv.height = Math.round(r.height*ratio);
+  cx.setTransform(ratio,0,0,ratio,0,0); cx.lineWidth = 2.2; cx.lineCap = cx.lineJoin = "round"; cx.strokeStyle = "#012060";
+  if (keep){ const im = new Image(); im.onload = () => cx.drawImage(im,0,0,r.width,r.height); im.src = keep; }
+}
+sizeCanvas(); window.addEventListener("resize", sizeCanvas);
+const pt = e => { const r = cv.getBoundingClientRect(); return {x:e.clientX-r.left,y:e.clientY-r.top}; };
+cv.addEventListener("pointerdown", e => { e.preventDefault(); cv.setPointerCapture(e.pointerId); drawing = true; last = pt(e); cx.beginPath(); cx.arc(last.x,last.y,1.1,0,6.3); cx.fill(); signed = true; });
+cv.addEventListener("pointermove", e => { if (!drawing) return; e.preventDefault(); const p = pt(e); cx.beginPath(); cx.moveTo(last.x,last.y); cx.lineTo(p.x,p.y); cx.stroke(); last = p; });
+["pointerup","pointercancel","pointerleave"].forEach(ev => cv.addEventListener(ev, () => { drawing = false; }));
+$("sigclear").onclick = () => { cx.clearRect(0,0,cv.width,cv.height); signed = false; };
+
+// load PDF library
+let jsPDFp = null;
+function loadPdf(){
+  if (window.jspdf) return Promise.resolve(window.jspdf.jsPDF);
+  if (!jsPDFp) jsPDFp = new Promise((ok,bad) => {
+    const s = document.createElement("script");
+    s.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
+    s.onload = () => ok(window.jspdf.jsPDF); s.onerror = () => { jsPDFp = null; bad(new Error("Could not load the PDF maker. Please check your signal and try again.")); };
+    document.head.appendChild(s);
+  });
+  return jsPDFp;
+}
+loadPdf().catch(()=>{});
+const logoP = fetch("induction-logo.png").then(r => r.blob()).then(b => new Promise(ok => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.readAsDataURL(b); })).catch(() => null);
+
+function collect(){
+  const d = {};
+  ["name","dob","mobile","address","company","nationality","startDate","jobNumber","kinName","kinRel","kinHome","kinEmergency","healthOther","healthDetails","medFor","medWhere","gpLast","gpName","gpTel","condOther","cscsNo","trainOther","signDate"].forEach(k => d[k] = val(k));
+  d.inductionType = rad("inductionType"); d.workedBefore = rad("workedBefore");
+  [...HEALTH,...MED,...GP,...COND,...DRIVE].forEach(([k]) => d[k] = rad(k));
+  TRAIN.forEach(([k]) => { d["t_"+k] = rad("t_"+k); d["x_"+k] = val("x_"+k); });
+  return d;
+}
+function validate(d){
+  const bad = [];
+  if (!d.name) bad.push("name");
+  if (!d.mobile) bad.push("mobile");
+  if (!d.inductionType) bad.push("inductionType");
+  if (!d.kinName) bad.push("kinName");
+  if (!d.kinEmergency) bad.push("kinEmergency");
+  [...HEALTH,...MED,...GP,...COND,...DRIVE].forEach(([k]) => { if (!d[k]) bad.push(k); });
+  if (!$("agree").checked) bad.push("agree");
+  if (!signed) bad.push("sig");
+  document.querySelectorAll(".bad").forEach(e => e.classList.remove("bad"));
+  bad.forEach(k => { const e = document.querySelector(`[data-k="${k}"]`); if (e) e.classList.add("bad"); });
+  if (bad.length){
+    const first = document.querySelector(".bad"); if (first) first.scrollIntoView({behavior:"smooth",block:"center"});
+    return "Please complete the highlighted fields. Every Yes / No question in Health and Capability must be answered.";
+  }
+  return "";
+}
+
+/* ---------- PDF in the layout of the original paper form (A4 landscape) ---------- */
+async function makePdf(d, ref, sigData){
+  const JsPDF = await loadPdf(), logo = await logoP;
+  const doc = new JsPDF({unit:"pt", format:"a4", orientation:"landscape"});
+  const NAVY=[1,32,96], PALE=[220,230,242], GREY=[110,118,133], LINE=[170,180,198];
+  const M=24, W=842, H=595, GAP=14, CW=(W-2*M-GAP)/2, LX=M, RX=M+CW+GAP;
+  const PAGE_TOP = 62;
+  doc.setLineWidth(.5);
+  // header
+  if (logo) doc.addImage(logo,"PNG",M,14,108,20);
+  doc.setFont("helvetica","normal"); doc.setFontSize(7); doc.setTextColor(...GREY);
+  doc.text("Patrician Secondary School, Newbridge", M, 41);
+  doc.setFont("helvetica","bold"); doc.setFontSize(14); doc.setTextColor(...NAVY);
+  doc.text("Site Induction Personal Information Form", W-M, 26, {align:"right"});
+  doc.setFont("helvetica","normal"); doc.setFontSize(7.5); doc.setTextColor(...GREY);
+  doc.text(`Ref ${ref} · Submitted ${dmy(d.signDate)} · ${d.name}`, W-M, 39, {align:"right"});
+  doc.setDrawColor(...NAVY); doc.setLineWidth(1.2); doc.line(M,48,W-M,48); doc.setLineWidth(.5);
+  // footer
+  doc.setFontSize(6.5); doc.setTextColor(...GREY);
+  doc.text("New Bridge Form · Site Induction Personal Information Form · Patrician Secondary School, Newbridge · CONFIDENTIAL personal data", M, H-14);
+  doc.text("Page 1 of 1", W-M, H-14, {align:"right"});
+  doc.setDrawColor(...LINE);
+
+  let y;
+  const ink = () => { doc.setTextColor(30,35,50); };
+  const lab = () => { doc.setFont("helvetica","bold"); doc.setFontSize(6.6); doc.setTextColor(...NAVY); };
+  function section(x, w, title){
+    doc.setFillColor(...NAVY); doc.rect(x,y,w,11.5,"F");
+    doc.setFont("helvetica","bold"); doc.setFontSize(7.5); doc.setTextColor(255,255,255);
+    doc.text(title.toUpperCase(), x+4, y+8.3); y += 11.5;
+  }
+  // cell: label (small, navy) + value, returns nothing. Draws border.
+  function cell(x, w, h, label, value, o={}){
+    doc.setDrawColor(...LINE); doc.rect(x,y,w,h);
+    lab(); doc.text(label, x+3, y+7.2);
+    if (value){
+      doc.setFont("helvetica","normal"); doc.setFontSize(o.fs||8); ink();
+      const lines = doc.splitTextToSize(String(value), w-6).slice(0, o.max||Math.max(1, Math.floor((h-8)/9.2)));
+      doc.text(lines, x+3, y+15.6);
+    }
+  }
+  function row(cells, h){
+    let x = cells.x0, tot = cells.cols.reduce((a,c)=>a+c[0],0);
+    cells.cols.forEach(([f, label, value, o]) => { const w = cells.w*f/tot; cell(x, w, h, label, value, o); x += w; });
+    y += h;
+  }
+  const R = (x,w,cols,h) => row({x0:x,w,cols},h);
+  const yn = (v) => v === "Yes" ? "YES" : v === "No" ? "NO" : "";
+  // box a labelled yes/no
+  function ynCell(x, w, h, label, v, extra){
+    doc.setDrawColor(...LINE); doc.rect(x,y,w,h);
+    doc.setFont("helvetica","normal"); doc.setFontSize(label.length>30&&h<16?6.2:7.2); ink();
+    const lines = doc.splitTextToSize(label, w-38); doc.text(lines.slice(0,2), x+3, y+(lines.length>1?6.2:(h>13?8:h-4)));
+    doc.setFont("helvetica","bold"); doc.setFontSize(8); doc.setTextColor(...NAVY);
+    const ans = v==="Yes"?"YES":v==="No"?"NO":"";
+    if (ans){ doc.setFillColor(...PALE); doc.roundedRect(x+w-32,y+2,29,h-4,2,2,"F"); doc.text(ans, x+w-17.5, y+h/2+2.8, {align:"center"}); }
+  }
+
+  // ------------- LEFT COLUMN -------------
+  y = PAGE_TOP;
+  section(LX,CW,"Personal Details");
+  R(LX,CW,[[2.2,"Name",d.name],[1,"Date of birth",dmy(d.dob)]],20);
+  R(LX,CW,[[2.2,"Home address",d.address,{max:2}],[1,"Mobile number",d.mobile]],24);
+  R(LX,CW,[[1,"Company name (sub-contractors / agency etc)",d.company]],20);
+  // nationality + induction type
+  {
+    const h=20, w1=CW*.38; cell(LX,w1,h,"Nationality",d.nationality); cell(LX+w1,CW-w1,h,"","");
+    doc.setFont("helvetica","normal"); doc.setFontSize(7); ink();
+    let x = LX+w1+4; ["Initial induction","New site","Site visitor"].forEach(t => {
+      doc.setDrawColor(...NAVY); doc.rect(x,y+6,8,8); if (d.inductionType===t){ doc.setFont("helvetica","bold"); doc.setFontSize(9); doc.setTextColor(...NAVY); doc.text("X",x+1.3,y+13); doc.setFont("helvetica","normal"); doc.setFontSize(7); ink(); }
+      doc.text(t, x+11, y+12.3); x += 11 + doc.getTextWidth(t) + 12; });
+    doc.setDrawColor(...LINE); y += h;
+  }
+  doc.setFillColor(...PALE); doc.setDrawColor(...LINE); doc.rect(LX,y,CW,25,"FD");
+  doc.setFont("helvetica","bold"); doc.setFontSize(6.4); doc.setTextColor(...NAVY);
+  doc.text("Proof of ID – original document to be verified and copy sent to office with this form.", LX+3, y+8);
+  doc.setFont("helvetica","bolditalic"); doc.text("Only a Passport or Birth Certificate (with additional photograph ID) can be accepted.", LX+3, y+15);
+  doc.text("Employees from outside the EU must also present a valid Work Permit.", LX+3, y+22); y += 25;
+  R(LX,CW,[[1,"Job number",d.jobNumber],[1,"Start date",dmy(d.startDate)],[1.3,"Has employee worked for JBD before?",yn(d.workedBefore)]],20);
+  R(LX,CW,[[1.3,"Induction completed by (inductor)",""],[1,"Signed (inductor)",""]],22);
+  y += 4;
+  section(LX,CW,"Next of Kin Details");
+  R(LX,CW,[[1,"Name",d.kinName],[1,"Relationship",d.kinRel]],19);
+  R(LX,CW,[[1,"Home tel no",d.kinHome],[1,"Emergency tel no",d.kinEmergency]],19);
+  y += 4;
+  section(LX,CW,"Health and Capability");
+  const q = 3, cw3 = CW/3, hh = 15;
+  for (let i=0;i<HEALTH.length;i+=3){
+    HEALTH.slice(i,i+3).forEach(([k,t],j) => ynCell(LX+j*cw3,cw3,hh,t,d[k]));
+    if (HEALTH.slice(i,i+3).length<3){ const j=HEALTH.slice(i,i+3).length; cell(LX+j*cw3,CW-j*cw3,hh,"Other",d.healthOther); }
+    y += hh;
+  }
+  if (HEALTH.length%3===0) { cell(LX,CW,hh,"Other",d.healthOther); y += hh; }
+  R(LX,CW,[[1,"If yes to any of the above, please provide details",d.healthDetails,{max:2}]],24);
+  doc.setDrawColor(...LINE);
+  ynCell(LX,CW*.55,15,"Are you currently taking any medication?",d.medication); cell(LX+CW*.55,CW*.45,15,"If yes, what for?",d.medFor); y += 15;
+  R(LX,CW,[[1,"Where is your medication kept?",d.medWhere]],19);
+  ynCell(LX,CW*.55,15,"Do we have permission to contact your GP?",d.gpPermission); cell(LX+CW*.55,CW*.45,15,"",""); y += 15;
+  R(LX,CW,[[1,"Date you last visited your GP",dmy(d.gpLast)],[1.3,"GP name",d.gpName],[1,"GP tel no",d.gpTel]],19);
+  doc.setFont("helvetica","bold"); doc.setFontSize(6.8); doc.setTextColor(...NAVY);
+  doc.setDrawColor(...LINE); doc.rect(LX,y,CW,11); doc.text("Are you aware of any reasons why you can not work under the following conditions?", LX+3, y+7.8); y += 11;
+  for (let i=0;i<4;i+=2){ ynCell(LX,CW/2,14,COND[i][1],d[COND[i][0]]); ynCell(LX+CW/2,CW/2,14,COND[i+1][1],d[COND[i+1][0]]); y += 14; }
+  R(LX,CW,[[1,"Other (please detail)",d.condOther]],18);
+  ynCell(LX,CW*.5,22,"Does the employee hold a valid UK driving licence?",d.licence);
+  doc.setDrawColor(...LINE); doc.rect(LX+CW*.5,y,CW*.5,22); doc.setFont("helvetica","bold"); doc.setFontSize(5.8); doc.setTextColor(...NAVY);
+  doc.text(doc.splitTextToSize("If so, a Data Protection Mandate form MUST be completed and returned to the office before consent can be given to drive a company vehicle", CW*.5-6), LX+CW*.5+3, y+8); y += 22;
+  ynCell(LX,CW,14,"Will you be driving company vehicles?",d.companyVehicles); y += 14;
+  ynCell(LX,CW,15,"Have you been convicted of a driving offence within the past 5 years? (required for insurance purposes)",d.convicted); y += 15;
+
+  // ------------- RIGHT COLUMN -------------
+  y = PAGE_TOP;
+  section(RX,CW,"Induction check list – to be completed by inductor");
+  const CHK = [["Reason for induction explained","Specific site rules"],["Location of risk assessments (inc COSHH)","Environmental policy"],["First aid location & name of first aiders","Name of supervisor"],["Welfare location (toilet & drying room)","Method statements"],["Use of compound","Delivery tickets"],["Plant & tools servicing requirements","Head protection"],["Location of safety policy","Accident reporting"],["Emergency procedures","Scope of contract"],["Restricted areas & plant","WorkSmart / WISE briefing"]];
+  doc.setDrawColor(...LINE); doc.setFont("helvetica","normal"); doc.setFontSize(6.6); ink();
+  CHK.forEach(([a,b]) => { const h=10.5, wl=CW*.36, wb=12;
+    doc.rect(RX,y,wl,h); doc.text(a,RX+3,y+7.4); doc.rect(RX+wl,y,wb,h);
+    doc.rect(RX+wl+wb,y,wl,h); doc.text(b,RX+wl+wb+3,y+7.4); doc.rect(RX+2*wl+wb,y,CW-2*wl-wb,h); y += h; });
+  doc.rect(RX,y,CW,18); doc.setFontSize(6.6); doc.text("Other contract specific issues noted here:",RX+3,y+7.4); y += 22;
+  section(RX,CW,"PPE issued");
+  doc.setFont("helvetica","normal"); doc.setFontSize(6.6); ink();
+  [["Hard hat","Safety boots","Goggles","Gloves"],["Face mask","Wet gear","Ear defenders","High vis vest"]].forEach(r => { const h=10.5, c=CW/4; r.forEach((t,i)=>{ doc.rect(RX+i*c,y,c,h); doc.text(t,RX+i*c+3,y+7.4); doc.rect(RX+(i+1)*c-12,y,12,h); }); y += h; });
+  doc.rect(RX,y,CW*.5,10.5); doc.text("Other:",RX+3,y+7.4); doc.rect(RX+CW*.5,y,CW*.5,10.5); doc.text("Own supplied?",RX+CW*.5+3,y+7.4); y += 14;
+  section(RX,CW,"Training");
+  doc.setFont("helvetica","bolditalic"); doc.setFontSize(6); doc.setTextColor(...GREY);
+  doc.text("Proof of any previous training will be required before it is added to your record. Copies of certificates need to be sent to the health and safety department.", RX, y+7, {maxWidth:CW}); y += 22;
+  // header row
+  doc.setFillColor(...PALE); doc.setDrawColor(...LINE); const cA=CW*.46, cB=CW*.24, cC=CW*.30;
+  doc.rect(RX,y,CW,11,"FD"); doc.setFont("helvetica","bold"); doc.setFontSize(6.8); doc.setTextColor(...NAVY);
+  doc.text("COURSE",RX+3,y+7.8); doc.text("HAVE (YES / NO)",RX+cA+cB/2,y+7.8,{align:"center"}); doc.text("EXPIRY DATE",RX+cA+cB+cC/2,y+7.8,{align:"center"}); y += 11;
+  const trow = (name, have, exp, h=11.5) => { doc.setDrawColor(...LINE); doc.rect(RX,y,cA,h); doc.rect(RX+cA,y,cB,h); doc.rect(RX+cA+cB,y,cC,h);
+    doc.setFont("helvetica","normal"); doc.setFontSize(6.8); ink(); doc.text(name,RX+3,y+7.8);
+    if (have){ doc.setFont("helvetica","bold"); doc.setTextColor(...NAVY); doc.text(have==="Yes"?"YES":"NO",RX+cA+cB/2,y+7.8,{align:"center"}); }
+    if (exp){ doc.setFont("helvetica","normal"); ink(); doc.text(doc.splitTextToSize(exp,cC-6)[0],RX+cA+cB+3,y+7.8); } y += h; };
+  trow("CSCS / CPCS registration number: "+(d.cscsNo||""),"","");
+  TRAIN.forEach(([k,t]) => trow(t, d["t_"+k], d["x_"+k]));
+  { const h=34; doc.setDrawColor(...LINE); doc.rect(RX,y,cA,h); doc.rect(RX+cA,y,cB+cC,h);
+    doc.setFont("helvetica","normal"); doc.setFontSize(6.8); ink(); doc.text("Other (please detail)",RX+3,y+7.8);
+    if (d.trainOther) doc.text(doc.splitTextToSize(d.trainOther,cA-6).slice(0,2),RX+3,y+16); y += h+6; }
+  // declaration
+  doc.setFont("helvetica","bold"); doc.setFontSize(7); doc.setTextColor(...NAVY); doc.text("Declaration",RX,y+6); y += 10;
+  doc.setFont("helvetica","normal"); doc.setFontSize(5.9); ink();
+  const decl = "I confirm I have been instructed and understand the contents of the general information for the site Health and Safety and will use my best endeavours to comply with the instructions given. I also confirm that should I observe or encounter any unsafe condition I will report the details to my supervisor so that immediate and appropriate corrective action can be taken. I am aware of the contents and understand the risk assessments / method statements applicable to my work activity and will comply with their requirements. I also confirm JBD have my express written permission to obtain any information concerning any training I may undertake during my employment.";
+  const dl = doc.splitTextToSize(decl, CW); doc.text(dl, RX, y+5); y += dl.length*7 + 8;
+  doc.setFont("helvetica","bold"); doc.setFontSize(7); doc.setTextColor(...NAVY); doc.text("Signed (inductee):",RX,y+10);
+  if (sigData){ try{ doc.addImage(sigData,"PNG",RX+66,y-8,100,26); }catch(e){} }
+  doc.setDrawColor(...LINE); doc.line(RX+64,y+14,RX+CW*.62,y+14);
+  doc.text("Date:",RX+CW*.68,y+10); doc.setFont("helvetica","normal"); ink(); doc.text(dmy(d.signDate),RX+CW*.68+22,y+10);
+  doc.line(RX+CW*.68+20,y+14,RX+CW,y+14);
+  doc.setFont("helvetica","italic"); doc.setFontSize(5.8); doc.setTextColor(...GREY);
+  doc.text("Declaration confirmed and signed electronically by the inductee on submission.", RX, y+23);
+  return doc;
+}
+
+function sigPng(){
+  const t = document.createElement("canvas"); const w = 400, h = Math.round(400*cv.height/cv.width);
+  t.width = w; t.height = h; t.getContext("2d").drawImage(cv,0,0,w,h); return t.toDataURL("image/png");
+}
+function newRef(){
+  const d = new Date(), p = n => String(n).padStart(2,"0");
+  return "IND-"+d.getFullYear()+p(d.getMonth()+1)+p(d.getDate())+"-"+Math.random().toString(36).slice(2,6).toUpperCase();
+}
+function showMsg(t){ const m = $("msg"); m.textContent = t; m.className = t ? "bad2" : ""; if (t) m.scrollIntoView({behavior:"smooth",block:"center"}); }
+let busy = false;
+$("form").addEventListener("submit", async ev => {
+  ev.preventDefault(); if (busy) return;
+  showMsg("");
+  const d = collect(), problem = validate(d);
+  if (problem){ showMsg(problem); return; }
+  if (!API){ showMsg("This form is not connected yet. Please tell your supervisor."); return; }
+  busy = true; const b = $("submit"); b.disabled = true; b.textContent = "Submitting...";
+  try{
+    const ref = newRef();
+    const sig = sigPng();
+    const doc = await makePdf(d, ref, sig);
+    const pdf = doc.output("datauristring").split(",")[1];
+    const res = await fetch(API, {method:"POST", headers:{"Content-Type":"text/plain;charset=utf-8"}, body: JSON.stringify({ref, fields:d, pdf, hp: val("hp")}), redirect:"follow"});
+    const out = await res.json().catch(() => null);
+    if (!out || !out.ok) throw new Error((out && out.error) || "The form could not be saved.");
+    $("form").style.display = "none"; $("done").style.display = "block"; $("doneRef").textContent = ref; window.scrollTo(0,0);
+  }catch(e){
+    showMsg("Your form has not been saved. Please check your signal and press Submit again. " + (e && e.message ? "("+e.message+")" : ""));
+    b.disabled = false; b.textContent = "Submit form"; busy = false;
+  }
+});
+window.__makePdf = makePdf; window.__collect = collect; // used for testing
+</script>
+</body></html>
