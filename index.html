@@ -1886,6 +1886,7 @@ const DET_FIELDS = [
   ["claim", "Flag for delay claim", "daily"],
   ["notes", "Notes", "daily"],
 ];
+const wdTitle = r => { const d = fromIso(r.dateFrom); return d ? d.toLocaleDateString("en-IE", {weekday: "long", day: "numeric", month: "long", year: "numeric"}) : "Daily record"; };
 const WD_CRANE = ["Available to us", "Not available: taken by JJR", "Not available: used by another trade", "Not available: breakdown", "Not needed today"];
 const WD_SCAF = ["Ready and in use", "Partly ready", "Not erected or not ready", "Not needed today"];
 const wdBad = v => /^Not available|^Not erected|^Partly/.test(v || "");
@@ -2074,7 +2075,7 @@ const KINDS = {
     calc(r){ const men = recMen(r); return fromIso(r.dateFrom) ? `<b>${men} men</b> on ${esc(niceYmd(r.dateFrom))}` : "Pick the date"; },
     dateFields: r => `
       <label class="field">Date<input type="date" data-rf="dateFrom" value="${esc(r.dateFrom)}"></label>`,
-    locationLabel: "Zone and level (optional)", locationPlaceholder: "e.g. Zone 1, first floor",
+    locationLabel: "Working zone and level (optional)", locationPlaceholder: "e.g. Zone 1, first floor",
     descLabel: () => "Works done today", descPlaceholder: () => "e.g. Poured columns C3 and C4 in Zone 1, first floor",
     noMen: true,
     extra2Html: r => `<label class="field" style="margin-top:10px">Notes<textarea data-rf="x_notes" maxlength="1000" rows="3" placeholder="Anything else that happened today">${esc(r.x_notes || "")}</textarea></label>`,
@@ -2091,12 +2092,12 @@ const KINDS = {
         <label class="field">Flag for delay claim<select data-rf="x_claim"><option value="">Automatic</option><option${r.x_claim === "Yes" ? " selected" : ""}>Yes</option></select></label></div>`;
     },
     rowTag: r => wdIssues(r).claim ? "Delay" : "",
-    rowTitle: r => r.location || String(r.description||"").split("\n")[0],
-    rowSub: r => `${r.dateFrom === (r.dateTo||r.dateFrom) ? shortYmd(r.dateFrom) : shortYmd(r.dateFrom) + " – " + shortYmd(r.dateTo)}`,
+    rowTitle: r => wdTitle(r),
+    rowSub: r => r.location || "",
     rowSide: r => "",
     detailRows: r => `
       <tr><th>Date</th><td>${r.dateFrom === (r.dateTo||r.dateFrom) ? esc(niceYmd(r.dateFrom)) : `${esc(niceYmd(r.dateFrom))} to ${esc(niceYmd(r.dateTo))}`}</td></tr>
-      ${r.location ? `<tr><th>Zone and level</th><td>${esc(r.location)}</td></tr>` : ""}
+      ${r.location ? `<tr><th>Working zone and level</th><td>${esc(r.location)}</td></tr>` : ""}
       ${(d => [["crane", "Crane"], ["scaf", "Scaffolding"], ["delay", "Delay / dependency"], ["need", "Holds up"], ["notes", "Notes"]].filter(([k]) => d[k]).map(([k, l]) => `<tr><th>${l}</th><td>${esc(d[k])}${k === "crane" && d.cranen ? " (" + esc(d.cranen) + ")" : ""}${k === "scaf" && d.scafn ? " (" + esc(d.scafn) + ")" : ""}</td></tr>`).join(""))(parseDet(r.description).det)}`,
     weekSummary: list => `${list.length} this week, ${list.filter(r => wdIssues(r).claim).length} with delays`,
     pdfNote: "Weekly report: a PDF of every daily record between the dates, with the delays and dependencies pulled together. Records with photos: the older Google PDF.",
@@ -3067,18 +3068,18 @@ async function dailyReportPdf(from, to){
     for (const {r, i} of list){
       const d = i.det;
       const rows = [];
-      if (r.location) rows.push(["Where", r.location]);
+      if (r.location) rows.push(["Working zone and level", r.location]);
       const work = workText(r.description); if (work) rows.push(["Works done", work]);
       if (d.crane) rows.push(["Crane", d.crane + (d.cranen ? ": " + d.cranen : "")]);
       if (d.scaf) rows.push(["Scaffolding", d.scaf + (d.scafn ? ": " + d.scafn : "")]);
       if (d.notes) rows.push(["Notes", d.notes]);
-      const blocks = rows.map(([k, v]) => [k, lines(v, W - 34, 9)]);
+      const blocks = rows.map(([k, v]) => [k, lines(v, W - 46, 9)]);
       const h = blocks.reduce((a, [, ls]) => a + ls.length * 4.2 + 1.6, 0);
       ensure(Math.min(h, 40));
       for (const [k, ls] of blocks){
         ensure(ls.length * 4.2 + 2);
         font("bold", 8.5, NAVY); doc.text(k, M + 2, y + 3.4);
-        font("normal", 9, "#111111"); ls.forEach((l, n) => doc.text(l, M + 32, y + 3.4 + n * 4.2));
+        font("normal", 9, "#111111"); ls.forEach((l, n) => doc.text(l, M + 44, y + 3.4 + n * 4.2));
         y += ls.length * 4.2 + 1.6;
       }
       if (d.delay || d.need || i.claim){
