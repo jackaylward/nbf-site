@@ -22,13 +22,16 @@ var COLUMNS = [
   ["Cannot wear breathing apparatus","breathing"],["Other restrictions","condOther"],
   ["Valid UK licence","licence"],["Driving company vehicles","companyVehicles"],["Driving offence (5 yrs)","convicted"],
   ["CSCS/CPCS reg no","cscsNo"],
-  ["CSCS card","t_cscs"],["CSCS expiry","x_cscs"],["CPCS card","t_cpcs"],["CPCS expiry","x_cpcs"],["SSSTS","t_sssts"],["SSSTS expiry","x_sssts"],
+  ["SafePass (Solas)","t_cscs"],["SafePass (Solas) expiry","x_cscs"],["CPCS card","t_cpcs"],["CPCS expiry","x_cpcs"],["Supervisor Course","t_sssts"],["Supervisor Course expiry","x_sssts"],
   ["First aid","t_firstAid"],["First aid expiry","x_firstAid"],["Manual handling","t_manual"],["Manual handling expiry","x_manual"],
   ["Abrasive wheels","t_abrasive"],["Abrasive wheels expiry","x_abrasive"],["Confined spaces training","t_confinedT"],["Confined spaces expiry","x_confinedT"],
   ["Cable avoidance","t_cable"],["Cable avoidance expiry","x_cable"],["Hand arm vibration training","t_hav"],["HAV expiry","x_hav"],
   ["New roads & street works","t_roads"],["New roads expiry","x_roads"],["Other training","trainOther"],
   ["Declaration signed date","signDate"],["PDF","pdfUrl"]
 ];
+
+// Earlier column headings, renamed in place so existing sheets keep their data and line up with the new names.
+var RENAMED = { "CSCS card": "SafePass (Solas)", "CSCS expiry": "SafePass (Solas) expiry", "SSSTS": "Supervisor Course", "SSSTS expiry": "Supervisor Course expiry" };
 
 function setup() {
   var s = getSheet_(); getFolder_();
@@ -80,7 +83,11 @@ function getSheet_() {
     sh.getRange(1, 1, 1, heads.length).setValues([heads]).setFontWeight("bold").setBackground("#012060").setFontColor("#ffffff");
     sh.setFrozenRows(1); sh.setFrozenColumns(3);
   }
-  return ss.getSheets()[0];
+  var sheet = ss.getSheets()[0];
+  var head = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0], changed = false;
+  head = head.map(function (h) { if (RENAMED[h]) { changed = true; return RENAMED[h]; } return h; });
+  if (changed) sheet.getRange(1, 1, 1, head.length).setValues([head]);
+  return sheet;
 }
 
 function getFolder_() {

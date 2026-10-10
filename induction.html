@@ -113,7 +113,7 @@ input:focus,textarea:focus{outline:2px solid var(--navy);outline-offset:0}
   <div id="condList"></div>
   <div class="f" style="margin-top:10px"><label for="condOther">Other (please detail)</label><input type="text" id="condOther"></div>
   <div id="driveList"></div>
-  <p class="small">If you hold a valid UK driving licence, a Data Protection Mandate form must be completed and returned to the office before consent can be given to drive a company vehicle. Convictions information is required for insurance purposes.</p>
+  <p class="small">If you hold a valid driving licence, a Data Protection Mandate form must be completed and returned to the office before consent can be given to drive a company vehicle. Convictions information is required for insurance purposes.</p>
 </section>
 
 <section id="s-training"><h2>Training</h2>
@@ -149,8 +149,8 @@ const HEALTH = [["disabilities","Disabilities"],["asthma","Asthma"],["heart","He
 const MED = [["medication","Are you currently taking any medication?"]];
 const GP = [["gpPermission","Do we have permission to contact your GP?"]];
 const COND = [["atHeight","At height"],["belowGround","Below ground"],["confined","In confined spaces"],["breathing","Wearing breathing apparatus"]];
-const DRIVE = [["licence","Do you hold a valid UK driving licence?"],["companyVehicles","Will you be driving company vehicles?"],["convicted","Have you been convicted of a driving offence within the past 5 years?"]];
-const TRAIN = [["cscs","SafePass (Solas)"],["cpcs","CPCS card"],["sssts","Supervisor Course"],["firstAid","First aid"],["manual","Manual handling"],["abrasive","Abrasive wheels"],["confinedT","Confined spaces"],["cable","Cable avoidance"],["hav","Hand arm vibration"],["roads","New roads and street works card"]];
+const DRIVE = [["licence","Do you hold a valid driving licence? (optional)"],["companyVehicles","Will you be driving company vehicles?"],["convicted","Have you been convicted of a driving offence within the past 5 years?"]];
+const TRAIN = [["cscs","SafePass (Solas)"],["cpcs","CPCS card (UK, optional)"],["sssts","Supervisor Course"],["firstAid","First aid"],["manual","Manual handling"],["abrasive","Abrasive wheels"],["confinedT","Confined spaces"],["cable","Cable avoidance"],["hav","Hand arm vibration"],["roads","New roads and street works card (UK, optional)"]];
 function seg(id, opts){
   const g = $(id); if (!g) return;
   const name = id.replace(/^g-/,"");
@@ -220,7 +220,7 @@ function validate(d){
   if (!d.inductionType) bad.push("inductionType");
   if (!d.kinName) bad.push("kinName");
   if (!d.kinEmergency) bad.push("kinEmergency");
-  [...HEALTH,...MED,...GP,...COND,...DRIVE].forEach(([k]) => { if (!d[k]) bad.push(k); });
+  [...HEALTH,...MED,...GP,...COND,...DRIVE].forEach(([k]) => { if (!d[k] && k !== "licence") bad.push(k); });
   if (!$("agree").checked) bad.push("agree");
   if (!signed) bad.push("sig");
   document.querySelectorAll(".bad").forEach(e => e.classList.remove("bad"));
@@ -335,7 +335,7 @@ async function makePdf(d, ref, sigData){
   doc.setDrawColor(...LINE); doc.rect(LX,y,CW,11); doc.text("Are you aware of any reasons why you can not work under the following conditions?", LX+3, y+7.8); y += 11;
   for (let i=0;i<4;i+=2){ ynCell(LX,CW/2,14,COND[i][1],d[COND[i][0]]); ynCell(LX+CW/2,CW/2,14,COND[i+1][1],d[COND[i+1][0]]); y += 14; }
   R(LX,CW,[[1,"Other (please detail)",d.condOther]],18);
-  ynCell(LX,CW*.5,22,"Does the employee hold a valid UK driving licence?",d.licence);
+  ynCell(LX,CW*.5,22,"Does the employee hold a valid driving licence?",d.licence);
   doc.setDrawColor(...LINE); doc.rect(LX+CW*.5,y,CW*.5,22); doc.setFont("helvetica","bold"); doc.setFontSize(5.8); doc.setTextColor(...NAVY);
   doc.text(doc.splitTextToSize("If so, a Data Protection Mandate form MUST be completed and returned to the office before consent can be given to drive a company vehicle", CW*.5-6), LX+CW*.5+3, y+8); y += 22;
   ynCell(LX,CW,14,"Will you be driving company vehicles?",d.companyVehicles); y += 14;
