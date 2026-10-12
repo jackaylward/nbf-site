@@ -118,7 +118,7 @@ input:focus,textarea:focus{outline:2px solid var(--navy);outline-offset:0}
 
 <section id="s-training"><h2>Training</h2>
   <p class="small" style="margin-top:0">Proof of any previous training will be required before it is added to your record. Copies of certificates need to be sent to the health and safety department.</p>
-  <div class="f"><label for="cscsNo">CSCS / CPCS registration number</label><input type="text" id="cscsNo"></div>
+  <div class="f"><label for="cscsNo">SafePass / CPCS registration number (optional)</label><input type="text" id="cscsNo"></div>
   <div id="trainList"></div>
   <div class="f" style="margin-top:10px"><label for="trainOther">Other training (please detail, with expiry dates)</label><textarea id="trainOther"></textarea></div>
 </section>
@@ -365,7 +365,7 @@ async function makePdf(d, ref, sigData){
     doc.setFont("helvetica","normal"); doc.setFontSize(6.8); ink(); doc.text(name,RX+3,y+7.8);
     if (have){ doc.setFont("helvetica","bold"); doc.setTextColor(...NAVY); doc.text(have==="Yes"?"YES":"NO",RX+cA+cB/2,y+7.8,{align:"center"}); }
     if (exp){ doc.setFont("helvetica","normal"); ink(); doc.text(doc.splitTextToSize(exp,cC-6)[0],RX+cA+cB+3,y+7.8); } y += h; };
-  trow("CSCS / CPCS registration number: "+(d.cscsNo||""),"","");
+  trow("SafePass / CPCS registration number (optional): "+(d.cscsNo||""),"","");
   TRAIN.forEach(([k,t]) => trow(t, d["t_"+k], d["x_"+k]));
   { const h=34; doc.setDrawColor(...LINE); doc.rect(RX,y,cA,h); doc.rect(RX+cA,y,cB+cC,h);
     doc.setFont("helvetica","normal"); doc.setFontSize(6.8); ink(); doc.text("Other (please detail)",RX+3,y+7.8);
