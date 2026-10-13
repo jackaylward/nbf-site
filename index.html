@@ -2803,6 +2803,15 @@ const WD_SEEDS = [{
   det: {x_scaf: "Not erected or not ready", x_scafn: "Zone 2 ground floor scaffolding incomplete",
     x_delay: "Scaffolding to the Zone 2 ground floor is incomplete. NBF cannot commence preparatory works for the first floor screed concrete pour in Zone 2 until the scaffolding has been completed and handed over by JJ Rhatigan",
     x_need: "First floor screed concrete pour, Zone 2", x_claim: "Yes"},
+}, {
+  key: "wdSeed20261012", rev: "wdSeed20261012r1", id: "wd-seed-2026-10-12", date: "2026-10-12",
+  location: "Zone 3 ground floor",
+  photos: [1, 2, 3, 4, 5, 6, 7].map(n => `daily-records/2026-10-12-${n}.jpg`),
+  work: "Concrete pour to Walls 35 and 42, ground floor, Zone 3.",
+  det: {x_scaf: "Not erected or not ready", x_scafn: "Zone 2 ground floor scaffolding remains incomplete",
+    x_delay: "Scaffolding to the Zone 2 ground floor remains incomplete, as previously recorded on 9 October 2026. NBF cannot commence preparatory works for the first floor screed concrete pour in Zone 2 until the scaffolding has been completed and handed over by JJ Rhatigan",
+    x_need: "First floor screed concrete pour, Zone 2", x_claim: "Yes",
+    x_notes: "Edge protection and scaffolding were not in place in certain areas, as shown in the photographs."},
 }];
 async function seedDailyRecords(){
   try{ if (S.wdSeeding || !RS("works") || !RS("works").list) return; }catch(e){ return; }
@@ -2827,11 +2836,14 @@ async function seedDailyRecords(){
       }
       if (await kvGet(v.key)) continue;
       if (have){ await kvSet(v.key, true); await kvSet(v.rev, true); continue; }
+      const photos = [];
+      for (const [i, src] of (v.photos || []).entries()){ const data = await srPhotoData({data: src}); if (data) photos.push({name: `${v.id}-p${i + 1}`, data}); }
+      if (photos.length < (v.photos || []).length) continue;   // try again next load
       const rec = {id: v.id, dateFrom: v.date, dateTo: v.date, location: v.location, description: "", chippies: 0, fixers: 0, operatives: 1, other: ""};
       rec.description = composeDet(v.work, {...rec, ...v.det, type: "Daily"});
-      await queueRecordSave("works", rec, [], []);
+      await queueRecordSave("works", rec, photos, []);
       await kvSet(v.key, true); await kvSet(v.rev, true);
-      setStatus("Daily record for Fri 9 Oct added", true);
+      setStatus("Daily record for " + shortYmd(v.date) + " added", true);
       if (S.view === "works") render();
     }
   }catch(e){}
