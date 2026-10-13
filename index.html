@@ -2672,14 +2672,14 @@ const VO_SEEDS = [{
     x_mats: "Fosroc Nitoprime Zincrich Plus zinc-rich primer (1.9 L tin, batch 102890068); Fosroc Renderoc HB45 fibre-reinforced repair mortar (25 kg bags) to follow; plywood for the corner shutter to follow"},
 }, {
   // Tue 13 Oct: temporary support frame under the precast slab at a gap in bearing, room bounded by Walls 33, 66, 51 and 52
-  key: "voSeedPrecastFrameW33", ids: ["dw-vo-precast-frame-w33"], photos: [], whoName: "Paul and Alan", crew: {chippies: 2},
-  days: [["2026-10-13", "08:00", "11:00", "Duration: 3 hours on Tuesday 13 October 2026, 2 carpenters (6 man-hours). Works ongoing: this record will be updated when the works are complete"]],
+  key: "voSeedPrecastFrameW33", ids: ["dw-vo-precast-frame-w33"], photos: [], whoName: "Paul, Alan and Damien", crew: {chippies: 2},
+  days: [["2026-10-13", "08:00", "12:00", "Time breakdown, Tuesday 13 October 2026: erection of the frame, 08:00 to 11:00, 2 carpenters (Paul and Alan), 6 man-hours; lowering of the frame by 275 mm, 1 hour, 2 carpenters (Alan and Damien), 2 man-hours. Total 8 man-hours (shown as 4 hours x 2 carpenters). Works ongoing: this record will be updated when the works are complete"]],
   who: "", location: "Ground floor, Zone 2: Room 034, General Classroom (30), bounded by Wall 33 (gridline 7), Wall 66 (Grid H), Wall 51 (Grid I) and Wall 52 (gridline 8), along Wall 33",
-  work: d => `Erection of a temporary support frame beneath the precast floor slab units along Wall 33, ground floor, Zone 2, in Room 034, General Classroom (30), bounded by Walls 33, 66, 51 and 52 (gridlines 7 to 8, Grids H to I; room per Healy Partners Ground Floor Plan AR-10010). The frame, formed with adjustable steel props, steel beams and timber bearers on an access tower, supports the precast units where there is a gap in their bearing, as shown in the attached photographs. ${d}.`,
+  work: d => `Erection of a temporary support frame beneath the precast floor slab units along Wall 33, ground floor, Zone 2, in Room 034, General Classroom (30), bounded by Walls 33, 66, 51 and 52 (gridlines 7 to 8, Grids H to I; room per Healy Partners Ground Floor Plan AR-10010). The frame, formed with adjustable steel props, steel beams and timber bearers on an access tower, supports the precast units where there is a gap in their bearing, as shown in the attached photographs. Following erection of the frame to the height given, the site engineers instructed that it be lowered by 275 mm; the frame was then lowered and re-set at the revised level, as shown in the attached photographs. ${d}.`,
   det: {x_zone: "Zone 2",
     x_why: "Temporary support to the precast slab units is not part of NBF's in-situ formwork works and is outside NBF's agreed scope and price",
     x_co: "JJ Rhatigan",
-    x_qty: "1 no. temporary support frame beneath the precast slab units along Wall 33 (works ongoing)",
+    x_qty: "1 no. temporary support frame beneath the precast slab units along Wall 33; subsequently lowered by 275 mm at the site engineers' request (works ongoing)",
     x_plant: "Adjustable steel props, steel beams, timber bearers, access tower and stepladder"},
 }];
 async function seedVariations(){
@@ -2718,7 +2718,7 @@ async function seedVariations(){
 // one-off fix (Jack, 13 Oct): support frame at Wall 33 is 3 hours (08:00 to 11:00, 6 man-hours), in Room 034
 async function patchFrameW33(){
   try{
-    if (!RS("dayworks") || !RS("dayworks").list || await kvGet("voPatchFrameW33")) return;
+    if (!RS("dayworks") || !RS("dayworks").list || await kvGet("voPatchFrameW33b")) return;
     const K = KINDS.dayworks, v = VO_SEEDS.find(x => x.key === "voSeedPrecastFrameW33"), all = mergedRecords("dayworks");
     const r = all.find(x => x.id === v.ids[0]);
     if (!r) return;
@@ -2726,12 +2726,12 @@ async function patchFrameW33(){
     const rec = {};
     K.textFields.forEach(k => rec[k] = r[k] == null ? "" : r[k]);
     ["chippies", "fixers", "operatives"].forEach(k => rec[k] = +r[k] || 0);
-    Object.assign(rec, {date, start, end, location: v.location});
+    Object.assign(rec, {date, start, end, location: v.location, other: v.whoName}, v.crew);
     const kept = {};
-    Object.entries(parseDet(r.description).det).forEach(([k, val]) => { if (val) kept["x_" + k] = val; });
-    rec.description = composeDet(v.work(day), {...rec, ...kept, x_ref: kept.x_ref || nextRef("Variation")});
+    Object.entries(parseDet(r.description).det).forEach(([k, val]) => { if (val && k !== "qty") kept["x_" + k] = val; });
+    rec.description = composeDet(v.work(day), {...rec, ...kept, x_qty: v.det.x_qty, x_ref: kept.x_ref || nextRef("Variation")});
     await queueRecordSave("dayworks", rec, [], []);
-    await kvSet("voPatchFrameW33", true);
+    await kvSet("voPatchFrameW33b", true);
     if (S.view === "dayworks") render();
   }catch(e){}
 }
