@@ -3950,7 +3950,8 @@ function poursHtml(){
     <select aria-label="Paper size" onchange="S.pourSize=this.value" style="padding:6px 8px;font-size:.85rem;border:1px solid var(--line);border-radius:10px;background:var(--card)">${[["a3","A3"],["a2","A2"],["a1","A1"],["a4","A3 plan + A4 list"]].map(([v, l]) => `<option value="${v}"${(S.pourSize || "a3") === v ? " selected" : ""}>${l}</option>`).join("")}</select>
     <button class="btn" data-ppdf style="padding:6px 14px;font-size:.85rem">Download plan PDF</button>
     <button class="btn ghost" data-ppdf data-pprint style="padding:6px 14px;font-size:.85rem">Print</button>
-    <button class="btn ghost" data-preport style="padding:6px 14px;font-size:.85rem">Make report</button></div>
+    <button class="btn ghost" data-preport style="padding:6px 14px;font-size:.85rem">Make report</button>
+    <button class="btn ghost" data-permitall style="padding:6px 14px;font-size:.85rem">Download all permits</button></div>
   <div class="pourwrap">
     <div class="plancard">${planSvg()}
       <div class="plantools"><button data-pzoom="1.6" aria-label="Zoom in">+</button><button data-pzoom="0.625" aria-label="Zoom out">−</button><button data-pzoom="fit" aria-label="Fit whole floor" style="font-size:.7rem">FIT</button></div>
@@ -3981,6 +3982,7 @@ function pourPanelHtml(){
     </div>
     <p class="muted" style="margin:-4px 0 12px;font-size:.85rem">${pourEst(e.i, p) ? `Estimate from the drawing: ${m3(pourEst(e.i, p))} m³ (${pourSize(e.i).len.toFixed(2)} m × ${pourSize(e.i).thk} mm × ${num(p.height)} m, doors left out). Put the docket figure in to override it.` : "Put in the pour height and it works out the concrete from the drawing, or type the docket figure."}</p>
     <label class="field">Notes<textarea id="pNotes" rows="2" placeholder="Pour no., docket, concrete grade" ${S.edit ? "" : "readonly"}>${esc(p.notes || "")}</textarea></label>
+    ${permitPanelHtml(e.i, p, ro)}
     <div class="field">Photos</div>
     ${(photos && photos.length) ? `<div class="pourphotos">${photos.map((ph, i) => `<img src="${ph.thumb || ph.data}" alt="Pour photo ${e.i}" data-pbig="${i}" decoding="async">`).join("")}</div>` : nPh ? (photos ? `<div class="pourphotos">${photos.map((ph, i) => `<img src="${ph.thumb || ph.data}" alt="Pour photo ${e.i}" data-pbig="${i}" decoding="async">`).join("")}</div>` : `<p class="muted">Loading ${nPh} photo${nPh > 1 ? "s" : ""}…</p>`) : `<p class="muted">No photos yet.</p>`}
     ${(photos || []).some(x => x.id === "new") ? `<p class="muted" style="margin:4px 0 8px;font-size:.85rem">${photos.filter(x => x.id === "new").length} photo(s) saved on this phone, still sending to Google.</p>` : ""}
@@ -4001,8 +4003,8 @@ async function loadPours(){
   if (S.view === "pours") render();
 }
 // saved on the phone first, then sent to Google; retried until it gets through
-async function savePourLocal(pid, rec, newPhoto, noFlush){
-  const id = pk(pid);
+const savePourLocal = (pid, rec, newPhoto, noFlush) => savePourKey(pk(pid), rec, newPhoto, noFlush);
+async function savePourKey(id, rec, newPhoto, noFlush){
   const pend = (await kvGet("pourPending")) || {};
   const j = pend[id] || {rec: {}, photos: []};
   const keep = (j.rec && j.rec.photos) || [];
@@ -4100,6 +4102,8 @@ function readPour(){
   if ($("pNotes")) rec.notes = $("pNotes").value.trim();
   if ($("pHeight")) rec.height = num($("pHeight").value) ? String(num($("pHeight").value)) : "";
   if ($("pVol")) rec.vol = num($("pVol").value) ? String(num($("pVol").value)) : "";
+  if ($("pPermit")) rec.permit = $("pPermit").value.trim();
+  if ($("pPTime")) rec.ptime = $("pPTime").value;
   rec.photos = cur.photos || [];
   return rec;
 }
@@ -4110,6 +4114,7 @@ $("view").addEventListener("change", async ev => {
   const id = S.pourSel, rec = readPour();
   const had = S.pours[id] && S.pours[id].status;
   if (!rec.status && had && !(await ask(`Mark ${pourName(id)} as not poured? Its date, variation, notes and photo links are removed.`, "Mark not poured", true))){ render(); return; }
+  if (ev.target.id === "pPermit" || ev.target.id === "pPTime"){ await permitSave(permitGroupOf(id), rec.permit, rec.ptime); render(); return; }
   await savePourLocal(id, rec);
   render();
 });
@@ -4121,6 +4126,8 @@ $("view").addEventListener("click", async ev => {
   if (f){ S.pourFilter = S.pourFilter === f.dataset.pfilter ? "" : f.dataset.pfilter; render(); return; }
   if (ev.target.closest("[data-ppdf]")){ pourPdf(ev.target.closest("[data-ppdf]")); return; }
   if (ev.target.closest("[data-preport]")){ pourReport(ev.target.closest("[data-preport]")); return; }
+  if (ev.target.closest("[data-permit]")){ permitPdf(ev.target.closest("[data-permit]"), S.pourSel); return; }
+  if (ev.target.closest("[data-permitall]")){ permitPdf(ev.target.closest("[data-permitall]"), null); return; }
   const z = ev.target.closest("[data-pzoom]");
   if (z){ if (z.dataset.pzoom === "fit") fitView(); else zoomPlan(+z.dataset.pzoom); pourRefresh(); return; }
   if (ev.target.closest("[data-pbig]")){ const ph = ((S.pourPhotos[pk(S.pourSel)] || [])[+ev.target.closest("[data-pbig]").dataset.pbig]) || {}; const m = document.createElement("div"); m.className = "pourbig"; m.innerHTML = `<img src="${ph.data || ev.target.src}" alt="Pour photo">`; m.onclick = () => m.remove(); document.body.appendChild(m); return; }
@@ -4574,6 +4581,138 @@ async function pourReport(btn){
     setStatus(missed ? `Report ready. Photos for ${missed} wall${missed === 1 ? "" : "s"} couldn't be loaded` : "Report ready", !missed);
   }catch(e){ setStatus(errText(e, "Couldn't make the report")); }
   if (btn){ btn.disabled = false; btn.textContent = label; }
+}
+// ================= permits to load (JJ Rhatigan form), one per pour =================
+// a pour = every wall and column on one floor with the same pour date; the permit number and
+// time of loading are saved on each of them, so any wall in the pour opens the same permit
+const PERMIT = {drawing: "NH-5417-300", desc: "RC Frame", offeree: "Denis O'Riordan", company: "New Bridge Form", first: 32, time: "14:00"};
+function permitGroups(){
+  const out = {};
+  for (const [f, F] of Object.entries(FLOORS)){
+    for (const id of [...new Set(F.plan.els.map(e => e.i))]){
+      const p = (S.poursAll || {})[F.key + id];
+      if (!pourState(p) || !p.date) continue;
+      const g = out[f + p.date] = out[f + p.date] || {f, date: p.date, ids: [], permit: "", ptime: ""};
+      g.ids.push(id);
+      if (p.permit && !g.permit) g.permit = p.permit;
+      if (p.ptime && !g.ptime) g.ptime = p.ptime;
+    }
+  }
+  return Object.values(out).sort((a, b) => a.date.localeCompare(b.date) || (a.f === "gf" ? -1 : 1));
+}
+const permitGroupOf = id => permitGroups().find(g => g.f === S.pourFloor && g.ids.includes(id)) || null;
+function permitNext(){
+  const nums = Object.values(S.poursAll || {}).map(p => p && parseInt(p.permit, 10)).filter(n => n > 0);
+  return Math.max(PERMIT.first - 1, ...nums) + 1;
+}
+const permitNo = n => /^\d+$/.test(String(n)) ? String(n).padStart(3, "0") : String(n || "");
+// "Walls 17 and 41", plus any columns, in drawing order
+function permitStructure(g){
+  const plan = FLOORS[g.f].plan, names = plan.names || {};
+  const nm = id => names[id] || String(parseInt(id.slice(1), 10));
+  const walls = [...new Set(g.ids.filter(i => i[0] === "W").sort((a, b) => parseInt(a.slice(1)) - parseInt(b.slice(1)) || a.localeCompare(b)).map(nm))];
+  const cols = g.ids.filter(i => i[0] === "C").map(i => names[i] || i);
+  const list = a => a.length < 2 ? a.join("") : a.slice(0, -1).join(", ") + " and " + a[a.length - 1];
+  return [walls.length ? `Wall${walls.length > 1 ? "s" : ""} ${list(walls)}` : "", list(cols)].filter(Boolean).join("; ") + `, ${FLOORS[g.f].name}`;
+}
+function permitPanelHtml(id, p, ro){
+  if (!pourState(p)) return "";
+  const g = permitGroupOf(id);
+  if (!g) return "";
+  const others = g.ids.length > 1 ? `This permit covers everything poured on the ${S.pourFloor === "ff" ? "first" : "ground"} floor on ${dmy(g.date)}: ${esc(permitStructure(g).replace(/, (Ground|First) floor$/, ""))}.` : `Pour of ${dmy(g.date)}.`;
+  return `<div class="field">Permit to load</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <label class="field">Permit no.<input id="pPermit" inputmode="numeric" maxlength="12" value="${esc(g.permit)}" placeholder="next: ${permitNo(permitNext())}" ${ro}></label>
+      <label class="field">Time of loading<input type="time" id="pPTime" value="${esc(g.ptime || PERMIT.time)}" ${ro}></label>
+    </div>
+    <p class="muted" style="margin:-4px 0 8px;font-size:.85rem">${others}${g.permit ? "" : " The next number is filled in when you make the permit in Edit mode."}</p>
+    <div style="display:flex;gap:8px;margin-bottom:12px"><button class="btn" data-permit style="flex:1">${PDF_ICON}Permit to load</button></div>`;
+}
+async function permitSave(g, permit, ptime){
+  if (!g) return;
+  for (const i of g.ids){ const k = FLOORS[g.f].key + i, cur = S.poursAll[k]; if (cur) await savePourKey(k, {...cur, permit: permit || "", ptime: ptime || ""}, null, true); }
+  flushPours();
+}
+function permitPage(doc, g){
+  const M = 15, W = 180, INK = "#1a1a1a", BAND = "#2b2326";
+  const box = (x, y, w, h, fill) => { if (fill){ doc.setFillColor(fill); doc.rect(x, y, w, h, "FD"); } else doc.rect(x, y, w, h); };
+  const font = (st, sz, col) => { doc.setFont("helvetica", st); doc.setFontSize(sz); doc.setTextColor(col || INK); };
+  const mid = (t, x, y, w, h, o) => doc.text(t, x + w / 2, y + h / 2 + 1.3, {align: "center", ...(o || {})});
+  const left = (t, x, y, h) => doc.text(t, x + 2.5, y + h / 2 + 1.3);
+  const hand = (t, x, y, w, h) => { font("normal", 13, "#1f2f8f"); mid(t, x, y, w, h); };   // filled-in values in blue, like the handwritten ones
+  const d = fromIso(g.date), day = d ? `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getFullYear()).slice(2)}` : "";
+  const t = g.ptime || PERMIT.time;
+  doc.setDrawColor(INK); doc.setLineWidth(0.4);
+  let y = 14;
+  // title band
+  doc.setFillColor(BAND); doc.rect(M, y, 135, 16, "F");
+  font("bold", 13, "#FFFFFF"); doc.text("Permit to Load", M + 67.5, y + 6.5, {align: "center"});
+  { const tw = doc.getTextWidth("Permit to Load"); doc.setLineWidth(0.3); doc.setDrawColor("#FFFFFF"); doc.line(M + 67.5 - tw / 2, y + 7.5, M + 67.5 + tw / 2, y + 7.5); doc.setDrawColor(INK); doc.setLineWidth(0.4); }
+  font("normal", 9.5, "#FFFFFF");
+  { let x = M + 3; ["(Permit to Load", "Permit to Pour Concrete", "Permit to Strike)"].forEach((p, i) => {
+    if (i){ doc.setDrawColor("#FFFFFF"); doc.setFillColor("#FFFFFF"); doc.line(x + 1, y + 12, x + 5, y + 12); doc.triangle(x + 5, y + 11, x + 5, y + 13, x + 6.5, y + 12, "F"); x += 8.5; }
+    doc.text(p, x, y + 13); x += doc.getTextWidth(p) + 1; }); doc.setDrawColor(INK); }
+  font("bold", 17, "#3a3a3a"); doc.text("Rhatigan", M + W, y + 7, {align: "right"});
+  font("normal", 6, "#3a3a3a"); doc.text("J.J. Rhatigan & Company", M + W, y + 10.5, {align: "right"});
+  y += 18;
+  const c1 = 48, c2 = W - c1;
+  // permit no row
+  box(M, y, 85, 11); box(M + 85, y, 45, 11); box(M + 130, y, 50, 11);
+  font("italic", 10); left("Temporary Works/Permanent Structures", M, y, 11);
+  font("normal", 10.5); mid("Permit No:", M + 85, y, 45, 11);
+  hand(permitNo(g.permit), M + 130, y, 50, 11); y += 11;
+  const row = (label, val, h) => { box(M, y, c1, h); box(M + c1, y, c2, h); font("normal", 10.5); const ls = doc.splitTextToSize(label, c1 - 4); ls.forEach((l, i) => doc.text(l, M + c1 / 2, y + h / 2 + 1.3 - (ls.length - 1) * 2.2 + i * 4.4, {align: "center"})); if (val){ const vs = doc.splitTextToSize(val, c2 - 6); font("normal", vs.length > 1 ? 11 : 13, "#1f2f8f"); vs.forEach((l, i) => doc.text(l, M + c1 + c2 / 2, y + h / 2 + 1.5 - (vs.length - 1) * 2.4 + i * 4.8, {align: "center"})); } y += h; };
+  row("Structure:", permitStructure(g), 9);
+  row("Description of Works", PERMIT.desc, 9);
+  row("Proposed Date/Time of loading", `${day}  ${t}`, 12);
+  const para = (head, lines) => {
+    box(M, y, W, 6); font("bold", 10.5); mid(head, M, y, W, 6); y += 6;
+    font("italic", 10); const ls = lines.flatMap(p => [...doc.splitTextToSize(p, W - 6), ""]).slice(0, -1);
+    const h = ls.length * 4.6 + 5; box(M, y, W, h); ls.forEach((l, i) => doc.text(l, M + 3, y + 5.5 + i * 4.6)); y += h;
+  };
+  para("PART 1", ["Temporary works to the section of works/structure described above are now complete in accordance with the drawings and amendments listed below. I have carried out a preliminary inspection and am satisfied that the temporary works are ready for loading, subject to the final inspection by the Temporary Works Engineering if required.",
+    "I am familiar with the design restraints that have been imposed on the loading of the temporary works and have communicated these to the supervisor responsible for these works"]);
+  row("Reference to the following drawings, schedules and amendments", PERMIT.drawing, 22);
+  const sig = (l1, v1, l2, v2, h) => { const cw = [c1, 70, 28, 34]; let x = M; [l1, v1, l2, v2].forEach((v, i) => { box(x, y, cw[i], h); if (i % 2 === 0){ font("normal", 10); const ls = String(v).split("\n"); ls.forEach((l, k) => doc.text(l, x + cw[i] / 2, y + h / 2 + 1.3 - (ls.length - 1) * 2 + k * 4, {align: "center"})); } else if (v) hand(v, x, y, cw[i], h); x += cw[i]; }); y += h; };
+  sig("Print:\n(Offeree for inspection)", PERMIT.offeree, "Date:", day, 9);
+  sig("Signed:", "", "Time:", t, 9);
+  sig("Company:", PERMIT.company, "", "", 9);
+  para("PART 2", ["I have visually inspected the temporary works to the section of works/location as described above and have found that they have been properly erected in accordance with the drawings and approved amendments"]);
+  sig("Print:\n(TW Engineer/Co-ordinator)", "", "Date:", "", 9);
+  sig("Signed:\n(TW Engineer/Co-ordinator)", "", "Time:", "", 9);
+  sig("Company:", "", "", "", 9);
+  sig("Print:\n(Engineer JJR)", "", "Date:", "", 9);
+  sig("Signed:\n(Engineer JJR)", "", "Time:", "", 9);
+  box(M, y, W, 11); font("bold", 12); mid("THESE TEMPORARY WORKS CAN NOW BE LOADED", M, y, W, 11);
+  { const tw = doc.getTextWidth("THESE TEMPORARY WORKS CAN NOW BE LOADED"); doc.setLineWidth(0.3); doc.line(M + (W - tw) / 2, y + 7.4, M + (W + tw) / 2, y + 7.4); doc.setLineWidth(0.4); } y += 11;
+  font("normal", 14, "#d32f2f"); doc.text("Please complete stage two – Permit to Pour Concrete", M + W / 2, y + 14, {align: "center"});
+  doc.setDrawColor("#d32f2f"); doc.line(M + 8, y + 15.5, M + W - 8, y + 15.5); doc.setDrawColor(INK);
+}
+async function permitPdf(btn, id){
+  const label = btn ? btn.innerHTML : "";
+  if (btn){ btn.disabled = true; btn.textContent = "Making permit…"; }
+  try{
+    let groups = id ? [permitGroupOf(id)].filter(Boolean) : permitGroups();
+    if (!groups.length) throw new Error(id ? "Set this wall as poured with a date first." : "No pours with a date yet.");
+    // give a number to any pour that hasn't got one yet, in date order
+    if (S.edit){
+      for (const g of (id ? groups : permitGroups())){
+        if (g.permit) continue;
+        await permitSave(g, String(permitNext()), g.ptime || PERMIT.time);
+      }
+      groups = id ? [permitGroupOf(id)].filter(Boolean) : permitGroups();
+    }
+    const jsPDF = await loadJsPdf();
+    const doc = new jsPDF({unit: "mm", format: "a4"});
+    groups.forEach((g, i) => { if (i) doc.addPage(); permitPage(doc, g); });
+    const name = id ? `Permit to Load ${permitNo(groups[0].permit)} (${dmy(groups[0].date).replace(/\//g, "-")}).pdf` : `Permits to Load ${dmy(groups[0].date).replace(/\//g, "-")} to ${dmy(groups[groups.length - 1].date).replace(/\//g, "-")}.pdf`;
+    const blob = doc.output("blob"), url = URL.createObjectURL(blob), a = document.createElement("a");
+    a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
+    setStatus(`${groups.length > 1 ? groups.length + " permits" : "Permit"} ready`, true);
+  }catch(e){ setStatus(errText(e, "Couldn't make the permit")); }
+  if (btn){ btn.disabled = false; btn.innerHTML = label; }
+  if (S.view === "pours") render();
 }
 function zoomPlan(f, cx, cy){
   const v = S.pourView;
