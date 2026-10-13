@@ -4102,7 +4102,6 @@ function readPour(){
   if ($("pNotes")) rec.notes = $("pNotes").value.trim();
   if ($("pHeight")) rec.height = num($("pHeight").value) ? String(num($("pHeight").value)) : "";
   if ($("pVol")) rec.vol = num($("pVol").value) ? String(num($("pVol").value)) : "";
-  if ($("pPermit")) rec.permit = $("pPermit").value.trim();
   if ($("pPTime")) rec.ptime = $("pPTime").value;
   rec.photos = cur.photos || [];
   return rec;
@@ -4114,7 +4113,7 @@ $("view").addEventListener("change", async ev => {
   const id = S.pourSel, rec = readPour();
   const had = S.pours[id] && S.pours[id].status;
   if (!rec.status && had && !(await ask(`Mark ${pourName(id)} as not poured? Its date, variation, notes and photo links are removed.`, "Mark not poured", true))){ render(); return; }
-  if (ev.target.id === "pPermit" || ev.target.id === "pPTime"){ await permitSave(permitGroupOf(id), rec.permit, rec.ptime); render(); return; }
+  if (ev.target.id === "pPTime"){ await permitSave(permitGroupOf(id), rec.ptime); render(); return; }
   await savePourLocal(id, rec);
   render();
 });
@@ -4585,7 +4584,23 @@ async function pourReport(btn){
 // ================= permits to load (JJ Rhatigan form), one per pour =================
 // a pour = every wall and column on one floor with the same pour date; the permit number and
 // time of loading are saved on each of them, so any wall in the pour opens the same permit
-const PERMIT = {drawing: "NH-5417-300", desc: "RC Frame", offeree: "Denis O'Riordan", company: "New Bridge Form", contract: "Patrician Secondary School", first: 32, time: "14:00"};
+const PERMIT = {drawing: "NH-5417-300", desc: "RC Frame", offeree: "Denis O'Riordan", company: "New Bridge Form", contract: "Patrician Secondary School", time: "14:00"};
+// JJ Rhatigan logo (rhatigan-logo.png, transparent), loaded once for the permits
+let permitLogoImg = null;
+function loadPermitLogo(){
+  if (permitLogoImg) return permitLogoImg;
+  return permitLogoImg = new Promise(ok => {
+    const im = new Image();
+    im.onload = () => { try{ const c = document.createElement("canvas"); c.width = im.naturalWidth; c.height = im.naturalHeight; c.getContext("2d").drawImage(im, 0, 0); ok({url: c.toDataURL("image/png"), r: im.naturalHeight / im.naturalWidth}); }catch(e){ ok(null); } };
+    im.onerror = () => { permitLogoImg = null; ok(null); };
+    im.src = "rhatigan-logo.png";
+  });
+}
+let permitLogoData = null;
+function permitLogo(doc, right, y){
+  if (permitLogoData){ const w = 38, h = w * permitLogoData.r; doc.addImage(permitLogoData.url, "PNG", right - w, y + 1, w, h, "rhatlogo", "FAST"); return; }
+  doc.setFont("helvetica", "bold"); doc.setFontSize(17); doc.setTextColor("#6a1f45"); doc.text("Rhatigan", right, y + 7, {align: "right"});
+}
 function permitGroups(){
   const out = {};
   for (const [f, F] of Object.entries(FLOORS)){
@@ -4594,17 +4609,19 @@ function permitGroups(){
       if (!pourState(p) || !p.date) continue;
       const g = out[f + p.date] = out[f + p.date] || {f, date: p.date, ids: [], permit: "", ptime: ""};
       g.ids.push(id);
-      if (p.permit && !g.permit) g.permit = p.permit;
       if (p.ptime && !g.ptime) g.ptime = p.ptime;
     }
   }
-  return Object.values(out).sort((a, b) => a.date.localeCompare(b.date) || (a.f === "gf" ? -1 : 1));
+  return permitNumbers(Object.values(out).sort((a, b) => a.date.localeCompare(b.date) || (a.f === "gf" ? -1 : 1)));
+}
+// numbers run in date order from Jack's anchor: the pour of 12/10/26 is load permit 33 and strike permit 31
+const PERMIT_ANCHOR = {date: "2026-10-12", load: 33, strike: 31};
+function permitNumbers(groups){
+  let a = -1; groups.forEach((g, i) => { if (g.date <= PERMIT_ANCHOR.date) a = i; });
+  groups.forEach((g, i) => { const n = PERMIT_ANCHOR.load + i - a; g.permit = n > 0 ? String(n) : ""; g.strikeNo = PERMIT_ANCHOR.strike + i - a > 0 ? String(PERMIT_ANCHOR.strike + i - a) : ""; });
+  return groups;
 }
 const permitGroupOf = id => permitGroups().find(g => g.f === S.pourFloor && g.ids.includes(id)) || null;
-function permitNext(){
-  const nums = Object.values(S.poursAll || {}).map(p => p && parseInt(p.permit, 10)).filter(n => n > 0);
-  return Math.max(PERMIT.first - 1, ...nums) + 1;
-}
 const permitNo = n => /^\d+$/.test(String(n)) ? String(n).padStart(3, "0") : String(n || "");
 // "Walls 17 and 41", plus any columns, in drawing order
 function permitStructure(g){
@@ -4622,16 +4639,16 @@ function permitPanelHtml(id, p, ro){
   const others = g.ids.length > 1 ? `This permit covers everything poured on the ${S.pourFloor === "ff" ? "first" : "ground"} floor on ${dmy(g.date)}: ${esc(permitStructure(g).replace(/, (Ground|First) floor$/, ""))}.` : `Pour of ${dmy(g.date)}.`;
   return `<div class="field">Permit to load</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-      <label class="field">Permit no.<input id="pPermit" inputmode="numeric" maxlength="12" value="${esc(g.permit)}" placeholder="next: ${permitNo(permitNext())}" ${ro}></label>
+      <label class="field">Permit no.<input value="${esc(permitNo(g.permit))} / PTS${esc(g.strikeNo)}" readonly></label>
       <label class="field">Time of loading<input type="time" id="pPTime" value="${esc(g.ptime || PERMIT.time)}" ${ro}></label>
     </div>
-    <p class="muted" style="margin:-4px 0 8px;font-size:.85rem">${others}${g.permit ? "" : " The next number is filled in when you make the permit in Edit mode."}</p>
+    <p class="muted" style="margin:-4px 0 8px;font-size:.85rem">${others}</p>
     <div style="display:flex;gap:8px;margin-bottom:12px"><button class="btn" data-permit="load" style="flex:1">${PDF_ICON}Permit to load</button><button class="btn" data-permit="strike" style="flex:1">${PDF_ICON}Permit to strike</button></div>
-    <p class="muted" style="margin:-4px 0 12px;font-size:.85rem">Permit to strike: PTS${esc(String(parseInt(g.permit, 10) || ""))}, dated ${dmy(permitStrikeDay(g.date))}, the day after the pour.</p>`;
+    <p class="muted" style="margin:-4px 0 12px;font-size:.85rem">Permit to strike: PTS${esc(g.strikeNo)}, dated ${dmy(permitStrikeDay(g.date))}, the day after the pour.</p>`;
 }
-async function permitSave(g, permit, ptime){
+async function permitSave(g, ptime){
   if (!g) return;
-  for (const i of g.ids){ const k = FLOORS[g.f].key + i, cur = S.poursAll[k]; if (cur) await savePourKey(k, {...cur, permit: permit || "", ptime: ptime || ""}, null, true); }
+  for (const i of g.ids){ const k = FLOORS[g.f].key + i, cur = S.poursAll[k]; if (cur) await savePourKey(k, {...cur, ptime: ptime || ""}, null, true); }
   flushPours();
 }
 function permitPage(doc, g){
@@ -4653,8 +4670,7 @@ function permitPage(doc, g){
   { let x = M + 3; ["(Permit to Load", "Permit to Pour Concrete", "Permit to Strike)"].forEach((p, i) => {
     if (i){ doc.setDrawColor("#FFFFFF"); doc.setFillColor("#FFFFFF"); doc.line(x + 1, y + 12, x + 5, y + 12); doc.triangle(x + 5, y + 11, x + 5, y + 13, x + 6.5, y + 12, "F"); x += 8.5; }
     doc.text(p, x, y + 13); x += doc.getTextWidth(p) + 1; }); doc.setDrawColor(INK); }
-  font("bold", 17, "#3a3a3a"); doc.text("Rhatigan", M + W, y + 7, {align: "right"});
-  font("normal", 6, "#3a3a3a"); doc.text("J.J. Rhatigan & Company", M + W, y + 10.5, {align: "right"});
+  permitLogo(doc, M + W, y);
   y += 18;
   const c1 = 48, c2 = W - c1;
   // permit no row
@@ -4695,7 +4711,7 @@ const ddmmyy = s => { const d = fromIso(s); return d ? `${String(d.getDate()).pa
 function permitStrikePage(doc, g, page){
   const M = 15, W = 180, INK = "#1a1a1a", BAND = "#2b2326", HEAD = "#b3a9b4", BLUE = "#1f2f8f";
   const font = (st, sz, col) => { doc.setFont("helvetica", st); doc.setFontSize(sz); doc.setTextColor(col || INK); };
-  const strike = permitStrikeDay(g.date), no = parseInt(g.permit, 10) ? "PTS" + parseInt(g.permit, 10) : "";
+  const strike = permitStrikeDay(g.date), no = g.strikeNo ? "PTS" + g.strikeNo : "";
   doc.setDrawColor(INK); doc.setLineWidth(0.35);
   let y = 12;
   // title band, same as the permit to load
@@ -4707,8 +4723,7 @@ function permitStrikePage(doc, g, page){
     if (i){ doc.setDrawColor("#FFFFFF"); doc.setFillColor("#FFFFFF"); doc.line(x + 1, y + 11.3, x + 5, y + 11.3); doc.triangle(x + 5, y + 10.3, x + 5, y + 12.3, x + 6.5, y + 11.3, "F"); x += 8.5; }
     doc.text(p, x, y + 12.3); x += doc.getTextWidth(p) + 1; }); }
   doc.setDrawColor(INK); doc.setLineWidth(0.35);
-  font("bold", 17, "#3a3a3a"); doc.text("Rhatigan", M + W, y + 7, {align: "right"});
-  font("normal", 6, "#3a3a3a"); doc.text("J.J. Rhatigan & Company", M + W, y + 10.5, {align: "right"});
+  permitLogo(doc, M + W, y);
   y += 20;
   const band = (t, h, right) => { doc.setFillColor(HEAD); doc.rect(M, y, W, h, "FD"); font("bold", 10); doc.text(t, M + 5, y + h / 2 + 1.4); if (right){ font("normal", 9.5); doc.text(right, M + W - 5, y + h / 2 + 1.4, {align: "right"}); } y += h; };
   const dots = (x1, x2, yy) => { doc.setLineDashPattern([0.4, 0.6], 0); doc.setLineWidth(0.3); doc.line(x1, yy, x2, yy); doc.setLineDashPattern([], 0); doc.setLineWidth(0.35); };
@@ -4760,15 +4775,8 @@ async function permitPdf(btn, id, kind){
   try{
     let groups = id ? [permitGroupOf(id)].filter(Boolean) : permitGroups();
     if (!groups.length) throw new Error(id ? "Set this wall as poured with a date first." : "No pours with a date yet.");
-    // give a number to any pour that hasn't got one yet, in date order
-    if (S.edit){
-      for (const g of (id ? groups : permitGroups())){
-        if (g.permit) continue;
-        await permitSave(g, String(permitNext()), g.ptime || PERMIT.time);
-      }
-      groups = id ? [permitGroupOf(id)].filter(Boolean) : permitGroups();
-    }
-    const jsPDF = await loadJsPdf();
+    const [jsPDF, lg] = await Promise.all([loadJsPdf(), loadPermitLogo()]);
+    permitLogoData = lg;
     const doc = new jsPDF({unit: "mm", format: "a4"});
     let first = true;
     const add = fn => { if (!first) doc.addPage(); first = false; fn(); };
@@ -4778,7 +4786,7 @@ async function permitPdf(btn, id, kind){
     });
     const fd = s => dmy(s).replace(/\//g, "-"), g0 = groups[0];
     const name = !id ? `Permits ${fd(g0.date)} to ${fd(groups[groups.length - 1].date)}.pdf`
-      : kind === "strike" ? `Permit to Strike PTS${parseInt(g0.permit, 10) || ""} (${fd(permitStrikeDay(g0.date))}).pdf`
+      : kind === "strike" ? `Permit to Strike PTS${g0.strikeNo} (${fd(permitStrikeDay(g0.date))}).pdf`
       : `Permit to Load ${permitNo(g0.permit)} (${fd(g0.date)}).pdf`;
     const blob = doc.output("blob"), url = URL.createObjectURL(blob), a = document.createElement("a");
     a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
