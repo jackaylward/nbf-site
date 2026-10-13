@@ -2726,6 +2726,17 @@ const VO_SEEDS = [{
     x_co: "JJ Rhatigan",
     x_qty: "1 no. temporary support frame beneath the precast slab units along Wall 33; subsequently lowered by 275 mm at the site engineers' request (works ongoing)",
     x_plant: "Adjustable steel props, steel beams, timber bearers, access tower and stepladder"},
+}, {
+  // Tue 13 Oct: L-bars from Wall 51 into the first floor screed, fixed by Victor (not on the Wall 51 drawing SE-26024; SE-16101 shows H10 01-300)
+  key: "voSeedW51Lbars", ids: ["dw-vo-w51-lbars"], photos: [], trade: "Fixer", whoName: "Victor Gudumac",
+  days: [["2026-10-13", "15:00", "16:00", "Duration: 1 hour on Tuesday 13 October 2026"]],
+  who: "victor", location: "First floor slab, Zone 2: top of Wall 51 (Grid I, between gridlines 7 and 8), on the precast hollowcore units, ahead of the structural screed pour on Wednesday 14 October 2026",
+  work: d => `Supply and fixing of additional horizontal L-bars at the top of Wall 51 (Grid I, between gridlines 7 and 8), laid on the precast hollowcore units and turned into the wall reinforcement, to tie the wall into the 75 mm structural screed. Work carried out by the steel fixing foreman, Victor Gudumac, ahead of the screed pour on Wednesday 14 October 2026, as shown in the attached photograph. ${d}.`,
+  det: {x_zone: "Zone 2",
+    x_why: "These bars are not shown on the Wall 51 reinforcement drawing (SE-26024 Rev 00) or its bar schedule (SH-26024), so they were not provided for in the wall reinforcement. Fixing them on site is additional work, outside NBF's agreed scope and price",
+    x_drg: "SE-26024 Rev 00 (Wall 51 elevation and Section 51B-51B) and bar schedule SH-26024: no L-bars from the top of Wall 51 into the screed",
+    x_co: "JJ Rhatigan",
+    x_qty: "Horizontal L-bars at the top of Wall 51 between gridlines 7 and 8 (approximately 20 no. visible in the photograph; exact number and bar size to be confirmed by the steel fixing foreman)"},
 }];
 async function seedVariations(){
   try{ if (S.voSeeding || !RS("dayworks") || !RS("dayworks").list || !(S.lads || []).length) return; }catch(e){ return; }
