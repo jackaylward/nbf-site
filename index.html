@@ -1847,7 +1847,17 @@ async function kvSet(k, v){ await DWQ.ready; if (!DWQ.db){ DWQ.mem.set("kv:"+k, 
 async function kvGet(k){ await DWQ.ready; if (!DWQ.db) return DWQ.mem.get("kv:"+k) || null; return (await idb("kv", "readonly", st => reqP(st.get(k)))) || null; }
 
 const toMin = t => { const m = /^(\d{1,2}):(\d{2})$/.exec(t||""); return m ? (+m[1])*60 + (+m[2]) : -1; };
-const dwHours = r => { const s = toMin(r.start), e = toMin(r.end); return s >= 0 && e > s ? Math.round((e-s)/60*100)/100 : 0; };
+const spanHrs = (a, b) => { const s = toMin(a), e = toMin(b); return s >= 0 && e > s ? Math.round((e-s)/60*100)/100 : 0; };
+// a variation or delay can run over several days: the first day is date/start/end, the rest are kept as
+// "Additional days: 14/10/2026 08:00 to 12:00; 15/10/2026 07:30 to 17:00" in the record details
+const DAY_RE = /(\d{2})\/(\d{2})\/(\d{4})\s+(\d{1,2}:\d{2})\s+to\s+(\d{1,2}:\d{2})/g;
+function dwExtraDays(r){
+  const s = r.x_days != null ? r.x_days : parseDet(r.description).det.days;
+  return [...String(s || "").matchAll(DAY_RE)].map(m => ({date: `${m[3]}-${m[2]}-${m[1]}`, start: m[4], end: m[5]}));
+}
+const dwDays = r => [{date: r.date, start: r.start, end: r.end}, ...dwExtraDays(r)];
+const dwHours = r => Math.round(dwDays(r).reduce((a, d) => a + spanHrs(d.start, d.end), 0) * 100) / 100;
+const dwWhen = r => dwDays(r).map(d => `${fmtDmy(d.date)}, ${d.start || ""} to ${d.end || ""}`).join("; ");
 const recMen = r => (+r.chippies||0) + (+r.fixers||0) + (+r.operatives||0);
 const wdDays = r => { const a = fromIso(r.dateFrom), b = fromIso(r.dateTo || r.dateFrom); return a && b && b >= a ? Math.round((b - a)/86400000) + 1 : 0; };
 function menText(r){
@@ -1873,6 +1883,7 @@ const CRANE_CAUSES = ["Crane in use by another trade", "Crane breakdown", "Crane
 const DET_FIELDS = [
   ["ref", "Ref", "both"],
   ["zone", "Zone", "both"],
+  ["days", "Additional days", "both"],
   ["why", "Why it's extra", "var"],
   ["drg", "Drawing / RFI ref", "var"],
   ["spec", "Spec / contract clause", "var"],
@@ -2016,7 +2027,7 @@ function namePickHtml(r){
 function detRowsHtml(r){
   const p = parseDet(r.description);
   if (!p.has) return "";
-  return detFieldsFor(r.type).filter(([k]) => k !== "ref" && p.det[k]).map(([k, label]) => `<tr><th>${esc(label)}</th><td>${esc(p.det[k])}</td></tr>`).join("");
+  return detFieldsFor(r.type).filter(([k]) => k !== "ref" && k !== "days" && p.det[k]).map(([k, label]) => `<tr><th>${esc(label)}</th><td>${esc(p.det[k])}</td></tr>`).join("");
 }
 const KINDS = {
   dayworks: {
@@ -2027,7 +2038,7 @@ const KINDS = {
       const now = new Date();
       const hh = String(now.getHours()).padStart(2,"0"), mm = String(Math.floor(now.getMinutes()/15)*15).padStart(2,"0");
       return {type: REC_TYPES[0], date: iso(now), start: `${hh}:${mm}`, end: "", location: "", description: "", chippies: 0, fixers: 0, operatives: 0, other: "",
-        _strict: true, x_ref: nextRef(REC_TYPES[0]), x_co: "JJ Rhatigan"};
+        _strict: true, x_ref: nextRef(REC_TYPES[0]), x_co: "JJ Rhatigan", x_days: "", _xdays: []};
     },
     missing(r){
       const miss = [];
@@ -2053,15 +2064,22 @@ const KINDS = {
       <label class="field">Date<input type="date" data-rf="date" value="${esc(r.date)}"></label>
       <label class="field">Start time<input type="time" data-rf="start" value="${esc(r.start)}"></label>
       <label class="field">End time<input type="time" data-rf="end" value="${esc(r.end)}"></label>`,
+    moreDays: r => `
+      ${(r._xdays || []).map((d, i) => `<div class="formgrid xdayrow" style="margin-top:0">
+        <label class="field">Day ${i + 2} date<input type="date" class="xday" data-i="${i}" data-k="date" value="${esc(d.date)}"></label>
+        <label class="field">Start time<input type="time" class="xday" data-i="${i}" data-k="start" value="${esc(d.start)}"></label>
+        <label class="field">End time<input type="time" class="xday" data-i="${i}" data-k="end" value="${esc(d.end)}"></label>
+        <div class="field" style="justify-content:flex-end"><button type="button" class="btn ghost" data-act="xdayDel" data-i="${i}">Remove day ${i + 2}</button></div></div>`).join("")}
+      <div class="row-actions" style="margin:0 0 12px"><button type="button" class="btn ghost" data-act="xdayAdd">+ Add another day</button></div>`,
     locationLabel: "Location", locationRequired: true,
     rowTitle: r => { const ref = parseDet(r.description).det.ref; return (ref ? ref + " · " : "") + (r.location || ""); },
-    rowSub: r => `${r.start} – ${r.end}, ${menText(r)}`,
+    rowSub: r => { const n = dwDays(r).length; return `${n > 1 ? n + " days, " + fmtH(dwHours(r)) + " hrs" : r.start + " – " + r.end}, ${menText(r)}`; },
     rowTag: r => typeLabel(r.type),
     rowSide: r => `<b>${fmtH(r.manHours || 0)}</b><span class="small muted">man-hrs</span>`,
     detailRows: r => `
       <tr><th>Type</th><td>${esc(typeLabel(r.type))}</td></tr>
       ${parseDet(r.description).det.ref ? `<tr><th>Ref</th><td>${esc(parseDet(r.description).det.ref)}</td></tr>` : ""}
-      <tr><th>Date / time</th><td>${esc(niceYmd(r.date))}, ${esc(r.start)} – ${esc(r.end)} (${fmtH(r.hours||0)} hrs)</td></tr>
+      <tr><th>Date / time</th><td>${dwDays(r).map(d => `${esc(niceYmd(d.date))}, ${esc(d.start)} – ${esc(d.end)} (${fmtH(spanHrs(d.start, d.end))} hrs)`).join("<br>")}${dwDays(r).length > 1 ? `<br><b>Total ${fmtH(r.hours||0)} hrs</b>` : ""}</td></tr>
       <tr><th>Location</th><td>${esc(r.location)}</td></tr>
       <tr><th>Men</th><td>${esc(menText(r))}</td></tr>
       <tr><th>Man-hours</th><td>${fmtH(r.manHours||0)}</td></tr>
@@ -2373,6 +2391,7 @@ async function openRecForm(K, rec, isNew){
     rec.description = p.work;
     for (const [k] of DET_FIELDS) rec["x_" + k] = p.det[k] || "";
     rec._strict = p.has;
+    rec._xdays = dwExtraDays(rec);
   }
   st.form = {rec, isNew, existing, added: [], removed: [], tried: false};
   st.view = "form";
@@ -2384,11 +2403,19 @@ function saveRecDraft(K){
   const key = "draft:" + K.kind;
   kvSet(key, {rec: f.rec, added: f.added}).catch(() => kvSet(key, {rec: f.rec, added: []}).catch(()=>{}));
 }
+const xdaysText = days => days.filter(d => fromIso(d.date) && toMin(d.start) >= 0 && toMin(d.end) >= 0)
+  .sort((a, b) => (a.date + a.start).localeCompare(b.date + b.start))
+  .map(d => `${fmtDmy(d.date)} ${d.start} to ${d.end}`).join("; ");
 function readRecForm(K){
   const f = RS(K.kind).form;
   document.querySelectorAll("[data-rf]").forEach(el => {
     f.rec[el.dataset.rf] = el.type === "number" ? Math.max(0, parseInt(el.value || "0", 10) || 0) : el.value;
   });
+  if (K.moreDays){
+    const days = (f.rec._xdays || []).map(d => ({...d}));
+    document.querySelectorAll(".xday").forEach(el => { if (days[+el.dataset.i]) days[+el.dataset.i][el.dataset.k] = el.value; });
+    f.rec._xdays = days; f.rec.x_days = xdaysText(days);
+  }
 }
 function recFormHtml(K){
   const f = RS(K.kind).form, r = f.rec;
@@ -2404,6 +2431,7 @@ function recFormHtml(K){
     <h2>${f.isNew ? K.newLabel : "Edit " + K.one}</h2>
     ${f.restored ? `<p class="pill amber">Your unsaved entry was brought back.</p>` : ""}
     <div class="formgrid">${K.dateFields(r)}</div>
+    ${K.moreDays ? K.moreDays(r) : ""}
     <label class="field">${K.locationLabel}<input data-rf="location" maxlength="200" list="recLocs" value="${esc(r.location)}" placeholder="${esc(K.locationPlaceholder || "e.g. Ground Floor Wall 60")}"></label>
     <datalist id="recLocs">${locs.map(l=>`<option value="${esc(l)}">`).join("")}</datalist>
     ${K.extraHtml ? K.extraHtml(r) : ""}
@@ -2483,6 +2511,18 @@ $("view").addEventListener("click", async ev => {
     if (draft && draft.rec){ st.form.added = draft.added || []; st.form.restored = true; render(); }
     return;
   }
+  if ((act === "xdayAdd" || act === "xdayDel") && st.form){
+    readRecForm(K);
+    const r = st.form.rec, days = r._xdays || [];
+    if (act === "xdayAdd"){
+      // next day after the last one entered, same times
+      const last = days.length ? days[days.length - 1] : {date: r.date, start: r.start, end: r.end};
+      const nd = fromIso(last.date); if (nd) nd.setDate(nd.getDate() + 1);
+      days.push({date: nd ? iso(nd) : "", start: last.start || "", end: last.end || ""});
+    } else days.splice(+a.dataset.i, 1);
+    r._xdays = days; r.x_days = xdaysText(days); saveRecDraft(K); render();
+    return;
+  }
   if (act === "open"){
     st.detail = a.dataset.id; st.view = "detail"; render(); window.scrollTo(0,0);
     await getRecPhotos(K.kind, st.detail); if (st.view === "detail") render();
@@ -2533,6 +2573,11 @@ $("view").addEventListener("input", ev => {
   if (ev.target.id === "recQ"){
     st.q = ev.target.value; const pos = ev.target.selectionStart; render();
     const q = $("recQ"); q.focus(); try{ q.setSelectionRange(pos, pos); }catch(e){}
+    return;
+  }
+  if (ev.target.classList && ev.target.classList.contains("xday") && st.form){
+    readRecForm(K); saveRecDraft(K);
+    const c = $("recCalc"); if (c) c.innerHTML = K.calc(st.form.rec);
     return;
   }
   if (ev.target.dataset && ev.target.dataset.rf != null && st.form){
@@ -2943,8 +2988,15 @@ function easTradeShort(label){
   return label || "";
 }
 function easLabour(r){
-  const hrs = easHrs(dwHours(r));
-  if (easType(r) === "Crane delay") return [["", "", "", r.start || "", r.end || "", hrs]];   // times only
+  const days = dwDays(r);
+  if (days.length === 1) return easLabourDay(r, r.start, r.end, "");
+  // several days: one set of rows per day, times marked with the day
+  return days.flatMap(d => { const t = fromIso(d.date), pre = t ? `${String(t.getDate()).padStart(2, "0")}/${String(t.getMonth() + 1).padStart(2, "0")} ` : ""; return easLabourDay(r, d.start, d.end, pre); });
+}
+function easLabourDay(r, start, end, pre){
+  const hrs = easHrs(spanHrs(start, end));
+  start = start ? pre + start : ""; end = end ? pre + end : "";
+  if (easType(r) === "Crane delay") return [["", "", "", start, end, hrs]];   // times only
   const left = {Carp: +r.chippies || 0, Fixer: +r.fixers || 0, GO: +r.operatives || 0};
   const rows = [];
   for (const full of namesList(r.other)){
@@ -2953,9 +3005,9 @@ function easLabour(r){
     if (!(trade in left) || left[trade] < 1) trade = Object.keys(left).find(k => left[k] > 0) || trade;
     if (trade in left && left[trade] > 0) left[trade]--;
     const parts = full.split(/\s+/);
-    rows.push([parts.length > 1 ? parts.slice(0, -1).join(" ") : full, parts.length > 1 ? parts[parts.length - 1] : "", trade, r.start || "", r.end || "", hrs]);
+    rows.push([parts.length > 1 ? parts.slice(0, -1).join(" ") : full, parts.length > 1 ? parts[parts.length - 1] : "", trade, start, end, hrs]);
   }
-  for (const [trade, n] of Object.entries(left)) for (let i = 0; i < n; i++) rows.push(["", "", trade, r.start || "", r.end || "", hrs]);
+  for (const [trade, n] of Object.entries(left)) for (let i = 0; i < n; i++) rows.push(["", "", trade, start, end, hrs]);
   return rows;
 }
 function easDescription(r){
@@ -3007,7 +3059,7 @@ function easPage(doc, r, num, logo){
   // date / EAS nr (EAS Nr. left blank for the QS)
   cell(M, y, 30, 8, PALE); cell(M + 30, y, 90, 8); cell(M + 120, y, 60, 8);
   font("bold", 9, NAVY); put("Date:", M + 2, y, 8); put("EAS Nr.", M + 122, y, 8);
-  font("normal", 10); put(easDate(r.date), M + 32, y, 8);
+  font("normal", 10); put(dwDays(r).map(d => easDate(d.date)).join(", "), M + 32, y, 8);
   y += 10;
   // description
   cell(M, y, W, 7, PALE); font("bold", 10, NAVY); put("Description of Works:", M + 2, y, 7); y += 7;
@@ -3361,7 +3413,7 @@ async function vcReportPdf(from, to){
   table("Variations", vars, [["Ref", 22, 0, r => refOf(r)], ["Date", 22, 0, r => fmtDmy(r.date)], ["Location", 56, 0, r => r.location || "-"],
     ["Operatives", 50, 0, r => menTxt(r) || "-"], ["Man-hrs", 30, 1, r => fmtH(mhOf(r))]], `${fmtH(sum(vars, mhOf))} man-hours`);
   table("Crane delays", cranes, [["Ref", 22, 0, r => refOf(r)], ["Date", 22, 0, r => fmtDmy(r.date)], ["Cause", 56, 0, r => { const d = parseDet(r.description).det; return [d.cause, d.zone].filter(Boolean).join(", ") || "-"; }],
-    ["Time lost", 50, 0, r => `${r.start || ""} to ${r.end || ""} (${fmtH(hrsOf(r))} hrs), ${menOf(r)} operative${menOf(r) === 1 ? "" : "s"}`], ["Man-hrs", 30, 1, r => fmtH(mhOf(r))]], `${fmtH(sum(cranes, mhOf))} man-hours lost`);
+    ["Time lost", 50, 0, r => `${dwDays(r).length > 1 ? dwWhen(r) : (r.start || "") + " to " + (r.end || "")} (${fmtH(hrsOf(r))} hrs), ${menOf(r)} operative${menOf(r) === 1 ? "" : "s"}`], ["Man-hrs", 30, 1, r => fmtH(mhOf(r))]], `${fmtH(sum(cranes, mhOf))} man-hours lost`);
   // each record in full, with its photographs
   const detail = async (r) => {
     const d = parseDet(r.description).det, crane = easType(r) === "Crane delay";
@@ -3374,7 +3426,7 @@ async function vcReportPdf(from, to){
     ensure(30);
     doc.setFillColor(NAVY); doc.rect(M, y, W, 8, "F");
     font("bold", 10, "#FFFFFF"); doc.text(`${refOf(r)}  ·  ${crane ? "Crane delay" : "Variation"}  ·  ${fmtDmy(r.date)}`, M + 2, y + 5.4); y += 10;
-    const rows = [["Date and time", `${fmtDmy(r.date)}, ${r.start || ""} to ${r.end || ""} (${fmtH(hrsOf(r))} hrs)`], ["Location", r.location],
+    const rows = [["Date and time", `${dwWhen(r)} (${fmtH(hrsOf(r))} hrs)`], ["Location", r.location],
       ["Operatives", [menTxt(r), r.other].filter(Boolean).join(": ") + (menOf(r) ? `. ${fmtH(mhOf(r))} man-hours.` : "")],
       [crane ? "Work held up" : "Works carried out", capFirst(workText(r.description)).replace(/\.?\s*$/, ".") + (pics.length && !/photograph/i.test(workText(r.description)) ? " As shown in the attached photographs." : "")]];
     if (crane){
@@ -3438,7 +3490,7 @@ function voDescription(r, num, nPhotos){
   out.push(work);
   const men = [[+r.chippies, "carpenter"], [+r.fixers, "steel fixer"], [+r.operatives, "general operative"]]
     .filter(([n]) => n > 0).map(([n, t]) => `${n} ${t}${n === 1 ? "" : "s"}`).join(", ");
-  out.push(`${VO_SUB} carried out the works on ${easDate(r.date)}${r.start && r.end ? ", " + r.start + " to " + r.end : ""}${men ? ", with " + men : ""}${capFirst(r.location) ? ", at " + capFirst(r.location) : ""}.`);
+  out.push(`${VO_SUB} carried out the works on ${dwDays(r).map(d => easDate(d.date) + (d.start && d.end ? ", " + d.start + " to " + d.end : "")).join(", and on ")}${men ? ", with " + men : ""}${capFirst(r.location) ? ", at " + capFirst(r.location) : ""}.`);
   out.push(`${d.why ? capFirst(d.why).replace(/\.?\s*$/, ". ") : ""}These works were not included in ${VO_SUB}'s Sub-Contract scope or price. Thus, the works carried out by ${VO_SUB} constitute a variation to the Sub-Contract Works.`);
   if (d.spec) out.push(`Reference: ${capFirst(d.spec).replace(/\.?\s*$/, ".")}`);
   if (d.qty) out.push(`Quantities: ${d.qty.replace(/\.?\s*$/, ".")}`);
@@ -3461,7 +3513,7 @@ function voPage(doc, r, num, logo, nPhotos){
   y += 11;
   // header
   const hdr = [["Contract:", EAS_SITE], ["Main Contractor:", VO_MAIN], ["Sub-Contract:", "Formwork, Steel Fixing & Concrete Placing"],
-    ["Sub-Contractor:", VO_SUB], ["Date:", easDate(r.date)], ["Status:", `Variation Nr ${String(num).padStart(3, "0")}`]];
+    ["Sub-Contractor:", VO_SUB], ["Date:", dwDays(r).map(d => easDate(d.date)).join(", ")], ["Status:", `Variation Nr ${String(num).padStart(3, "0")}`]];
   hdr.forEach(([k, v]) => { cell(M, y, 40, 6, PALE); cell(M + 40, y, W - 40, 6); font("bold", 8.5, NAVY); put(k, M + 2, y, 6); font("normal", 9); put(v, M + 42, y, 6); y += 6; });
   y += 3;
   // key references
