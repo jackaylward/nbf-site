@@ -2659,6 +2659,28 @@ const VO_SEEDS = [{
     x_why: "This column is not shown on the structural drawings. The Wall 17 sheet (SE-26005 Rev 00, 16.09.26) and the Wall 44 sheet (SE-26034 Rev 01, 11.08.26) show no column at this junction; the only column on the Wall 17 sheet is C1, between gridlines H and I at gridline 5. The additional reinforcement is outside NBF's agreed scope and price",
     x_drg: "SE-26005 Rev 00 (Walls 17 and 18, 16.09.26) and SE-26034 Rev 01 (Walls 43, 44 and 49, 11.08.26): no column shown at the Wall 44 / Wall 17 junction",
     x_co: "JJ Rhatigan", x_qty: "1 no. additional column reinforcement cage, fabricated and fixed in position"},
+}, {
+  // Mon 12 Oct: Fosroc primer to the wall ends at the Wall 62 / Wall 50 junction (works ongoing: mortar and shutter to follow)
+  key: "voSeedW62W50", ids: ["dw-vo-w62-w50-prime"], photos: [], whoName: "Vitalie",
+  days: [["2026-10-12", "15:00", "16:00", "Duration: 1 hour on Monday 12 October 2026. Works ongoing: this record will be updated when the repair mortar and shutter are complete"]],
+  who: "vitalie", location: "Ground floor, Zone 2: junction of Wall 62 and Wall 50 (gridline 7 at Grid F)",
+  work: d => `Preparation of the ends of Wall 62 and Wall 50 at their junction (gridline 7 at Grid F), ground floor, Zone 2. Fosroc Nitoprime Zincrich Plus zinc-rich primer was applied by brush to the ends of both walls, as shown in the attached photographs. The joint is to be reinstated with Fosroc Renderoc HB45 fibre-reinforced repair mortar placed over the primer, with a plywood shutter formed in the corner. ${d}.`,
+  det: {x_zone: "Zone 2",
+    x_why: "Priming and reinstatement of the wall ends at this junction is additional work, not shown on the drawings, and is outside NBF's agreed scope and price",
+    x_co: "JJ Rhatigan",
+    x_qty: "Ends of 2 no. walls (Wall 62 and Wall 50) primed at one junction. Repair mortar and plywood shutter to follow",
+    x_mats: "Fosroc Nitoprime Zincrich Plus zinc-rich primer (1.9 L tin, batch 102890068); Fosroc Renderoc HB45 fibre-reinforced repair mortar (25 kg bags) to follow; plywood for the corner shutter to follow"},
+}, {
+  // Tue 13 Oct: temporary support frame under the precast slab at a gap in bearing, room bounded by Walls 33, 66, 51 and 52
+  key: "voSeedPrecastFrameW33", ids: ["dw-vo-precast-frame-w33"], photos: [], whoName: "Paul and Alan", crew: {chippies: 2},
+  days: [["2026-10-13", "08:00", "10:00", "Duration: 2 hours on Tuesday 13 October 2026, 2 carpenters (4 man-hours). Works ongoing: this record will be updated when the works are complete"]],
+  who: "", location: "Ground floor, Zone 2: room bounded by Wall 33 (gridline 7), Wall 66 (Grid H), Wall 51 (Grid I) and Wall 52 (gridline 8), along Wall 33",
+  work: d => `Erection of a temporary support frame beneath the precast floor slab units along Wall 33, ground floor, Zone 2, in the room bounded by Walls 33, 66, 51 and 52 (gridlines 7 to 8, Grids H to I). The frame, formed with adjustable steel props, steel beams and timber bearers on an access tower, supports the precast units where there is a gap in their bearing, as shown in the attached photographs. ${d}.`,
+  det: {x_zone: "Zone 2",
+    x_why: "Temporary support to the precast slab units is not part of NBF's in-situ formwork works and is outside NBF's agreed scope and price",
+    x_co: "JJ Rhatigan",
+    x_qty: "1 no. temporary support frame beneath the precast slab units along Wall 33 (works ongoing)",
+    x_plant: "Adjustable steel props, steel beams, timber bearers, access tower and stepladder"},
 }];
 async function seedVariations(){
   try{ if (S.voSeeding || !RS("dayworks") || !RS("dayworks").list || !(S.lads || []).length) return; }catch(e){ return; }
@@ -2668,7 +2690,7 @@ async function seedVariations(){
       if (await kvGet(v.key)) continue;
       const have = new Set(mergedRecords("dayworks").map(r => r.id));
       if (v.ids.every(id => have.has(id))){ await kvSet(v.key, true); continue; }
-      const lad = (S.lads || []).find(l => l && l.name && l.name.toLowerCase().startsWith(v.who));
+      const lad = v.who ? (S.lads || []).find(l => l && l.name && l.name.toLowerCase().startsWith(v.who)) : null;
       const trade = v.trade || (lad ? easTradeShort(lad.trade) : "GO");
       const ref = nextRef("Variation");
       const photos = [];
@@ -2680,6 +2702,7 @@ async function seedVariations(){
         const rec = {id, type: "Variation", date, start, end, location: v.location, description: "",
           chippies: trade === "Carp" ? 1 : 0, fixers: trade === "Fixer" ? 1 : 0, operatives: trade === "Carp" || trade === "Fixer" ? 0 : 1,
           other: lad ? lad.name : (v.whoName || "Doru")};
+        if (v.crew) Object.assign(rec, {chippies: 0, fixers: 0, operatives: 0}, v.crew);
         rec.description = composeDet(v.work(day), {...rec, ...v.det, x_ref: ref});
         await queueRecordSave("dayworks", rec, i === 0 ? photos : [], []);
       }
