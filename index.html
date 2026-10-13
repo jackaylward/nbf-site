@@ -4624,13 +4624,17 @@ function permitNumbers(groups){
 const permitGroupOf = id => permitGroups().find(g => g.f === S.pourFloor && g.ids.includes(id)) || null;
 const permitNo = n => /^\d+$/.test(String(n)) ? String(n).padStart(3, "0") : String(n || "");
 // "Walls 17 and 41", plus any columns, in drawing order
+// Walls with a corbel (B1 150 x 200) per the OCSC bar schedules SH-26009/10/11/16/17/18/24/40 and SE-26023 (two members: 1F and 2F corbels)
+const CORBEL_WALLS = ["26", "27", "33", "34", "50", "51", "105"];
 function permitStructure(g){
   const plan = FLOORS[g.f].plan, names = plan.names || {};
   const nm = id => names[id] || String(parseInt(id.slice(1), 10));
-  const walls = [...new Set(g.ids.filter(i => i[0] === "W").sort((a, b) => parseInt(a.slice(1)) - parseInt(b.slice(1)) || a.localeCompare(b)).map(nm))];
+  const all = [...new Set(g.ids.filter(i => i[0] === "W").sort((a, b) => parseInt(a.slice(1)) - parseInt(b.slice(1)) || a.localeCompare(b)).map(nm))];
   const cols = g.ids.filter(i => i[0] === "C").map(i => names[i] || i);
   const list = a => a.length < 2 ? a.join("") : a.slice(0, -1).join(", ") + " and " + a[a.length - 1];
-  return [walls.length ? `Wall${walls.length > 1 ? "s" : ""} ${list(walls)}` : "", list(cols)].filter(Boolean).join("; ") + `, ${FLOORS[g.f].name}`;
+  const walls = all.filter(n => !CORBEL_WALLS.includes(n)), corb = all.filter(n => CORBEL_WALLS.includes(n));
+  const wl = (a, pre) => a.length ? `${pre}${a.length > 1 ? "s" : ""} ${list(a)}` : "";
+  return [[wl(walls, "Wall"), wl(corb, walls.length ? "corbel wall" : "Corbel wall")].filter(Boolean).join(", "), list(cols)].filter(Boolean).join("; ") + `, ${FLOORS[g.f].name}`;
 }
 function permitPanelHtml(id, p, ro){
   if (!pourState(p)) return "";
