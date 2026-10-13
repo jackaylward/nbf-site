@@ -2812,6 +2812,15 @@ const WD_SEEDS = [{
     x_delay: "Scaffolding to the Zone 2 ground floor remains incomplete, as previously recorded on 9 October 2026. NBF cannot commence preparatory works for the first floor screed concrete pour in Zone 2 until the scaffolding has been completed and handed over by JJ Rhatigan",
     x_need: "First floor screed concrete pour, Zone 2", x_claim: "Yes",
     x_notes: "Edge protection and scaffolding were not in place in certain areas, as shown in the photographs."},
+}, {
+  key: "wdSeed20261013", rev: "wdSeed20261013r1", id: "wd-seed-2026-10-13", date: "2026-10-13",
+  location: "Zone 2 first floor",
+  photos: [1, 2].map(n => `daily-records/2026-10-13-${n}.jpg`),
+  work: "Preparatory works for the first floor slab screed concrete pour, Zone 2 (Section 2), commenced following the erection of scaffolding between Walls 66 and 62, Walls 65 and 57, and Walls 52 and 56. The scaffolding was completed at 12:00, as shown in the photographs. No concrete pour took place today, as all operatives were engaged on preparation of the first floor slab for the pour scheduled for tomorrow. In-situ infill works between the precast concrete slabs commenced using mortar.",
+  det: {x_scaf: "Erected, completed at 12:00", x_scafn: "Zone 2 first floor scaffolding between Walls 66 and 62, 65 and 57, and 52 and 56 completed at 12:00; preparatory works could not commence in these areas before then",
+    x_delay: "Scaffolding to Zone 2 first floor was completed at 12:00 today, as shown in the photographs, and was not available to NBF before then. Further delay to the first floor slab pour is possible: at Wall 50 first floor, where it meets Wall 16, a column (C7, grid 7/G) is required, and U-bars must first be fixed to the top of the steel so that the column can continue. JJ Rhatigan have a welder attending tomorrow to carry out these works",
+    x_need: "Completion of the C7 column starter U-bars by JJ Rhatigan, Wall 50 / Wall 16, first floor", x_claim: "Yes",
+    x_notes: "The in-situ infill works between the precast concrete slabs, using mortar, are to be the subject of a future variation. Column C7 is 250 x 450 RC (drawing SE-16010 Rev 00), with 3 no. H16 U-bars to be site welded to the steel beam starters."},
 }];
 async function seedDailyRecords(){
   try{ if (S.wdSeeding || !RS("works") || !RS("works").list) return; }catch(e){ return; }
