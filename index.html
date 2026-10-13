@@ -4126,7 +4126,7 @@ $("view").addEventListener("click", async ev => {
   if (f){ S.pourFilter = S.pourFilter === f.dataset.pfilter ? "" : f.dataset.pfilter; render(); return; }
   if (ev.target.closest("[data-ppdf]")){ pourPdf(ev.target.closest("[data-ppdf]")); return; }
   if (ev.target.closest("[data-preport]")){ pourReport(ev.target.closest("[data-preport]")); return; }
-  if (ev.target.closest("[data-permit]")){ permitPdf(ev.target.closest("[data-permit]"), S.pourSel); return; }
+  if (ev.target.closest("[data-permit]")){ permitPdf(ev.target.closest("[data-permit]"), S.pourSel, ev.target.closest("[data-permit]").dataset.permit); return; }
   if (ev.target.closest("[data-permitall]")){ permitPdf(ev.target.closest("[data-permitall]"), null); return; }
   const z = ev.target.closest("[data-pzoom]");
   if (z){ if (z.dataset.pzoom === "fit") fitView(); else zoomPlan(+z.dataset.pzoom); pourRefresh(); return; }
@@ -4585,7 +4585,7 @@ async function pourReport(btn){
 // ================= permits to load (JJ Rhatigan form), one per pour =================
 // a pour = every wall and column on one floor with the same pour date; the permit number and
 // time of loading are saved on each of them, so any wall in the pour opens the same permit
-const PERMIT = {drawing: "NH-5417-300", desc: "RC Frame", offeree: "Denis O'Riordan", company: "New Bridge Form", first: 32, time: "14:00"};
+const PERMIT = {drawing: "NH-5417-300", desc: "RC Frame", offeree: "Denis O'Riordan", company: "New Bridge Form", contract: "Patrician Secondary School", first: 32, time: "14:00"};
 function permitGroups(){
   const out = {};
   for (const [f, F] of Object.entries(FLOORS)){
@@ -4626,7 +4626,8 @@ function permitPanelHtml(id, p, ro){
       <label class="field">Time of loading<input type="time" id="pPTime" value="${esc(g.ptime || PERMIT.time)}" ${ro}></label>
     </div>
     <p class="muted" style="margin:-4px 0 8px;font-size:.85rem">${others}${g.permit ? "" : " The next number is filled in when you make the permit in Edit mode."}</p>
-    <div style="display:flex;gap:8px;margin-bottom:12px"><button class="btn" data-permit style="flex:1">${PDF_ICON}Permit to load</button></div>`;
+    <div style="display:flex;gap:8px;margin-bottom:12px"><button class="btn" data-permit="load" style="flex:1">${PDF_ICON}Permit to load</button><button class="btn" data-permit="strike" style="flex:1">${PDF_ICON}Permit to strike</button></div>
+    <p class="muted" style="margin:-4px 0 12px;font-size:.85rem">Permit to strike: PTS${esc(String(parseInt(g.permit, 10) || ""))}, dated ${dmy(permitStrikeDay(g.date))}, the day after the pour.</p>`;
 }
 async function permitSave(g, permit, ptime){
   if (!g) return;
@@ -4688,7 +4689,72 @@ function permitPage(doc, g){
   font("normal", 14, "#d32f2f"); doc.text("Please complete stage two – Permit to Pour Concrete", M + W / 2, y + 14, {align: "center"});
   doc.setDrawColor("#d32f2f"); doc.line(M + 8, y + 15.5, M + W - 8, y + 15.5); doc.setDrawColor(INK);
 }
-async function permitPdf(btn, id){
+// permit to strike: dated the day after the pour, numbered PTS + the permit to load number
+const permitStrikeDay = date => { const d = fromIso(date); if (!d) return ""; d.setDate(d.getDate() + 1); return iso(d); };
+const ddmmyy = s => { const d = fromIso(s); return d ? `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getFullYear()).slice(2)}` : ""; };
+function permitStrikePage(doc, g, page){
+  const M = 15, W = 180, INK = "#1a1a1a", BAND = "#2b2326", HEAD = "#b3a9b4", BLUE = "#1f2f8f";
+  const font = (st, sz, col) => { doc.setFont("helvetica", st); doc.setFontSize(sz); doc.setTextColor(col || INK); };
+  const strike = permitStrikeDay(g.date), no = parseInt(g.permit, 10) ? "PTS" + parseInt(g.permit, 10) : "";
+  doc.setDrawColor(INK); doc.setLineWidth(0.35);
+  let y = 12;
+  // title band, same as the permit to load
+  doc.setFillColor(BAND); doc.rect(M, y, 140, 15, "F");
+  font("bold", 13, "#FFFFFF"); doc.text("Permit to Strike", M + 70, y + 6, {align: "center"});
+  { const tw = doc.getTextWidth("Permit to Strike"); doc.setLineWidth(0.3); doc.setDrawColor("#FFFFFF"); doc.line(M + 70 - tw / 2, y + 7, M + 70 + tw / 2, y + 7); }
+  font("normal", 9.5, "#FFFFFF");
+  { let x = M + 3; ["(Permit to Load", "Permit to Pour Concrete", "Permit to Strike)"].forEach((p, i) => {
+    if (i){ doc.setDrawColor("#FFFFFF"); doc.setFillColor("#FFFFFF"); doc.line(x + 1, y + 11.3, x + 5, y + 11.3); doc.triangle(x + 5, y + 10.3, x + 5, y + 12.3, x + 6.5, y + 11.3, "F"); x += 8.5; }
+    doc.text(p, x, y + 12.3); x += doc.getTextWidth(p) + 1; }); }
+  doc.setDrawColor(INK); doc.setLineWidth(0.35);
+  font("bold", 17, "#3a3a3a"); doc.text("Rhatigan", M + W, y + 7, {align: "right"});
+  font("normal", 6, "#3a3a3a"); doc.text("J.J. Rhatigan & Company", M + W, y + 10.5, {align: "right"});
+  y += 20;
+  const band = (t, h, right) => { doc.setFillColor(HEAD); doc.rect(M, y, W, h, "FD"); font("bold", 10); doc.text(t, M + 5, y + h / 2 + 1.4); if (right){ font("normal", 9.5); doc.text(right, M + W - 5, y + h / 2 + 1.4, {align: "right"}); } y += h; };
+  const dots = (x1, x2, yy) => { doc.setLineDashPattern([0.4, 0.6], 0); doc.setLineWidth(0.3); doc.line(x1, yy, x2, yy); doc.setLineDashPattern([], 0); doc.setLineWidth(0.35); };
+  // label (one or two lines) + dotted line + filled-in value in blue
+  const field = (label, x, lw, x2, yy, val, sub) => {
+    font("bold", 9.5); const ls = label.split("\n"); ls.forEach((l, i) => doc.text(l, x, yy - (ls.length - 1) * 4.2 + i * 4.2));
+    dots(x + lw, x2, yy + 1); if (val){ let sz = 12; font("normal", sz, BLUE); while (sz > 7 && doc.getTextWidth(val) > x2 - x - lw - 3) font("normal", --sz, BLUE); doc.text(val, x + lw + 2, yy - 0.3); }
+    if (sub){ font("normal", 9); doc.text(sub, (x + lw + x2) / 2, yy + 5, {align: "center"}); }
+  };
+  if (page === 1){
+    doc.setFillColor(HEAD); doc.rect(M, y, W, 12, "FD"); doc.line(M + 148, y, M + 148, y + 12);
+    font("normal", 12); doc.text("Permit to Strike Formwork/ Remove Back Propping", M + 6, y + 7.8);
+    font("normal", 9.5); doc.text("Page 1 of 3", M + 164, y + 7, {align: "center"}); y += 12;
+    band("Contract Particulars & Form Details:", 9);
+    let top = y; y += 14;
+    field("Contract\nName:", M + 6, 26, M + 103, y, PERMIT.contract); field("Contract\nNumber:", M + 115, 23, M + 172, y, "");
+    font("normal", 10); doc.text("P21-006", M + 140, y - 6.5);
+    y += 15; field("Date:", M + 6, 26, M + 103, y, ddmmyy(strike)); field("Permit\nNumber:", M + 115, 23, M + 172, y, no);
+    y += 7; doc.rect(M, top, W, y - top); doc.line(M, top + 19, M + W, top + 19);
+    y += 6; band("Sub-Contractor Particulars:", 9); top = y; y += 13;
+    field("Company\nName:", M + 6, 28, M + 112, y, PERMIT.company); field("Person\nResponsible:", M + 118, 26, M + W - 4, y, PERMIT.offeree);
+    y += 7; doc.rect(M, top, W, y - top);
+    y += 6; band("Formwork Details:", 10); top = y; y += 11;
+    field("Location:", M + 6, 33, M + W - 4, y, permitStructure(g).replace(/, (Ground|First) floor$/, ""));
+    y += 12; field("Area:", M + 6, 33, M + 103, y, ""); field("Floor/Level:", M + 118, 26, M + W - 4, y, FLOORS[g.f].name);
+    y += 10; field("Drawing Ref:", M + 6, 33, M + 103, y, ""); field("Approved by:", M + 118, 26, M + W - 4, y, "");
+    y += 11; field("Method Statement\nRef:", M + 6, 33, M + 103, y, ""); field("Approved by:", M + 118, 26, M + W - 4, y - 4, "");
+    y += 7; doc.rect(M, top, W, y - top);
+  } else {
+    const sec = (title, right, h, body) => { const top = y; band(title, 9, right); body(); y = top + 9 + h; doc.rect(M, top, W, y - top); y += 5; };
+    sec("Formwork/Falsework to the locations described above may be struck on or after", "Page 3 of 3", 15, () => { field("Date:", M + 6, 14, M + 92, y + 9, ddmmyy(strike)); field("Signed:", M + 110, 18, M + W - 4, y + 9, "", "(JJR)"); });
+    sec("Minimum Back Propping Requirements", "", 48, () => {
+      field("To Slabs until\nDate:", M + 6, 28, M + 92, y + 12, ""); field("To Beams until\nDate:", M + 110, 32, M + W - 4, y + 11, "");
+      doc.line(M, y + 16, M + W, y + 16); font("bold", 9.5); doc.text("Notes:", M + 9, y + 21); { const tw = doc.getTextWidth("Notes:"); doc.setLineWidth(0.25); doc.line(M + 9, y + 21.6, M + 9 + tw, y + 21.6); doc.setLineWidth(0.35); }
+      [27, 33.5, 40, 46].forEach(o => dots(M + 6, M + W - 6, y + o)); });
+    const pair = (title, who, d) => sec(title, "", 15, () => { field("Date:", M + 6, 14, M + 80, y + 9, d); field("Signed:", M + 92, 18, M + W - 4, y + 9, "", who); });
+    pair("Permit to Remove Back Propping to Slab", "(JJR)", "");
+    pair("Confirmation that Propping to Slab has been Removed", "Sub-Contractor", "");
+    pair("Permit to Remove Back Propping to Walls", "(JJR)", "");
+    pair("Confirmation that Propping to Walls has been Removed", "Sub-Contractor", ddmmyy(strike));
+    font("normal", 14, "#d32f2f"); doc.text(["Permit to Strike Formwork/ Remove Back Propping can now be", "commenced."], M + W / 2, y + 12, {align: "center"});
+  }
+  font("normal", 13); doc.text("Please file away all three Permit stages together in QA Folder.", M + W / 2, 283, {align: "center"});
+}
+async function permitPdf(btn, id, kind){
+  kind = kind || "all";
   const label = btn ? btn.innerHTML : "";
   if (btn){ btn.disabled = true; btn.textContent = "Making permit…"; }
   try{
@@ -4704,8 +4770,16 @@ async function permitPdf(btn, id){
     }
     const jsPDF = await loadJsPdf();
     const doc = new jsPDF({unit: "mm", format: "a4"});
-    groups.forEach((g, i) => { if (i) doc.addPage(); permitPage(doc, g); });
-    const name = id ? `Permit to Load ${permitNo(groups[0].permit)} (${dmy(groups[0].date).replace(/\//g, "-")}).pdf` : `Permits to Load ${dmy(groups[0].date).replace(/\//g, "-")} to ${dmy(groups[groups.length - 1].date).replace(/\//g, "-")}.pdf`;
+    let first = true;
+    const add = fn => { if (!first) doc.addPage(); first = false; fn(); };
+    groups.forEach(g => {
+      if (kind !== "strike") add(() => permitPage(doc, g));
+      if (kind !== "load"){ add(() => permitStrikePage(doc, g, 1)); add(() => permitStrikePage(doc, g, 3)); }
+    });
+    const fd = s => dmy(s).replace(/\//g, "-"), g0 = groups[0];
+    const name = !id ? `Permits ${fd(g0.date)} to ${fd(groups[groups.length - 1].date)}.pdf`
+      : kind === "strike" ? `Permit to Strike PTS${parseInt(g0.permit, 10) || ""} (${fd(permitStrikeDay(g0.date))}).pdf`
+      : `Permit to Load ${permitNo(g0.permit)} (${fd(g0.date)}).pdf`;
     const blob = doc.output("blob"), url = URL.createObjectURL(blob), a = document.createElement("a");
     a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 30000);
