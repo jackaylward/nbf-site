@@ -2795,6 +2795,17 @@ const VO_SEEDS = [{
     x_drg: "SE-26024 Rev 00 (Wall 51 elevation and Section 51B-51B) and bar schedule SH-26024: no L-bars from the top of Wall 51 into the screed",
     x_co: "JJ Rhatigan",
     x_qty: "Approximately 20 no. horizontal L-bars at the top of Wall 51 between gridlines 7 and 8, as shown in the attached photograph"},
+}, {
+  // 3 beam cages made up by Victor for the first floor screed pour on 14 Oct: B4 above Wall 33 (8 m, steel not detailed) and 2 no. on Wall 51 (2.0 m and 2.5 m, not shown)
+  key: "voSeedBeamsW33W51", ids: ["dw-vo-beams-w33-w51"], photos: [], trade: "Fixer", whoName: "Victor Gudumac",
+  days: [["2026-10-13", "07:00", "17:00", "Duration: 1 working day (10 hours), steel fixing foreman, ahead of the first floor structural screed pour (Section 2) on Wednesday 14 October 2026"]],
+  who: "victor", location: "First floor slab, Zone 2: beam B4 above Wall 33 (gridline 7, Grids H to I, Room 034) and 2 no. beams on top of Wall 51 (Grid I)",
+  work: d => `Fabrication and fixing of three reinforced concrete beam cages, with L-bars tying each beam into the structural screed, for the first floor structural screed pour (Section 2) on the precast hollowcore units, Zone 2: (1) an 8.0 m beam cage for beam B4 above Wall 33 (gridline 7, Grids H to I), which is supported by the temporary propping frame recorded separately; (2) a 2.0 m beam cage and (3) a 2.5 m beam cage on top of Wall 51 (Grid I). Work carried out by the steel fixing foreman, Victor Gudumac, as shown in the attached photographs (the two Wall 51 beams installed, and the 8.0 m beam before and after being placed and tied in position). ${d}.`,
+  det: {x_zone: "Zone 2",
+    x_why: "The steel drawings do not provide for this reinforcement. Beam B4 (250 x 550 mm deep RC downstand beam) is shown on the general arrangement SE-10031 and section SE-30031, but no reinforcement for it is detailed on the first floor tie steel drawings SE-16101 and SE-16102, the bar schedule SH-16101 or any other steel drawing, so the cage was made up on site. The two beams on Wall 51 are not shown on SE-16101 (which shows only H10 L-bars and H12 peripheral ties along Wall 51) or on the Wall 51 drawing SE-26024. This work is outside NBF's agreed scope and price",
+    x_drg: "SE-16101 Rev 00 and SE-16102 Rev 02 (first floor tie steel) and SH-16101 (bar schedule): no reinforcement for beam B4 and no beams on Wall 51. SE-10031 and SE-30031: B4 shown as a 250 x 550 mm deep RC downstand beam. SE-26024 Rev 00 (Wall 51): no beams shown",
+    x_co: "JJ Rhatigan",
+    x_qty: "3 no. reinforced concrete beam cages: 8.0 m (beam B4 above Wall 33), 2.0 m and 2.5 m (on Wall 51), 12.5 m in total, each with L-bars into the screed"},
 }];
 async function seedVariations(){
   try{ if (S.voSeeding || !RS("dayworks") || !RS("dayworks").list || !(S.lads || []).length) return; }catch(e){ return; }
