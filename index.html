@@ -2362,7 +2362,7 @@ async function loadRecords(kind, quiet){
     cacheSet("records:" + kind, st.list);
     // moveSiteRecords() was a one-off and is switched off
     if (kind === "works") seedDailyRecords();
-    if (kind === "dayworks"){ unmoveLadderRecord(); seedVariations().then(patchWall70).then(patchFrameW33).then(patchW51Qty).then(seedCraneDelays).then(rewordSeeded); }
+    if (kind === "dayworks"){ unmoveLadderRecord(); seedVariations().then(patchWall70).then(patchFrameW33).then(oneOffFixes14Oct).then(seedCraneDelays).then(rewordSeeded); }
   }catch(e){
     st.loadFailed = !st.list;
     if (!quiet) connectionTrouble();
@@ -2785,20 +2785,9 @@ const VO_SEEDS = [{
     x_qty: "1 no. temporary support frame beneath the precast slab units along Wall 33; subsequently lowered by 275 mm at the site engineers' request (works ongoing)",
     x_plant: "Adjustable steel props, steel beams, timber bearers, access tower and stepladder"},
 }, {
-  // Tue 13 Oct: L-bars from Wall 51 into the first floor screed, fixed by Victor (not on the Wall 51 drawing SE-26024; SE-16101 shows H10 01-300)
-  key: "voSeedW51Lbars", ids: ["dw-vo-w51-lbars"], photos: [], trade: "Fixer", whoName: "Victor Gudumac",
-  days: [["2026-10-13", "15:00", "16:00", "Duration: 1 hour on Tuesday 13 October 2026"]],
-  who: "victor", location: "First floor slab, Zone 2: top of Wall 51 (Grid I, between gridlines 7 and 8), on the precast hollowcore units, ahead of the structural screed pour on Wednesday 14 October 2026",
-  work: d => `Fixing of additional horizontal L-bars at the top of Wall 51 (Grid I, between gridlines 7 and 8), laid on the precast hollowcore units and turned into the wall reinforcement, to tie the wall into the 75 mm structural screed. Work carried out by the steel fixing foreman, Victor Gudumac, ahead of the screed pour on Wednesday 14 October 2026, as shown in the attached photograph. ${d}.`,
-  det: {x_zone: "Zone 2",
-    x_why: "These bars are not shown on the Wall 51 reinforcement drawing (SE-26024 Rev 00) or its bar schedule (SH-26024), so they were not provided for in the wall reinforcement. Fixing them on site is additional work, outside NBF's agreed scope and price",
-    x_drg: "SE-26024 Rev 00 (Wall 51 elevation and Section 51B-51B) and bar schedule SH-26024: no L-bars from the top of Wall 51 into the screed",
-    x_co: "JJ Rhatigan",
-    x_qty: "Approximately 20 no. horizontal L-bars at the top of Wall 51 between gridlines 7 and 8, as shown in the attached photograph"},
-}, {
   // 3 beam cages made up by Victor for the first floor screed pour on 14 Oct: B4 above Wall 33 (8 m, steel not detailed) and 2 no. on Wall 51 (2.0 m and 2.5 m, not shown)
   key: "voSeedBeamsW33W51", ids: ["dw-vo-beams-w33-w51"], photos: [], trade: "Fixer", whoName: "Victor Gudumac",
-  days: [["2026-10-13", "07:00", "17:00", "Duration: 1 working day (10 hours), steel fixing foreman, ahead of the first floor structural screed pour (Section 2) on Wednesday 14 October 2026"]],
+  days: [["2026-10-13", "07:00", "17:00", "Works carried out over two days: 5 hours on Tuesday 13 October 2026 and 5 hours on Wednesday 14 October 2026 (10 hours in total), ahead of the first floor structural screed pour (Section 2)"]],
   who: "victor", location: "First floor slab, Zone 2: beam B4 above Wall 33 (gridline 7, Grids H to I, Room 034) and 2 no. beams on top of Wall 51 (Grid I)",
   work: d => `Fabrication and fixing of three reinforced concrete beam cages, with L-bars tying each beam into the structural screed, for the first floor structural screed pour (Section 2) on the precast hollowcore units, Zone 2: (1) an 8.0 m beam cage for beam B4 above Wall 33 (gridline 7, Grids H to I), which is supported by the temporary propping frame recorded separately; (2) a 2.0 m beam cage and (3) a 2.5 m beam cage on top of Wall 51 (Grid I). Work carried out by the steel fixing foreman, Victor Gudumac, as shown in the attached photographs (the two Wall 51 beams installed, and the 8.0 m beam before and after being placed and tied in position). ${d}.`,
   det: {x_zone: "Zone 2",
@@ -2860,21 +2849,26 @@ async function patchFrameW33(){
     if (S.view === "dayworks") render();
   }catch(e){}
 }
-// one-off fix (Jack, 13 Oct): Wall 51 L-bars quantity without the "to be confirmed" wording
-async function patchW51Qty(){
+// one-off fixes (Jack, 14 Oct): delete the Wall 51 L-bar variation (covered by the beams variation),
+// and split the beams variation into 5 hours on Tue 13 Oct and 5 hours on Wed 14 Oct
+async function oneOffFixes14Oct(){
   try{
-    if (!RS("dayworks") || !RS("dayworks").list || await kvGet("voPatchW51Qty")) return;
-    const K = KINDS.dayworks, v = VO_SEEDS.find(x => x.key === "voSeedW51Lbars");
-    const r = mergedRecords("dayworks").find(x => x.id === v.ids[0]);
+    if (!RS("dayworks") || !RS("dayworks").list || await kvGet("fix14Oct")) return;
+    const K = KINDS.dayworks, all = mergedRecords("dayworks");
+    const v = VO_SEEDS.find(x => x.key === "voSeedBeamsW33W51"), r = all.find(x => x.id === v.ids[0]);
     if (!r) return;
+    if (all.some(x => x.id === "dw-vo-w51-lbars")) await queueRecordDelete("dayworks", "dw-vo-w51-lbars");
+    await kvSet("voSeedW51Lbars", true);
+    const [date, start, end, day] = v.days[0];
     const rec = {};
     K.textFields.forEach(k => rec[k] = r[k] == null ? "" : r[k]);
     ["chippies", "fixers", "operatives"].forEach(k => rec[k] = +r[k] || 0);
-    const p = parseDet(r.description), kept = {};
-    Object.entries(p.det).forEach(([k, val]) => { if (val) kept["x_" + k] = val; });
-    rec.description = composeDet(p.work, {...rec, ...kept, x_qty: v.det.x_qty});
+    Object.assign(rec, {date, start, end});
+    const kept = {};
+    Object.entries(parseDet(r.description).det).forEach(([k, val]) => { if (val) kept["x_" + k] = val; });
+    rec.description = composeDet(v.work(day), {...rec, ...kept});
     await queueRecordSave("dayworks", rec, [], []);
-    await kvSet("voPatchW51Qty", true);
+    await kvSet("fix14Oct", true);
     if (S.view === "dayworks") render();
   }catch(e){}
 }
@@ -2909,6 +2903,14 @@ const DL_SEEDS = [{
   det: {x_zone: "Zone 3", x_cause: "Crane in use by another trade",
     x_causeInfo: "Mobile crane allocated to precast slab installation in Zone 2 from 08:00 for the full day; not available to NBF for Zone 3",
     x_co: "JJ Rhatigan", x_effect: "No crane lifts possible in Zone 3 for the full day. Second consecutive day affected (see also the delay of Monday 5 October 2026)"},
+}, {
+  // Wed 14 Oct: screed pour held up, concrete wagons blocked by a picket at the front gates (national 24-hour public sector strike)
+  key: "dlSeed20261014protest", id: "dw-dl-2026-10-14-protest", date: "2026-10-14", start: "08:00", end: "13:00", copyFrom: "-",
+  location: "First floor slab, Zone 2 (structural screed pour, Section 2); site front entrance gates", photos: [],
+  work: "The first floor structural screed pour (Section 2), Zone 2, scheduled for Wednesday 14 October 2026, could not proceed as planned. Ready-mix concrete delivery vehicles were unable to enter the site because a picket held at the front entrance gates, as part of the national 24-hour public sector strike (HSE staff, teachers and other public sector workers), obstructed vehicle access, as shown in the attached photographs. At 11:00 the pour was delayed until 13:00 at the earliest.",
+  det: {x_zone: "Zone 2", x_cause: "Waiting on concrete",
+    x_causeInfo: "Concrete delivery vehicles unable to enter the site: picket at the front entrance gates during the national 24-hour public sector strike on Wednesday 14 October 2026, an event outside NBF's control (reported nationally by RTE, The Irish Times and TheJournal.ie)",
+    x_co: "JJ Rhatigan", x_effect: "Start of the first floor screed pour (Section 2) delayed until 13:00 at the earliest. NBF reserves its entitlement to an extension of time and to recover any associated costs"},
 }];
 async function seedCraneDelays(){
   try{ if (S.dlSeeding || !RS("dayworks") || !RS("dayworks").list) return; }catch(e){ return; }
@@ -2923,8 +2925,8 @@ async function seedCraneDelays(){
       const photos = [];
       for (const [i, src] of v.photos.entries()){ const data = await srPhotoData({data: src}); if (data) photos.push({name: `${v.id}-p${i + 1}`, data}); }
       if (photos.length < v.photos.length) continue;   // try again next load
-      const rec = {id: v.id, type: "Crane delay", date: v.date, start: v.start, end: (mon && mon.end) || "17:00",
-        location: (mon && mon.location) || "Zone 3", description: "",
+      const rec = {id: v.id, type: "Crane delay", date: v.date, start: v.start, end: v.end || (mon && mon.end) || "17:00",
+        location: v.location || (mon && mon.location) || "Zone 3", description: "",
         chippies: mon ? +mon.chippies || 0 : 0, fixers: mon ? +mon.fixers || 0 : 0, operatives: mon ? +mon.operatives || 0 : 0,
         other: (mon && mon.other) || ""};
       const det = {...v.det};
@@ -2933,7 +2935,7 @@ async function seedCraneDelays(){
       rec.description = composeDet(v.work, {...rec, ...det, x_ref: nextRef("Crane delay")});
       await queueRecordSave("dayworks", rec, photos, []);
       await kvSet(v.key, true);
-      setStatus("Crane delay for Tue 6 Oct added", true);
+      setStatus("Delay added", true);
       if (S.view === "dayworks") render();
     }
   }catch(e){}
