@@ -2986,6 +2986,13 @@ const WD_SEEDS = [{
     x_delay: "Scaffolding to Zone 2 first floor was completed at 12:00 today, as shown in the photographs, and was not available to NBF before then. Further delay to the first floor slab pour is possible: at Wall 50 first floor, where it meets Wall 16, a column (C7, grid 7/G) is required, and U-bars must first be fixed to the top of the steel so that the column can continue. JJ Rhatigan have a welder attending tomorrow to carry out these works",
     x_need: "Completion of the C7 column starter U-bars by JJ Rhatigan, Wall 50 / Wall 16, first floor", x_claim: "Yes",
     x_notes: "The in-situ infill works between the precast concrete slabs, using mortar, are to be the subject of a future variation. Column C7 is 250 x 450 RC (drawing SE-16010 Rev 00), with 3 no. H16 U-bars to be site welded to the steel beam starters."},
+}, {
+  key: "wdSeed20261014", rev: "wdSeed20261014r1", id: "wd-seed-2026-10-14", date: "2026-10-14",
+  location: "Zone 2 first floor, Zone 3",
+  work: "First floor slab screed concrete pour, Zone 2 (Section 2), completed. Wall works continued in Zone 3 (Section 3).",
+  det: {x_delay: "The first floor screed concrete pour, Zone 2 (Section 2), was delayed on 14 October 2026 by a picket at the site entrance gates, which obstructed the entry of concrete delivery vehicles. This is recorded in full as a concrete delay on the same date. The delay arose from an event outside NBF's control",
+    x_claim: "Yes",
+    x_notes: "No photographs were recorded with this entry."},
 }];
 async function seedDailyRecords(){
   try{ if (S.wdSeeding || !RS("works") || !RS("works").list) return; }catch(e){ return; }
