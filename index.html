@@ -401,6 +401,10 @@ input[readonly],textarea[readonly]{background:var(--soft);color:var(--muted);cur
 const DEFAULT_LOGO = document.getElementById("logoBlack").src;
 const WHITE_LOGO = document.getElementById("logo").src;
 const BUILTIN_PHOTOS = {};
+// operatives added from here once (Jack, 14/10/2026); their faces are already in the Drive photo folder
+const LAD_SEEDS = {key: "seedConcreteLads2", agency: "Concrete Lads 2", trade: "CF", names: ["Eusebiu Balasca", "Iulian Balasca", "Giorgi Kharbedia", "Tornike Katcharava", "Sorin Merchidan"]};
+// JB Structures operatives are paid 10 hours for a full day, so overtime starts after 10
+const paidFor = l => /^\s*jb\s*structures/i.test((l && l.agency) || "") ? 10 : S.paidHours;
 const AG_COLORS = {"DCOR Construction":"#012060","Talcon Group":"#1F6FB2","Adebura":"#2E7D4F","Dragos":"#7B3FA0","Petru Pirtac":"#B03A5B","Aitken":"#2F6F7A"};
 const AG_ORDER = Object.keys(AG_COLORS);
 // trades: these are the defaults; the real list comes from the Settings tab of the timesheet
@@ -584,18 +588,23 @@ const S = {
   view: "home",
   brand: {name:"New Bridge Form", color:"#012060", logo:""},
   lads: [], agencies: [], hasHours: false, paidHours: 9.5, tsWeek: "", sheetUrl: "", agencyList: [],
-  ladPhotos: {},
+  ladPhotos: {}, allLads: [], hidden: [],
   att: {week: mondayOf(new Date()), day: Math.min((new Date().getDay()+6)%7, 5), mode: "day", ticks: {}, loaded: null, edit: false},
   tools: null, toolPhotos: null, toolFilter: {q:"", status:""}, openTool: null,
   todayCount: null,
 };
 
 function setLadData(d){
+  S.lastLadData = d;
   if (d && d.trades) setTrades(d.trades);
   S.hasHours = !!d.hasHours; S.paidHours = d.paidHours || 9.5; S.tsWeek = d.weekStart || ""; S.sheetUrl = d.sheetUrl || "";
   S.agencyList = d.agencies || [];
   const b = buildLads(d);
-  S.lads = b.lads; S.agencies = b.agencies;
+  S.allLads = b.lads;
+  // hidden operatives drop off attendance and the timesheet (not deleted); anyone with hours this week stays visible
+  const hid = new Set(S.hidden || []);
+  S.lads = b.lads.filter(l => !hid.has(l.id) || l.hours.some(h => typeof h === "number" && h > 0));
+  S.agencies = b.agencies.filter(([a]) => S.lads.some(l => l.agency === a));
   if (typeof seedVariations === "function") seedVariations();
 }
 const AG_PALETTE = ["#012060","#1F6FB2","#2E7D4F","#7B3FA0","#B03A5B","#2F6F7A","#9A6700","#4B5563","#9C2F6B","#2F5D8A"];
@@ -872,7 +881,7 @@ function weekTotals(){
     const h = l.hours.map(x => typeof x === "number" ? x : 0);
     const sum = h.reduce((a,b)=>a+b,0);
     hours += sum; if (sum > 0) working++;
-    ot += h.reduce((a,x)=>a+Math.max(0, x - S.paidHours), 0);
+    ot += h.reduce((a,x)=>a+Math.max(0, x - paidFor(l)), 0);
   }
   return {hours, ot, working};
 }
@@ -1138,7 +1147,7 @@ $("view").addEventListener("click", async ev => {
 const needScript = e => /Unknown action/i.test(errText(e, "")) ? new Error("Add the latest LadEdit.gs and Extras.gs to the Apps Script first.") : e;
 function agenciesHtml(){
   const rows = agencyOptions().map(a => {
-    const n = S.lads.filter(l => l.agency === a).length;
+    const n = (S.allLads || S.lads).filter(l => l.agency === a).length;
     return `<div class="agrow"><span class="agdot" style="background:${agColor(a)}"></span><div class="who"><strong>${esc(a)}</strong><em>${n} lad${n === 1 ? "" : "s"}</em></div>
       <button class="btn ghost" data-agrename="${esc(a)}">Rename</button><button class="btn danger" data-agdelete="${esc(a)}">Delete</button></div>`;
   }).join("");
@@ -1188,7 +1197,8 @@ async function editLad(lad){
     <label class="field">Trade<select id="ladTrade">${lad.code && !TRADE_LABEL[lad.code] ? `<option value="${esc(lad.code)}" selected>${esc(lad.code)}</option>` : ""}${!lad.code ? `<option value="" selected>No trade set</option>` : ""}${TRADES.map(([c, l]) => `<option value="${esc(c)}"${c === lad.code ? " selected" : ""}>${esc(l)}</option>`).join("")}</select></label>
     <p class="msg" id="ladMsg"></p>
     <div class="row-actions" style="margin-top:14px"><button class="btn" id="ladSave">Save</button><button type="button" class="btn ghost" data-a="no">Cancel</button>
-      <button type="button" class="btn danger" data-a="remove" style="margin-left:auto">Remove lad</button></div></form>`);
+      <button type="button" class="btn ghost" data-a="hide" style="margin-left:auto">Hide</button><button type="button" class="btn danger" data-a="remove">Remove lad</button></div>
+    <p class="muted small" style="margin:8px 0 0">Hide takes him off attendance and the timesheet without deleting him. Hidden lads are listed at the bottom of Edit lads, with Unhide.</p></form>`);
   m.querySelector(".box").classList.add("wide");
   const close = () => m.remove();
   m.querySelector("#ladAgency").onchange = ev => { m.querySelector("#ladNewAgWrap").hidden = ev.target.value !== "__new"; };
@@ -1202,6 +1212,7 @@ async function editLad(lad){
       catch(e){ m.querySelector("#ladMsg").textContent = "Couldn't use that photo."; }
     }
     if (a === "remove"){ close(); removeLadFlow(lad); }
+    if (a === "hide"){ close(); setHidden(lad.id, true); setStatus(`${lad.name} hidden`, true); }
   };
   m.querySelector("#ladForm").onsubmit = async ev => {
     ev.preventDefault();
@@ -1322,7 +1333,54 @@ function attendanceHtml(){
   <div class="count"><b>${A.ready ? count : '<span class="spin" style="width:30px;height:30px"></span>'}</b><span class="muted">of ${S.lads.length} lads ${weekMode ? "in at least one day this week" : "in on " + DAY_LABEL[A.day]}</span></div>
   <p class="muted small" style="margin:-6px 2px 12px">${A.edit ? "Tap Edit to change a lad's name, agency, trade or photo. Agencies are at the bottom." : "Tap a photo circle to add or change that lad's photo."}</p>
   ${groups}
-  ${A.edit ? agenciesHtml() + addLadHtml() : ""}`;
+  ${A.edit ? hiddenHtml() + agenciesHtml() + addLadHtml() : ""}`;
+}
+function hiddenHtml(){
+  const ids = new Set(S.hidden || []), list = (S.allLads || []).filter(l => ids.has(l.id) && !S.lads.includes(l));
+  if (!list.length) return "";
+  return `<div class="panel" id="hidPanel"><h2>Hidden lads (${list.length})</h2>
+    <p class="muted small" style="margin:0 0 10px">Hidden from attendance and the timesheet, not deleted. A hidden lad given hours shows again for that week.</p>
+    <div class="lads week">${list.map(l => `<div class="lad">${avatar(l)}<div class="who"><strong>${esc(l.name)}</strong><em>${esc(l.agency)}</em></div><button class="btn ghost rm" data-unhide="${esc(l.id)}">Unhide</button></div>`).join("")}</div></div>`;
+}
+function setHidden(id, on){
+  const h = new Set(S.hidden || []);
+  if (on) h.add(id); else h.delete(id);
+  S.hidden = [...h];
+  kvSet("hiddenLads", S.hidden).catch(() => {});
+  if (S.lastLadData) setLadData(S.lastLadData);
+  render();
+}
+$("view").addEventListener("click", ev => {
+  const b = ev.target.closest("[data-unhide]");
+  if (!b) return;
+  const l = (S.allLads || []).find(x => x.id === b.dataset.unhide);
+  setHidden(b.dataset.unhide, false);
+  if (l) setStatus(`${l.name} is back on the list`, true);
+});
+// add the seeded operatives once (their faces are already in the Drive photo folder)
+async function seedLads(){
+  if (S.ladSeeding) return;
+  S.ladSeeding = true;
+  try{
+    if (await kvGet(LAD_SEEDS.key)) return;
+    let added = 0;
+    for (const name of LAD_SEEDS.names){
+      if ((S.allLads || []).some(l => l.id === slug(name))) continue;
+      const d = await server("addLadPlus", name, LAD_SEEDS.agency, LAD_SEEDS.trade).catch(e => {
+        if (/Unknown action/i.test(errText(e, ""))) return server("addLad", name, LAD_SEEDS.agency, LAD_SEEDS.trade);
+        if (/already/i.test(errText(e, ""))) return null;
+        throw e;
+      });
+      if (d && d.lads){ setLadData(d); added++; }
+    }
+    await kvSet(LAD_SEEDS.key, true);
+    if (added){
+      render();
+      bgServer("getPhotosSmall").catch(() => bgServer("getPhotos"))
+        .then(p => { if (p){ S.ladPhotos = p; cacheSet("ladPhotos", p); render(); } }).catch(() => {});
+    }
+  }catch(e){ /* try again next load */ }
+  finally{ S.ladSeeding = false; }
 }
 function addLadHtml(){
   const ags = agencyOptions();
@@ -1461,7 +1519,7 @@ $("view").addEventListener("submit", async ev => {
 // ================= timesheet =================
 function ladTotals(l){
   const h = l.hours.map(x => typeof x === "number" ? x : 0);
-  return {sum: h.reduce((a,b)=>a+b,0), ot: h.reduce((a,x)=>a+Math.max(0,x-S.paidHours),0)};
+  return {sum: h.reduce((a,b)=>a+b,0), ot: h.reduce((a,x)=>a+Math.max(0,x-paidFor(l)),0)};
 }
 function pastPicker(){
   const list = S.pastWeeks || [];
@@ -1474,7 +1532,7 @@ function pastHtml(){
   if (P.loading) return `<div class="panel tsbar"><div class="controls" style="margin:0">${pastPicker()}</div></div>${loadingBox("Loading that week…")}`;
   const d = P.data, paid = d.paidHours || S.paidHours;
   const b = buildLads(d);
-  const tot = l => { const h = (l.hours||[]).map(x => typeof x === "number" ? x : 0); return {sum: h.reduce((a,x)=>a+x,0), ot: h.reduce((a,x)=>a+Math.max(0,x-paid),0)}; };
+  const tot = l => { const h = (l.hours||[]).map(x => typeof x === "number" ? x : 0); return {sum: h.reduce((a,x)=>a+x,0), ot: h.reduce((a,x)=>a+Math.max(0,x-(/^\s*jb\s*structures/i.test(l.agency || "") ? 10 : paid)),0)}; };
   let gSum = 0, gOt = 0, working = 0;
   const groups = b.agencies.map(([agency, color]) => {
     const lads = b.lads.filter(l => l.agency === agency);
@@ -1540,7 +1598,7 @@ function timesheetHtml(){
       return `<div class="ts-lad" data-lad="${esc(l.id)}">
         <div class="ts-top">${avatar(l)}<div class="who"><strong>${esc(l.name)}</strong><em>${esc(l.trade) || "&nbsp;"}</em></div>
           <div class="tot"><b data-sum>${fmtH(lt.sum)}</b> hrs<span class="ot" data-ot ${lt.ot > 0 ? "" : "hidden"}>${fmtH(lt.ot)} OT</span></div></div>
-        <div class="hours">${DAYS.map((d,i) => { const v = l.hours[i]; const over = typeof v === "number" && v > S.paidHours;
+        <div class="hours">${DAYS.map((d,i) => { const v = l.hours[i]; const over = typeof v === "number" && v > paidFor(l);
           return `<label>${DAY_LABEL[i]}<input inputmode="decimal" data-h="${i}" value="${v === "" || v == null ? "" : v}" ${S.edit ? "" : "readonly"} class="${over ? "over" : ""}" aria-label="${esc(l.name)} ${DAY_LABEL[i]} hours"></label>`; }).join("")}</div>
         <input class="notes" data-notes placeholder="Notes" value="${esc(l.notes)}" ${S.edit ? "" : "readonly"} aria-label="${esc(l.name)} notes">
       </div>`;
@@ -1561,7 +1619,7 @@ function timesheetHtml(){
       <label class="field">PDF of<select id="tsTab">${(S.tsTabs && S.tsTabs.length ? S.tsTabs : ["Timesheet"]).map(n => `<option value="${esc(n)}">${n === "Timesheet" ? "Whole timesheet" : esc(n) + " only"}</option>`).join("")}</select></label>
       ${pdfBtn("timesheet", "Save as PDF")}
     </div>
-    <p class="muted small" style="margin:10px 0 0">Anything over the paid hours in a day shows <span class="ot" style="margin:0">yellow</span> as overtime.</p>
+    <p class="muted small" style="margin:10px 0 0">Anything over the paid hours in a day shows <span class="ot" style="margin:0">yellow</span> as overtime. JB Structures operatives are paid 10 hours a day, so their overtime starts after 10.</p>
   </div>
   ${pdfResult("timesheet")}
   <div class="ts-total" style="margin-bottom:14px"><span>Week total, ${t.working} lads</span><span><b id="grandSum">${fmtH(t.hours)}</b> hrs <span class="ot" id="grandOt" ${t.ot > 0 ? "" : "hidden"}>${fmtH(t.ot)} OT</span></span></div>
@@ -1611,7 +1669,7 @@ $("view").addEventListener("change", async ev => {
     if (v !== "" && !(v >= 0 && v <= 24)){ el.classList.add("bad"); setStatus("Hours must be between 0 and 24"); return; }
     el.classList.remove("bad");
     el.value = v === "" ? "" : v;
-    el.classList.toggle("over", v !== "" && v > S.paidHours);
+    el.classList.toggle("over", v !== "" && v > paidFor(lad));
     lad.hours[i] = v;
     refreshTotals(lad, row);
     queueSave(() => server("setHours", lad.name, DAYS[i], v));
@@ -5706,6 +5764,7 @@ go((() => {
   }catch(e){ return "home"; }
 })());
 (async () => {
+  try{ S.hidden = (await kvGet("hiddenLads")) || []; }catch(e){ S.hidden = []; }
   const cached = await cacheGet("boot");
   const cachedPhotos = await cacheGet("ladPhotos");
   if (cachedPhotos){ S.ladPhotos = cachedPhotos; S.photosLoaded = true; }
@@ -5716,6 +5775,7 @@ go((() => {
     startApp(b, false);
     cacheSet("boot", b);
     setStatus("Up to date", true);
+    seedLads();
     askWho();
     refreshJobs().then(() => { if (S.rec.jobs.length) processQueue(); });
     tickQLoad().then(() => flushTicks());
