@@ -2362,7 +2362,7 @@ async function loadRecords(kind, quiet){
     cacheSet("records:" + kind, st.list);
     // moveSiteRecords() was a one-off and is switched off
     if (kind === "works") seedDailyRecords();
-    if (kind === "dayworks"){ unmoveLadderRecord(); seedVariations().then(patchWall70).then(patchFrameW33).then(oneOffFixes14Oct).then(seedCraneDelays).then(rewordSeeded); }
+    if (kind === "dayworks"){ unmoveLadderRecord(); seedVariations().then(patchWall70).then(patchFrameW33).then(oneOffFixes14Oct).then(seedCraneDelays).then(patchProtestDelay).then(rewordSeeded); }
   }catch(e){
     st.loadFailed = !st.list;
     if (!quiet) connectionTrouble();
@@ -2872,6 +2872,24 @@ async function oneOffFixes14Oct(){
     if (S.view === "dayworks") render();
   }catch(e){}
 }
+// one-off fix (Jack, 14 Oct): protest delay is 09:30 to 13:00 with 5 concrete operatives standing
+async function patchProtestDelay(){
+  try{
+    if (!RS("dayworks") || !RS("dayworks").list || await kvGet("fixProtest1")) return;
+    const K = KINDS.dayworks, v = DL_SEEDS.find(x => x.key === "dlSeed20261014protest");
+    const r = mergedRecords("dayworks").find(x => x.id === v.id);
+    if (!r) return;
+    const rec = {};
+    K.textFields.forEach(k => rec[k] = r[k] == null ? "" : r[k]);
+    Object.assign(rec, {start: v.start, end: v.end, other: v.whoNames, chippies: 0, fixers: 0, operatives: 0}, v.crew);
+    const kept = {};
+    Object.entries(parseDet(r.description).det).forEach(([k, val]) => { if (val) kept["x_" + k] = val; });
+    rec.description = composeDet(v.work, {...rec, ...kept, x_effect: v.det.x_effect});
+    await queueRecordSave("dayworks", rec, [], []);
+    await kvSet("fixProtest1", true);
+    if (S.view === "dayworks") render();
+  }catch(e){}
+}
 async function patchWall70(){
   try{
     if (!RS("dayworks") || !RS("dayworks").list || await kvGet("voPatchWall70b")) return;
@@ -2905,12 +2923,12 @@ const DL_SEEDS = [{
     x_co: "JJ Rhatigan", x_effect: "No crane lifts possible in Zone 3 for the full day. Second consecutive day affected (see also the delay of Monday 5 October 2026)"},
 }, {
   // Wed 14 Oct: screed pour held up, concrete wagons blocked by a picket at the front gates (national 24-hour public sector strike)
-  key: "dlSeed20261014protest", id: "dw-dl-2026-10-14-protest", date: "2026-10-14", start: "08:00", end: "13:00", copyFrom: "-",
+  key: "dlSeed20261014protest", id: "dw-dl-2026-10-14-protest", date: "2026-10-14", start: "09:30", end: "13:00", copyFrom: "-", crew: {operatives: 5}, whoNames: "5 concrete operatives (screed pour gang)",
   location: "First floor slab, Zone 2 (structural screed pour, Section 2); site front entrance gates", photos: [],
-  work: "The first floor structural screed pour (Section 2), Zone 2, scheduled for Wednesday 14 October 2026, could not proceed as planned. Ready-mix concrete delivery vehicles were unable to enter the site because a picket held at the front entrance gates, as part of the national 24-hour public sector strike (HSE staff, teachers and other public sector workers), obstructed vehicle access, as shown in the attached photographs. At 11:00 the pour was delayed until 13:00 at the earliest.",
+  work: "The first floor structural screed pour (Section 2), Zone 2, scheduled for Wednesday 14 October 2026, commenced at 08:00 and was stopped at 09:30. Further ready-mix concrete delivery vehicles were unable to enter the site because a picket held at the front entrance gates, as part of the national 24-hour public sector strike (HSE staff, teachers and other public sector workers), obstructed vehicle access, as shown in the attached photographs. Five concrete operatives were standing idle from 09:30, awaiting concrete. At 11:00 the pour was delayed until 13:00 at the earliest.",
   det: {x_zone: "Zone 2", x_cause: "Waiting on concrete",
     x_causeInfo: "Concrete delivery vehicles unable to enter the site: picket at the front entrance gates during the national 24-hour public sector strike on Wednesday 14 October 2026, an event outside NBF's control (reported nationally by RTE, The Irish Times and TheJournal.ie)",
-    x_co: "JJ Rhatigan", x_effect: "Start of the first floor screed pour (Section 2) delayed until 13:00 at the earliest. NBF reserves its entitlement to an extension of time and to recover any associated costs"},
+    x_co: "JJ Rhatigan", x_effect: "First floor screed pour (Section 2) stopped at 09:30 and unable to resume until 13:00 at the earliest; 5 concrete operatives standing idle (17.5 man-hours lost to 13:00). NBF reserves its entitlement to an extension of time and to recover any associated costs"},
 }];
 async function seedCraneDelays(){
   try{ if (S.dlSeeding || !RS("dayworks") || !RS("dayworks").list) return; }catch(e){ return; }
@@ -2928,7 +2946,8 @@ async function seedCraneDelays(){
       const rec = {id: v.id, type: "Crane delay", date: v.date, start: v.start, end: v.end || (mon && mon.end) || "17:00",
         location: v.location || (mon && mon.location) || "Zone 3", description: "",
         chippies: mon ? +mon.chippies || 0 : 0, fixers: mon ? +mon.fixers || 0 : 0, operatives: mon ? +mon.operatives || 0 : 0,
-        other: (mon && mon.other) || ""};
+        other: v.whoNames || (mon && mon.other) || ""};
+      if (v.crew) Object.assign(rec, {chippies: 0, fixers: 0, operatives: 0}, v.crew);
       const det = {...v.det};
       if (md.cby) det.x_cby = md.cby;
       if (md.pstand) det.x_pstand = md.pstand;
