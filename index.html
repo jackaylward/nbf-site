@@ -2373,7 +2373,8 @@ async function loadRecords(kind, quiet){
 }
 function mergedRecords(kind){
   const K = KINDS[kind], st = RS(kind);
-  const byId = new Map((st.list || []).map(r => [r.id, {...r, pending: false}]));
+  // hours and man-hours are always worked out on the phone, so extra time slots count (the sheet only sees the first slot)
+  const byId = new Map((st.list || []).map(r => [r.id, {...r, ...(kind === "dayworks" ? K.derive(r) : {}), pending: false}]));
   for (const j of kindJobs(kind)){
     if (j.del){ byId.delete(j.id); continue; }
     const base = byId.get(j.id) || {photos: 0};
