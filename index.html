@@ -403,6 +403,7 @@ const WHITE_LOGO = document.getElementById("logo").src;
 const BUILTIN_PHOTOS = {};
 // operatives added from here once (Jack, 14/10/2026); their faces are already in the Drive photo folder
 const LAD_SEEDS = {key: "seedConcreteLads2", agency: "Concrete Lads 2", trade: "CF", names: ["Eusebiu Balasca", "Iulian Balasca", "Giorgi Kharbedia", "Tornike Katcharava", "Sorin Merchidan"]};
+const HID_RE = /\s*\(hidden\)\s*$/i;
 // JB Structures operatives are paid 10 hours for a full day, so overtime starts after 10
 const paidFor = l => /^\s*jb\s*structures/i.test((l && l.agency) || "") ? 10 : S.paidHours;
 const AG_COLORS = {"DCOR Construction":"#012060","Talcon Group":"#1F6FB2","Adebura":"#2E7D4F","Dragos":"#7B3FA0","Petru Pirtac":"#B03A5B","Aitken":"#2F6F7A"};
@@ -603,7 +604,7 @@ function setLadData(d){
   S.allLads = b.lads;
   // hidden operatives drop off attendance and the timesheet (not deleted); anyone with hours this week stays visible
   const hid = new Set(S.hidden || []);
-  S.lads = b.lads.filter(l => !hid.has(l.id) || l.hours.some(h => typeof h === "number" && h > 0));
+  S.lads = b.lads.filter(l => !(l.hidden || hid.has(l.id)) || l.hours.some(h => typeof h === "number" && h > 0));
   S.agencies = b.agencies.filter(([a]) => S.lads.some(l => l.agency === a));
   if (typeof seedVariations === "function") seedVariations();
 }
@@ -623,8 +624,9 @@ function agencyOptions(){
 function buildLads(d){
   const seen = new Set();
   const lads = (d.lads || []).map((l, i) => {
-    const code = String(l.trade||"").trim();
-    return {id: slug(l.name), name: l.name, code, trade: TRADE_LABEL[code] || code, rank: code in TRADE_RANK ? TRADE_RANK[code] : 99,
+    // "(hidden)" after the trade code in the sheet marks a hidden lad, so every phone and tablet agrees
+    const raw = String(l.trade||"").trim(), hidden = HID_RE.test(raw), code = raw.replace(HID_RE, "").trim();
+    return {id: slug(l.name), hidden, name: l.name, code, trade: TRADE_LABEL[code] || code, rank: code in TRADE_RANK ? TRADE_RANK[code] : 99,
       agency: l.agency || "No agency", color: agColor(l.agency || "No agency"),
       hours: (l.hours || []).slice(0,6), notes: l.notes || "", order: i};
   }).filter(l => l.name && !seen.has(l.id) && seen.add(l.id));
@@ -1024,7 +1026,7 @@ async function makeHeadcountPdf(){
   const doc = new jsPDF({unit: "mm", format: "a4"});
   doc.setProperties({title: `Headcount ${dateLabel}`, author: "New Bridge Form"});
   const W = 210, H = 297, M = 16, BOTTOM = H - 22;
-  const txt = (s, x, y, o) => doc.text(String(s), x, y, o);
+  const txt = (s, x, y, o) => doc.text(String(s).normalize("NFD").replace(/[\u0300-\u036f]/g, ""), x, y, o);   // plain letters: the PDF font has no ă, ș etc.
   const font = (style, size, color) => { doc.setFont("helvetica", style); doc.setFontSize(size); doc.setTextColor(color); };
 
   // header
@@ -1227,7 +1229,7 @@ async function editLad(lad){
     const changes = {};
     if (name !== lad.name) changes.name = name;
     if (agency !== cur) changes.agency = agency;
-    if (trade !== lad.code) changes.trade = trade;
+    if (trade !== lad.code) changes.trade = lad.hidden ? `${trade} (hidden)`.trim() : trade;
     if (!Object.keys(changes).length && !newPhoto){ close(); return; }
     m.querySelector("#ladSave").disabled = true; msg.textContent = "Saving…";
     try{
@@ -1336,18 +1338,41 @@ function attendanceHtml(){
   ${A.edit ? hiddenHtml() + agenciesHtml() + addLadHtml() : ""}`;
 }
 function hiddenHtml(){
-  const ids = new Set(S.hidden || []), list = (S.allLads || []).filter(l => ids.has(l.id) && !S.lads.includes(l));
+  const list = (S.allLads || []).filter(l => !S.lads.includes(l));
   if (!list.length) return "";
   return `<div class="panel" id="hidPanel"><h2>Hidden lads (${list.length})</h2>
     <p class="muted small" style="margin:0 0 10px">Hidden from attendance and the timesheet, not deleted. A hidden lad given hours shows again for that week.</p>
     <div class="lads week">${list.map(l => `<div class="lad">${avatar(l)}<div class="who"><strong>${esc(l.name)}</strong><em>${esc(l.agency)}</em></div><button class="btn ghost rm" data-unhide="${esc(l.id)}">Unhide</button></div>`).join("")}</div></div>`;
 }
-function setHidden(id, on){
+// hiding is saved on the timesheet (trade "C (hidden)") so it shows the same on every device;
+// until Google confirms, it is held on this device
+async function setHidden(id, on){
+  const lad = (S.allLads || []).find(l => l.id === id);
   const h = new Set(S.hidden || []);
   if (on) h.add(id); else h.delete(id);
   S.hidden = [...h];
-  kvSet("hiddenLads", S.hidden).catch(() => {});
   if (S.lastLadData) setLadData(S.lastLadData);
+  render();
+  if (!lad) return;
+  try{
+    const d = await server("updateLad", lad.name, {trade: on ? `${lad.code} (hidden)`.trim() : lad.code});
+    if (d && d.lads){ S.hidden = S.hidden.filter(x => x !== id); setLadData(d); render(); }
+  }catch(e){ setStatus(errText(e, "Saved on this phone only. Try again with signal")); }
+  kvSet("hiddenLads", S.hidden).catch(() => {});
+}
+// move lads hidden on this device before hiding was shared onto the timesheet
+async function syncHidden(){
+  const local = [...(S.hidden || [])];
+  for (const id of local){
+    const lad = (S.allLads || []).find(l => l.id === id);
+    if (!lad){ S.hidden = S.hidden.filter(x => x !== id); continue; }
+    if (lad.hidden){ S.hidden = S.hidden.filter(x => x !== id); continue; }
+    try{
+      const d = await server("updateLad", lad.name, {trade: `${lad.code} (hidden)`.trim()});
+      if (d && d.lads){ S.hidden = S.hidden.filter(x => x !== id); setLadData(d); }
+    }catch(e){ break; }
+  }
+  kvSet("hiddenLads", S.hidden).catch(() => {});
   render();
 }
 $("view").addEventListener("click", ev => {
@@ -5857,7 +5882,7 @@ go((() => {
     startApp(b, false);
     cacheSet("boot", b);
     setStatus("Up to date", true);
-    seedLads();
+    seedLads(); syncHidden();
     askWho();
     refreshJobs().then(() => { if (S.rec.jobs.length) processQueue(); });
     tickQLoad().then(() => flushTicks());
