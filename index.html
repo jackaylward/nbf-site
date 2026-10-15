@@ -3103,6 +3103,11 @@ const WD_SEEDS = [{
   det: {x_delay: "The first floor screed concrete pour, Zone 2 (Section 2), was delayed on 14 October 2026 by a picket at the site entrance gates, which obstructed the entry of concrete delivery vehicles. This is recorded in full as a concrete delay on the same date. The delay arose from an event outside NBF's control",
     x_claim: "Yes",
     x_notes: "No photographs were recorded with this entry."},
+}, {
+  key: "wdSeed20261015", rev: "wdSeed20261015r1", id: "wd-seed-2026-10-15", date: "2026-10-15",
+  location: "Zone 3; Zone 2 first floor",
+  work: "Concrete pour to Walls 13, 14, 15, 25, 46, 47 and 48, Zone 3. The first floor screed slab, Zone 2 (Section 2), was completed, including power floating and finishing, and was surveyed by the engineer.",
+  det: {x_notes: "JJ Rhatigan requested that NBF install edge protection to the slab above Wall 33, first floor. NBF advised that this was outside NBF's scope of works. The scaffolder subsequently installed the edge protection. No photographs were recorded with this entry."},
 }];
 async function seedDailyRecords(){
   try{ if (S.wdSeeding || !RS("works") || !RS("works").list) return; }catch(e){ return; }
