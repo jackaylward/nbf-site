@@ -2894,6 +2894,18 @@ const VO_SEEDS = [{
     x_qty: "Rough estimate: about 23 m of gaps between the slabs (taken off the Ducon layout SC-10001 Rev 03), about 200 mm wide on average, filled to about half the 200 mm slab depth (about 100 mm). About 23 m x 0.20 m x 0.10 m = 0.46 m3, say 0.5 m3 of mortar",
     x_mats: "Mortar from the site mortar bin, about 0.5 m3 (rough estimate)",
     x_days: "14/10/2026 08:00 to 12:00"},
+}, {
+  // Wed 14 Oct, 08:00-10:00: Alan erected the decking frame and timber shutter for beam B4 over Wall 33 (Wall 66 to Wall 50), first floor Zone 2
+  key: "voSeedB4DeckW33", ids: ["dw-vo-b4-deck-w33"], photos: [], trade: "Carp", whoName: "Alan",
+  days: [["2026-10-14", "08:00", "10:00", "Time: Wednesday 14 October 2026, 08:00 to 10:00, 1 carpenter (Alan), 2 man-hours"]],
+  who: "alan", location: "First floor, Zone 2: beam B4 over Wall 33 (gridline 7), running from Wall 66 (Grid H) to Wall 50, with the support frame standing on the ground floor slab below",
+  work: d => `Putting up a decking frame and a timber shutter for beam B4 (250 x 550 mm deep RC downstand beam) over Wall 33, first floor, Zone 2, running from Wall 66 to Wall 50, between the top of the wall and the precast slab. The frame stands on the ground floor slab and is made up of Peri Multiprops carrying Kaufmann HT20 and Peri VT20 timber beams, with timber bearers and decking on top, and the timber beam shutter built on the decking. The frame carries the beam shutter and the wet concrete of the beam until it gains strength, as shown in the attached photographs. ${d}.`,
+  det: {x_zone: "Zone 2",
+    x_why: "No detail was given for how beam B4 was to be formed or supported. B4 is shown only on SE-10031 and SE-30031, both issued P01 For Information, and no reinforcement for it is detailed on any steel drawing. No propping or temporary works design, method statement or design certificate was provided for the support frame, as required for propping to in-situ formwork (Works Requirements A1.3, clause E20/132). The temporary support frame is outside NBF's agreed scope and price",
+    x_drg: "SE-10031 (B4, 250 x 550 mm deep RC downstand beam) and SE-30031 section 7, both P01 For Information; SE-16101, SE-16102 and SH-16101 show no reinforcement for B4",
+    x_co: "JJ Rhatigan",
+    x_qty: "1 no. decking frame and timber beam shutter to beam B4, Wall 66 to Wall 50",
+    x_plant: "Peri Multiprops, Kaufmann HT20 and Peri VT20 timber beams, timber bearers and decking"},
 }];
 async function seedVariations(){
   try{ if (S.voSeeding || !RS("dayworks") || !RS("dayworks").list || !(S.lads || []).length) return; }catch(e){ return; }
