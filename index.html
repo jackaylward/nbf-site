@@ -403,7 +403,17 @@ const WHITE_LOGO = document.getElementById("logo").src;
 const BUILTIN_PHOTOS = {};
 // operatives added from here once (Jack, 14/10/2026); their faces are already in the Drive photo folder
 const LAD_SEEDS = {key: "seedConcreteLads2", agency: "Concrete Lads 2", trade: "CF", names: ["Eusebiu Balasca", "Iulian Balasca", "Giorgi Kharbedia", "Tornike Katcharava", "Sorin Merchidan"]};
-const HID_RE = /\s*\(hidden\)\s*$/i;
+const HID_RE = /\s*\(hidden(?:\s+(\d{4}-\d{2}-\d{2}))?\)\s*$/i;
+const hidTag = from => from ? `(hidden ${from})` : "(hidden)";
+// a hidden lad still shows on days before he was hidden, and on any day he was marked in, so past records keep him
+function shownOn(l, date, isIn){
+  if (isIn) return true;
+  const from = l.hidden ? l.hiddenFrom : ((S.hidden || []).includes(l.id) ? iso(new Date()) : null);
+  if (from == null) return true;
+  return !!from && date < from;
+}
+const dayIso = (week, i) => { const d = new Date(week); d.setDate(d.getDate() + i); return iso(d); };
+const hasH = (l, i) => typeof l.hours[i] === "number" && l.hours[i] > 0;
 // JB Structures operatives are paid 10 hours for a full day, so overtime starts after 10
 const paidFor = l => /^\s*jb\s*structures/i.test((l && l.agency) || "") ? 10 : S.paidHours;
 const AG_COLORS = {"DCOR Construction":"#012060","Talcon Group":"#1F6FB2","Adebura":"#2E7D4F","Dragos":"#7B3FA0","Petru Pirtac":"#B03A5B","Aitken":"#2F6F7A"};
@@ -602,9 +612,9 @@ function setLadData(d){
   S.agencyList = d.agencies || [];
   const b = buildLads(d);
   S.allLads = b.lads;
-  // hidden operatives drop off attendance and the timesheet (not deleted); anyone with hours this week stays visible
-  const hid = new Set(S.hidden || []);
-  S.lads = b.lads.filter(l => !(l.hidden || hid.has(l.id)) || l.hours.some(h => typeof h === "number" && h > 0));
+  // hidden operatives drop off from the day they were hidden (not deleted); earlier days and days with hours keep them
+  const wk = fromIso(S.tsWeek) || mondayOf(new Date());
+  S.lads = b.lads.filter(l => DAYS.some((_, i) => shownOn(l, dayIso(wk, i), hasH(l, i))));
   S.agencies = b.agencies.filter(([a]) => S.lads.some(l => l.agency === a));
   if (typeof seedVariations === "function") seedVariations();
 }
@@ -625,8 +635,8 @@ function buildLads(d){
   const seen = new Set();
   const lads = (d.lads || []).map((l, i) => {
     // "(hidden)" after the trade code in the sheet marks a hidden lad, so every phone and tablet agrees
-    const raw = String(l.trade||"").trim(), hidden = HID_RE.test(raw), code = raw.replace(HID_RE, "").trim();
-    return {id: slug(l.name), hidden, name: l.name, code, trade: TRADE_LABEL[code] || code, rank: code in TRADE_RANK ? TRADE_RANK[code] : 99,
+    const raw = String(l.trade||"").trim(), hm = raw.match(HID_RE), code = raw.replace(HID_RE, "").trim();
+    return {id: slug(l.name), hidden: !!hm, hiddenFrom: hm ? (hm[1] || "") : null, name: l.name, code, trade: TRADE_LABEL[code] || code, rank: code in TRADE_RANK ? TRADE_RANK[code] : 99,
       agency: l.agency || "No agency", color: agColor(l.agency || "No agency"),
       hours: (l.hours || []).slice(0,6), notes: l.notes || "", order: i};
   }).filter(l => l.name && !seen.has(l.id) && seen.add(l.id));
@@ -1012,7 +1022,7 @@ async function makeHeadcountPdf(){
   const dateLabel = `${wd} ${dd}/${mm}/${yy.slice(2)}`;
   const fileName = `Headcount_${wd.slice(0,3)}_${dd}-${mm}-${yy.slice(2)}.pdf`;
 
-  const lads = S.lads.map(l => ({...l, hcTrade: hcTrade(l), isIn: ticked(l.id, dayKey), hcAgency: l.agency === "No agency" ? "Agency not set" : l.agency}));
+  const lads = attLads(A.day).map(l => ({...l, hcTrade: hcTrade(l), isIn: ticked(l.id, dayKey), hcAgency: l.agency === "No agency" ? "Agency not set" : l.agency}));
   const X = lads.filter(l => l.isIn).length, Y = lads.length;
   const found = [...new Set(lads.map(l => l.hcTrade))];
   const trades = [...HC_TRADE_ORDER.filter(t => found.includes(t)),
@@ -1229,7 +1239,7 @@ async function editLad(lad){
     const changes = {};
     if (name !== lad.name) changes.name = name;
     if (agency !== cur) changes.agency = agency;
-    if (trade !== lad.code) changes.trade = lad.hidden ? `${trade} (hidden)`.trim() : trade;
+    if (trade !== lad.code) changes.trade = lad.hidden ? `${trade} ${hidTag(lad.hiddenFrom)}`.trim() : trade;
     if (!Object.keys(changes).length && !newPhoto){ close(); return; }
     m.querySelector("#ladSave").disabled = true; msg.textContent = "Saving…";
     try{
@@ -1303,14 +1313,22 @@ $("view").addEventListener("submit", async ev => {
 // ================= attendance =================
 const A = S.att;
 const ticked = (id, d) => !!(A.ticks[id] && A.ticks[id][d]);
+// lads for the attendance day (or week) on screen: hidden lads stay on days before they were hidden
+function attLads(day){
+  const all = S.allLads && S.allLads.length ? S.allLads : S.lads;
+  const on = i => l => shownOn(l, dayIso(A.week, i), ticked(l.id, DAYS[i]));
+  return day == null ? all.filter(l => DAYS.some((_, i) => on(i)(l))) : all.filter(on(day));
+}
 function attendanceHtml(){
   if (!S.booted) return loadingBox("Loading lads…");
   const end = new Date(A.week); end.setDate(end.getDate()+5);
   const weekMode = A.mode === "week";
   const dayKey = DAYS[A.day];
   let count = 0;
-  const groups = S.agencies.map(([agency, color]) => {
-    const lads = S.lads.filter(l => l.agency === agency);
+  const shown = attLads(weekMode ? null : A.day);
+  const groups = [...new Set(shown.map(l => l.agency))].map(a => [a, agColor(a)]).map(([agency, color]) => {
+    const lads = shown.filter(l => l.agency === agency);
+    if (!lads.length) return "";
     const inN = weekMode ? lads.filter(l => DAYS.some(d => ticked(l.id,d))).length : lads.filter(l => ticked(l.id, dayKey)).length;
     count += inN;
     const rows = lads.map(l => {
@@ -1332,17 +1350,17 @@ function attendanceHtml(){
   </div>
   ${modeBar()}
   ${pdfResult("attendance")}
-  <div class="count"><b>${A.ready ? count : '<span class="spin" style="width:30px;height:30px"></span>'}</b><span class="muted">of ${S.lads.length} lads ${weekMode ? "in at least one day this week" : "in on " + DAY_LABEL[A.day]}</span></div>
+  <div class="count"><b>${A.ready ? count : '<span class="spin" style="width:30px;height:30px"></span>'}</b><span class="muted">of ${shown.length} lads ${weekMode ? "in at least one day this week" : "in on " + DAY_LABEL[A.day]}</span></div>
   <p class="muted small" style="margin:-6px 2px 12px">${A.edit ? "Tap Edit to change a lad's name, agency, trade or photo. Agencies are at the bottom." : "Tap a photo circle to add or change that lad's photo."}</p>
   ${groups}
   ${A.edit ? hiddenHtml() + agenciesHtml() + addLadHtml() : ""}`;
 }
 function hiddenHtml(){
-  const list = (S.allLads || []).filter(l => !S.lads.includes(l));
+  const list = (S.allLads || []).filter(l => l.hidden || (S.hidden || []).includes(l.id));
   if (!list.length) return "";
   return `<div class="panel" id="hidPanel"><h2>Hidden lads (${list.length})</h2>
-    <p class="muted small" style="margin:0 0 10px">Hidden from attendance and the timesheet, not deleted. A hidden lad given hours shows again for that week.</p>
-    <div class="lads week">${list.map(l => `<div class="lad">${avatar(l)}<div class="who"><strong>${esc(l.name)}</strong><em>${esc(l.agency)}</em></div><button class="btn ghost rm" data-unhide="${esc(l.id)}">Unhide</button></div>`).join("")}</div></div>`;
+    <p class="muted small" style="margin:0 0 10px">Hidden from attendance and the timesheet from the day they were hidden, not deleted. Earlier days still show them.</p>
+    <div class="lads week">${list.map(l => `<div class="lad">${avatar(l)}<div class="who"><strong>${esc(l.name)}</strong><em>${esc(l.agency)}${l.hiddenFrom ? " · from " + esc(l.hiddenFrom.split("-").reverse().join("/")) : ""}</em></div><button class="btn ghost rm" data-unhide="${esc(l.id)}">Unhide</button></div>`).join("")}</div></div>`;
 }
 // hiding is saved on the timesheet (trade "C (hidden)") so it shows the same on every device;
 // until Google confirms, it is held on this device
@@ -1355,7 +1373,7 @@ async function setHidden(id, on){
   render();
   if (!lad) return;
   try{
-    const d = await server("updateLad", lad.name, {trade: on ? `${lad.code} (hidden)`.trim() : lad.code});
+    const d = await server("updateLad", lad.name, {trade: on ? `${lad.code} ${hidTag(iso(new Date()))}`.trim() : lad.code});
     if (d && d.lads){ S.hidden = S.hidden.filter(x => x !== id); setLadData(d); render(); }
   }catch(e){ setStatus(errText(e, "Saved on this phone only. Try again with signal")); }
   kvSet("hiddenLads", S.hidden).catch(() => {});
@@ -1368,7 +1386,7 @@ async function syncHidden(){
     if (!lad){ S.hidden = S.hidden.filter(x => x !== id); continue; }
     if (lad.hidden){ S.hidden = S.hidden.filter(x => x !== id); continue; }
     try{
-      const d = await server("updateLad", lad.name, {trade: `${lad.code} (hidden)`.trim()});
+      const d = await server("updateLad", lad.name, {trade: `${lad.code} ${hidTag(iso(new Date()))}`.trim()});
       if (d && d.lads){ S.hidden = S.hidden.filter(x => x !== id); setLadData(d); }
     }catch(e){ break; }
   }
@@ -1489,7 +1507,7 @@ $("view").addEventListener("click", async ev => {
   const e = ev.target.closest("[data-edit]"), r = ev.target.closest("[data-remove]");
   if (t){
     const [id, day] = t.dataset.tick.split("|");
-    const lad = S.lads.find(l => l.id === id);
+    const lad = (S.allLads || S.lads).find(l => l.id === id);
     if (!A.ready) return;
     if (!(await canEdit())) return;
     const val = !ticked(id, day);
