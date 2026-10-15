@@ -2881,6 +2881,19 @@ const VO_SEEDS = [{
     x_drg: "SE-16101 Rev 00 and SE-16102 Rev 02 (first floor tie steel) and SH-16101 (bar schedule): no reinforcement for beam B4 and no beams on Wall 51. SE-10031 and SE-30031: B4 shown as a 250 x 550 mm deep RC downstand beam. SE-26024 Rev 00 (Wall 51): no beams shown",
     x_co: "JJ Rhatigan",
     x_qty: "3 no. reinforced concrete beam cages: 8.0 m (beam B4 above Wall 33), 2.0 m and 2.5 m (on Wall 51), 12.5 m in total, each with L-bars into the screed"},
+}, {
+  // Tue 13 Oct (3 hrs) and Wed 14 Oct (4 hrs): Vitalie filling the gaps between the precast slabs with mortar from the mortar bin, first floor Zone 2
+  key: "voSeedInfillsFFZ2", ids: ["dw-vo-infills-ff-z2"], photos: [], whoName: "Vitalie",
+  days: [["2026-10-13", "08:00", "11:00", "Time: 3 hours on Tuesday 13 October 2026 and 4 hours on Wednesday 14 October 2026, 1 general operative (Vitalie), 7 man-hours in total"]],
+  who: "vitalie", location: "First floor slab, Zone 2: gaps (infills) between the Ducon precast hollowcore slabs (layout SC-10001 Rev 03)",
+  work: d => `Filling the gaps (infills) between the precast hollowcore slabs on the first floor, Zone 2, with mortar, ahead of the structural screed pour. The mortar was mixed at the site mortar bin and barrowed to the slab. The gaps between the slabs averaged about 200 mm wide and were filled to about half depth. As shown in the attached photographs (the filled gaps between the slabs, and the operative mixing at the mortar bin). ${d}.`,
+  det: {x_zone: "Zone 2",
+    x_why: "Filling the gaps between the precast slabs is not part of NBF's formwork works and is outside NBF's agreed scope and price",
+    x_drg: "Ducon precast layout SC-10001 Rev 03 (first floor, Zone 2)",
+    x_co: "JJ Rhatigan",
+    x_qty: "Rough estimate: about 23 m of gaps between the slabs (taken off the Ducon layout SC-10001 Rev 03), about 200 mm wide on average, filled to about half the 200 mm slab depth (about 100 mm). About 23 m x 0.20 m x 0.10 m = 0.46 m3, say 0.5 m3 of mortar",
+    x_mats: "Mortar from the site mortar bin, about 0.5 m3 (rough estimate)",
+    x_days: "14/10/2026 08:00 to 12:00"},
 }];
 async function seedVariations(){
   try{ if (S.voSeeding || !RS("dayworks") || !RS("dayworks").list || !(S.lads || []).length) return; }catch(e){ return; }
