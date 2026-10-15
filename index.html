@@ -1719,6 +1719,7 @@ async function loadTools(quiet){
     S.tools = tools;
     cacheSet("tools", tools);
     if (S.view === "tools" || S.view === "home") render();
+    seedTools();
     if (!quiet) setStatus("Up to date", true);
   }catch(e){ if (!quiet) connectionTrouble(); }
   toolsLoading = false;
@@ -1862,6 +1863,47 @@ $("view").addEventListener("click", async ev => {
     catch(e){ $("toolMsg").textContent = errText(e, "Couldn't remove the tool."); }
   }
 });
+
+// one-off: new tools added to the register (photos in /tools). Skipped if the serial is already on the register.
+const TOOL_SEEDS = [{
+  key: "toolSeedDGA452", tool: "Cordless angle grinder, 115 mm (4-1/2\")", make: "Makita", model: "DGA452Z", serial: "2187084 Y",
+  made: "March 2025", power: "18V Li-ion (LXT), body only", full: "tools/dga452-full.jpg", tag: "tools/dga452-tag.jpg",
+  notes: "New tool, supplied boxed with side handle, wheel guard, lock-nut spanner and grinding disc. Wheel guard and side handle to be fitted before use.",
+}, {
+  key: "toolSeedDTW700", tool: "Cordless impact wrench, 1/2\" square drive", make: "Makita", model: "DTW700", serial: "212183G",
+  made: "February 2025", power: "18V Li-ion (LXT)", full: "tools/dtw700-full.jpg", tag: "tools/dtw700-tag.jpg",
+  notes: "New tool.",
+}, {
+  key: "toolSeedDHR242", tool: "Cordless SDS-Plus rotary hammer drill, 24 mm", make: "Makita", model: "DHR242", serial: "120992 R",
+  made: "September 2025", power: "18V Li-ion (LXT), brushless", full: "tools/dhr242-full.jpg", tag: "tools/dhr242-tag.jpg",
+  notes: "New tool, supplied with side handle.",
+}];
+async function seedTools(){
+  if (S.toolSeeding || !Array.isArray(S.tools)) return;
+  S.toolSeeding = true;
+  const norm = x => String(x || "").replace(/\s+/g, "").toUpperCase();
+  try{
+    for (const v of TOOL_SEEDS){
+      if (await kvGet(v.key)) continue;
+      if (S.tools.some(t => norm(t.serial) === norm(v.serial) && norm(t.model) === norm(v.model))){ await kvSet(v.key, true); continue; }
+      const full = await srPhotoData({data: v.full}), tag = await srPhotoData({data: v.tag});
+      if (!full || !tag) continue;   // try again next load
+      const rec = {id: "", tool: v.tool, make: v.make, model: v.model, serial: v.serial, made: v.made, power: v.power,
+        photoTaken: "2026-10-15", location: "Site store, Patrician Secondary School, Newbridge", status: "In store",
+        notes: v.notes + " Added to the register on 15 October 2026. No inspection or certificate dates recorded.", check: false};
+      const res = await server("saveTool", rec);
+      S.tools = res.tools;
+      await kvSet(v.key, true);
+      await server("saveToolPhoto", res.id, "full", full);
+      await server("saveToolPhoto", res.id, "tag", tag);
+      S.toolPhotos = {...S.toolPhotos, [res.id]: {full, tag}};
+      cacheSet("tools", S.tools); cacheSet("toolPhotos", S.toolPhotos);
+      setStatus(`${v.make} ${v.model} added to tools`, true);
+      if (S.view === "tools" || S.view === "home") render();
+    }
+  }catch(e){}
+  finally{ S.toolSeeding = false; }
+}
 
 // ================= dayworks and works done =================
 // Every save goes into a queue on this device first (IndexedDB), then is sent to Google.
