@@ -2447,7 +2447,7 @@ async function loadRecords(kind, quiet){
     cacheSet("records:" + kind, st.list);
     // moveSiteRecords() was a one-off and is switched off
     if (kind === "works") seedDailyRecords();
-    if (kind === "dayworks"){ unmoveLadderRecord(); seedVariations().then(patchWall70).then(patchFrameW33).then(oneOffFixes14Oct).then(seedCraneDelays).then(patchProtestDelay).then(rewordSeeded).then(rewordR115).then(patchInfill150); }
+    if (kind === "dayworks"){ unmoveLadderRecord(); seedVariations().then(patchWall70).then(patchFrameW33).then(oneOffFixes14Oct).then(seedCraneDelays).then(patchProtestDelay).then(rewordSeeded).then(rewordR115).then(patchInfill150).then(dropStaleRewords); }
   }catch(e){
     st.loadFailed = !st.list;
     if (!quiet) connectionTrouble();
@@ -3166,6 +3166,27 @@ async function patchInfill150(){
     rec.description = composeDet(work, {...rec, ...kept, x_qty: v.det.x_qty, x_mats: v.det.x_mats});
     await queueRecordSave("dayworks", rec, [], []);
     await kvSet("fixInfill150", true);
+    if (S.view === "dayworks") render();
+  }catch(e){}
+}
+// The R115 rewording and the 150 mm fix ran on every device. Google already holds the new wording from the
+// first device, and turned down the later copies, so they sat as "Needs fixing". Drop those copies once
+// Google's version has the new wording (they hold no photos), so nothing is overwritten.
+async function dropStaleRewords(){
+  try{
+    const st = RS("dayworks");
+    if (!st || !st.list) return;
+    let dropped = 0;
+    for (const id of ["dw-vo-precast-frame-w33", "dw-vo-beams-w33-w51", "dw-vo-infills-ff-z2", "dw-vo-b4-deck-w33"]){
+      const job = await jobGet("save:" + id), live = st.list.find(r => r.id === id);
+      if (!job || !job.error || !live || job.newPhotos.some(p => !p.sent) || job.removed.length) continue;
+      const d = String(live.description || "");
+      if (!/BOQ or pro-rata rates/.test(d) || (id === "dw-vo-infills-ff-z2" && !/150 mm/.test(d))) continue;
+      await jobDel(job.key); dropped++;
+    }
+    if (!dropped) return;
+    await refreshJobs();
+    processQueue();
     if (S.view === "dayworks") render();
   }catch(e){}
 }
