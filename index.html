@@ -2447,7 +2447,7 @@ async function loadRecords(kind, quiet){
     cacheSet("records:" + kind, st.list);
     // moveSiteRecords() was a one-off and is switched off
     if (kind === "works") seedDailyRecords();
-    if (kind === "dayworks"){ unmoveLadderRecord(); seedVariations().then(patchWall70).then(patchFrameW33).then(oneOffFixes14Oct).then(seedCraneDelays).then(patchProtestDelay).then(rewordSeeded); }
+    if (kind === "dayworks"){ unmoveLadderRecord(); seedVariations().then(patchWall70).then(patchFrameW33).then(oneOffFixes14Oct).then(seedCraneDelays).then(patchProtestDelay).then(rewordSeeded).then(rewordR115); }
   }catch(e){
     st.loadFailed = !st.list;
     if (!quiet) connectionTrouble();
@@ -2866,7 +2866,8 @@ const VO_SEEDS = [{
   who: "", location: "Ground floor, Zone 2: Room 034, General Classroom (30), bounded by Wall 33 (gridline 7), Wall 66 (Grid H), Wall 51 (Grid I) and Wall 52 (gridline 8), along Wall 33",
   work: d => `Erection of a temporary support frame beneath the precast floor slab units along Wall 33, ground floor, Zone 2, in Room 034, General Classroom (30), bounded by Walls 33, 66, 51 and 52 (gridlines 7 to 8, Grids H to I; room per Healy Partners Ground Floor Plan AR-10010). The frame, formed with adjustable steel props, steel beams and timber bearers on an access tower, supports the precast units where there is a gap in their bearing, as shown in the attached photographs. Following erection of the frame to the height given, the site engineers instructed that it be lowered by 275 mm; the frame was then lowered and re-set at the revised level, as shown in the attached photographs. ${d}.`,
   det: {x_zone: "Zone 2",
-    x_why: "Temporary support to the precast slab units is not part of NBF's in-situ formwork works and is outside NBF's agreed scope and price",
+    x_why: "The Ducon precast layout SC-10001 Rev 03, note 4, puts propping by the Main Contractor during construction and during pouring and curing of the screed. This frame holds up the precast units where there is a gap in their bearing along Wall 33; the gap is not shown or detailed on any drawing and no propping or temporary works design was issued for it. This work is outside NBF's agreed scope and price and is to be valued using BOQ or pro-rata rates",
+    x_drg: "Ducon SC-10001 Rev 03, note 4 (propping by the Main Contractor)",
     x_co: "JJ Rhatigan",
     x_qty: "1 no. temporary support frame beneath the precast slab units along Wall 33; subsequently lowered by 275 mm at the site engineers' request (works ongoing)",
     x_plant: "Adjustable steel props, steel beams, timber bearers, access tower and stepladder"},
@@ -2877,7 +2878,7 @@ const VO_SEEDS = [{
   who: "victor", location: "First floor slab, Zone 2: beam B4 above Wall 33 (gridline 7, Grids H to I, Room 034) and 2 no. beams on top of Wall 51 (Grid I)",
   work: d => `Fabrication and fixing of three reinforced concrete beam cages, with L-bars tying each beam into the structural screed, for the first floor structural screed pour (Section 2) on the precast hollowcore units, Zone 2: (1) an 8.0 m beam cage for beam B4 above Wall 33 (gridline 7, Grids H to I), which is supported by the temporary propping frame recorded separately; (2) a 2.0 m beam cage and (3) a 2.5 m beam cage on top of Wall 51 (Grid I). Work carried out by the steel fixing foreman, Victor Gudumac, as shown in the attached photographs (the two Wall 51 beams installed, and the 8.0 m beam before and after being placed and tied in position). ${d}.`,
   det: {x_zone: "Zone 2",
-    x_why: "The steel drawings do not provide for this reinforcement. Beam B4 (250 x 550 mm deep RC downstand beam) is shown on the general arrangement SE-10031 and section SE-30031, but no reinforcement for it is detailed on the first floor tie steel drawings SE-16101 and SE-16102, the bar schedule SH-16101 or any other steel drawing, so the cage was made up on site. The two beams on Wall 51 are not shown on SE-16101 (which shows only H10 L-bars and H12 peripheral ties along Wall 51) or on the Wall 51 drawing SE-26024. This work is outside NBF's agreed scope and price",
+    x_why: "Additional reinforcement not detailed on any steel drawing. Beam B4 (250 x 550 mm deep RC downstand beam) is shown on the general arrangement SE-10031 and section SE-30031, but no reinforcement for it is detailed on the first floor tie steel drawings SE-16101 and SE-16102, the bar schedule SH-16101 or any other steel drawing, so the cage was made up on site. The two beams on Wall 51 are not shown on SE-16101 (which shows only H10 L-bars and H12 peripheral ties along Wall 51) or on the Wall 51 drawing SE-26024. The extra reinforcement is to be added to the remeasure by weight and valued using BOQ or pro-rata rates",
     x_drg: "SE-16101 Rev 00 and SE-16102 Rev 02 (first floor tie steel) and SH-16101 (bar schedule): no reinforcement for beam B4 and no beams on Wall 51. SE-10031 and SE-30031: B4 shown as a 250 x 550 mm deep RC downstand beam. SE-26024 Rev 00 (Wall 51): no beams shown",
     x_co: "JJ Rhatigan",
     x_qty: "3 no. reinforced concrete beam cages: 8.0 m (beam B4 above Wall 33), 2.0 m and 2.5 m (on Wall 51), 12.5 m in total, each with L-bars into the screed"},
@@ -2888,8 +2889,8 @@ const VO_SEEDS = [{
   who: "vitalie", location: "First floor slab, Zone 2: gaps (infills) between the Ducon precast hollowcore slabs (layout SC-10001 Rev 03)",
   work: d => `Filling the gaps (infills) between the precast hollowcore slabs on the first floor, Zone 2, with mortar, ahead of the structural screed pour. The mortar was mixed at the site mortar bin and barrowed to the slab. The gaps between the slabs averaged about 200 mm wide and were filled to about half depth. As shown in the attached photographs (the filled gaps between the slabs, and the operative mixing at the mortar bin). ${d}.`,
   det: {x_zone: "Zone 2",
-    x_why: "Filling the gaps between the precast slabs is not part of NBF's formwork works and is outside NBF's agreed scope and price",
-    x_drg: "Ducon precast layout SC-10001 Rev 03 (first floor, Zone 2)",
+    x_why: "The Ducon precast layout SC-10001 Rev 03 puts the in-situ infill and the mortar with the Main Contractor: note 5, mortar if required, supplied and placed by the Main Contractor; note 9, the cross-hatching represents in-situ infill by the Main Contractor. The quantity, the mortar used and the time are recorded here for valuation, to be valued using BOQ or pro-rata rates",
+    x_drg: "Ducon precast layout SC-10001 Rev 03 (first floor, Zone 2), notes 5 and 9",
     x_co: "JJ Rhatigan",
     x_qty: "Rough estimate: about 23 m of gaps between the slabs (taken off the Ducon layout SC-10001 Rev 03), about 200 mm wide on average, filled to about half the 200 mm slab depth (about 100 mm). About 23 m x 0.20 m x 0.10 m = 0.46 m3, say 0.5 m3 of mortar",
     x_mats: "Mortar from the site mortar bin, about 0.5 m3 (rough estimate)",
@@ -2901,10 +2902,10 @@ const VO_SEEDS = [{
   who: "alan", location: "First floor, Zone 2: beam B4 over Wall 33 (gridline 7), running from Wall 66 (Grid H) to Wall 50, with the support frame standing on the ground floor slab below",
   work: d => `Putting up a decking frame and a timber shutter for beam B4 (250 x 550 mm deep RC downstand beam) over Wall 33, first floor, Zone 2, running from Wall 66 to Wall 50, between the top of the wall and the precast slab. The frame stands on the ground floor slab and is made up of Peri Multiprops carrying Kaufmann HT20 and Peri VT20 timber beams, with timber bearers and decking on top, and the timber beam shutter built on the decking. The frame carries the beam shutter and the wet concrete of the beam until it gains strength, as shown in the attached photographs. ${d}.`,
   det: {x_zone: "Zone 2",
-    x_why: "No detail was given for how beam B4 was to be formed or supported. B4 is shown only on SE-10031 and SE-30031, both issued P01 For Information, and no reinforcement for it is detailed on any steel drawing. No propping or temporary works design, method statement or design certificate was provided for the support frame, as required for propping to in-situ formwork (Works Requirements A1.3, clause E20/132). The temporary support frame is outside NBF's agreed scope and price",
-    x_drg: "SE-10031 (B4, 250 x 550 mm deep RC downstand beam) and SE-30031 section 7, both P01 For Information; SE-16101, SE-16102 and SH-16101 show no reinforcement for B4",
+    x_why: "This record is split in two. (1) Beam shutter: formwork to beam B4, to be included in the remeasure at BOQ rates. (2) Support frame: this is the claim. The Ducon precast layout SC-10001 Rev 03, note 4, puts propping by the Main Contractor during construction and during pouring and curing of the screed, and no propping or temporary works design, method statement or design certificate was issued for B4 (Works Requirements A1.3, clause E20/132). B4 is shown only on SE-10031 and SE-30031, both issued P01 For Information, and no reinforcement for it is detailed on any steel drawing. The support frame is outside NBF's agreed scope and price and is to be valued using BOQ or pro-rata rates",
+    x_drg: "SE-10031 (B4, 250 x 550 mm deep RC downstand beam) and SE-30031 section 7, both P01 For Information; SE-16101, SE-16102 and SH-16101 show no reinforcement for B4; Ducon SC-10001 Rev 03, note 4 (propping by the Main Contractor)",
     x_co: "JJ Rhatigan",
-    x_qty: "1 no. decking frame and timber beam shutter to beam B4, Wall 66 to Wall 50",
+    x_qty: "Beam shutter: formwork to beam B4, Wall 66 to Wall 50 (remeasure at BOQ rates). Support frame: 1 no. decking frame on Multiprops carrying the beam shutter (claim)",
     x_plant: "Peri Multiprops, Kaufmann HT20 and Peri VT20 timber beams, timber bearers and decking"},
 }];
 async function seedVariations(){
@@ -3147,6 +3148,31 @@ async function seedDailyRecords(){
 }
 // one-off (Jack, 9 Oct): reword the Wall 70 variation and the 6 Oct crane delay already in the app to the precise wording above.
 // Keeps the ref, times, crew, photos and anything filled in on the phone; replaces only the wording fields.
+// one-off fix (Jack, 16 Oct): reword the frame, beams, infill and B4 deck variations to match the R115 package
+// (Ducon notes, remeasure, BOQ or pro-rata rates). Keeps the work text, times and photos as saved.
+async function rewordR115(){
+  try{
+    if (!RS("dayworks") || !RS("dayworks").list || await kvGet("rewordR115a")) return;
+    const K = KINDS.dayworks, all = mergedRecords("dayworks");
+    let done = 0;
+    for (const key of ["voSeedPrecastFrameW33", "voSeedBeamsW33W51", "voSeedInfillsFFZ2", "voSeedB4DeckW33"]){
+      const v = VO_SEEDS.find(x => x.key === key), r = v && all.find(x => x.id === v.ids[0]);
+      if (!r) continue;
+      const rec = {};
+      K.textFields.forEach(k => rec[k] = r[k] == null ? "" : r[k]);
+      ["chippies", "fixers", "operatives"].forEach(k => rec[k] = +r[k] || 0);
+      const p = parseDet(r.description), kept = {};
+      Object.entries(p.det).forEach(([k, val]) => { if (val) kept["x_" + k] = val; });
+      const over = {x_why: v.det.x_why, x_drg: v.det.x_drg};
+      if (key === "voSeedB4DeckW33") over.x_qty = v.det.x_qty;
+      rec.description = composeDet(p.work, {...rec, ...kept, ...over});
+      await queueRecordSave("dayworks", rec, [], []);
+      done++;
+    }
+    if (done) await kvSet("rewordR115a", true);
+    if (done && S.view === "dayworks") render();
+  }catch(e){}
+}
 async function rewordSeeded(){
   try{
     if (!RS("dayworks") || !RS("dayworks").list || await kvGet("rewordSeeded3")) return;
