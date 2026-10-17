@@ -1410,14 +1410,14 @@ async function seedTimesheet(){
       if (await kvGet(v.key)) continue;
       if (S.tsWeek !== v.week) { if (S.tsWeek && S.tsWeek > v.week) await kvSet(v.key, true); continue; }
       const di = DAYS.indexOf(v.day);
+      let failed = 0;
       for (const name of v.names){
         const l = (S.allLads || []).find(x => x.id === slug(name));
         if (!l || hasH(l, di)) continue;
-        await server("setHours", l.name, v.day, v.hours);
-        l.hours[di] = v.hours;
+        try{ await server("setHours", l.name, v.day, v.hours); l.hours[di] = v.hours; render(); }
+        catch(e){ failed++; }
       }
-      await kvSet(v.key, true);
-      render();
+      if (!failed) await kvSet(v.key, true);
     }
   }catch(e){ /* try again next load */ }
   finally{ S.tsSeeding = false; }
