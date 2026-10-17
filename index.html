@@ -1400,6 +1400,28 @@ $("view").addEventListener("click", ev => {
   setHidden(b.dataset.unhide, false);
   if (l) setStatus(`${l.name} is back on the list`, true);
 });
+// Saturday 17/10/2026 hours from the HammerTech site diary (one-off; only fills a blank Saturday cell, and only while the timesheet is on w/c 12/10/2026)
+const TS_SEEDS = [{key: "tsSeed20261017sat", week: "2026-10-12", day: "sat", hours: 8, names: ["Cosmin Alexandru Popei", "Serghei Balas", "Ioan Batin", "Cornel Ionut Calin", "Vexhi Cekici", "Victor Gudumac", "Ion Gusatu", "Constantin Ionut", "Vitalie Nicoara", "Marian Niculae", "Dritan Permargjeta", "Marian Petre", "Radu Pop", "Petrus Marius Radu", "Constantin Robert", "Constantin Roman", "Mihai Roman", "Peti Sandu", "Razvan Claudiu Schiopu", "Bogdan Petru Steti", "Doru-Ciprian Zamfir"]}];
+async function seedTimesheet(){
+  if (S.tsSeeding) return;
+  S.tsSeeding = true;
+  try{
+    for (const v of TS_SEEDS){
+      if (await kvGet(v.key)) continue;
+      if (S.tsWeek !== v.week) { if (S.tsWeek && S.tsWeek > v.week) await kvSet(v.key, true); continue; }
+      const di = DAYS.indexOf(v.day);
+      for (const name of v.names){
+        const l = (S.allLads || []).find(x => x.id === slug(name));
+        if (!l || hasH(l, di)) continue;
+        await server("setHours", l.name, v.day, v.hours);
+        l.hours[di] = v.hours;
+      }
+      await kvSet(v.key, true);
+      render();
+    }
+  }catch(e){ /* try again next load */ }
+  finally{ S.tsSeeding = false; }
+}
 // add the seeded operatives once (their faces are already in the Drive photo folder)
 async function seedLads(){
   if (S.ladSeeding) return;
@@ -6024,7 +6046,7 @@ go((() => {
     startApp(b, false);
     cacheSet("boot", b);
     setStatus("Up to date", true);
-    seedLads(); syncHidden();
+    seedLads(); syncHidden(); seedTimesheet();
     askWho();
     refreshJobs().then(() => { if (S.rec.jobs.length) processQueue(); });
     tickQLoad().then(() => flushTicks());
