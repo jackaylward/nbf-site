@@ -402,7 +402,11 @@ const DEFAULT_LOGO = document.getElementById("logoBlack").src;
 const WHITE_LOGO = document.getElementById("logo").src;
 const BUILTIN_PHOTOS = {};
 // operatives added from here once (Jack, 14/10/2026); their faces are already in the Drive photo folder
-const LAD_SEEDS = {key: "seedConcreteLads2", agency: "Concrete Lads 2", trade: "CF", names: ["Eusebiu Balasca", "Iulian Balasca", "Giorgi Kharbedia", "Tornike Katcharava", "Sorin Merchidan"]};
+const LAD_SEEDS = [
+  {key: "seedConcreteLads2", agency: "Concrete Lads 2", trade: "CF", names: ["Eusebiu Balasca", "Iulian Balasca", "Giorgi Kharbedia", "Tornike Katcharava", "Sorin Merchidan"]},
+  // Carpenters started 19/10/2026, agency not yet known (set later with Edit beside each one)
+  {key: "seedCarpenters19Oct", agency: "", trade: "C", names: ["Ruslan Bizgan", "Ioan Damoc", "Iurie Nisfoianu"]}
+];
 const HID_RE = /\s*\(hidden(?:\s+(\d{4}-\d{2}-\d{2}))?\)\s*$/i;
 const hidTag = from => from ? `(hidden ${from})` : "(hidden)";
 // a hidden lad still shows on days before he was hidden, and on any day he was marked in, so past records keep him
@@ -1433,18 +1437,24 @@ async function seedLads(){
   if (S.ladSeeding) return;
   S.ladSeeding = true;
   try{
-    if (await kvGet(LAD_SEEDS.key)) return;
     let added = 0;
-    for (const name of LAD_SEEDS.names){
-      if ((S.allLads || []).some(l => l.id === slug(name))) continue;
-      const d = await server("addLadPlus", name, LAD_SEEDS.agency, LAD_SEEDS.trade).catch(e => {
-        if (/Unknown action/i.test(errText(e, ""))) return server("addLad", name, LAD_SEEDS.agency, LAD_SEEDS.trade);
-        if (/already/i.test(errText(e, ""))) return null;
-        throw e;
-      });
-      if (d && d.lads){ setLadData(d); added++; }
+    for (const seed of LAD_SEEDS){
+      if (await kvGet(seed.key)) continue;
+      for (const name of seed.names){
+        if ((S.allLads || []).some(l => l.id === slug(name))) continue;
+        const add = ag => server("addLadPlus", name, ag, seed.trade).catch(e => {
+          if (/Unknown action/i.test(errText(e, ""))) return server("addLad", name, ag, seed.trade);
+          throw e;
+        });
+        const d = await add(seed.agency).catch(e => {
+          if (/already/i.test(errText(e, ""))) return null;
+          if (!seed.agency) return add("Agency to be confirmed");
+          throw e;
+        });
+        if (d && d.lads){ setLadData(d); added++; }
+      }
+      await kvSet(seed.key, true);
     }
-    await kvSet(LAD_SEEDS.key, true);
     if (added){
       render();
       bgServer("getPhotosSmall").catch(() => bgServer("getPhotos"))
