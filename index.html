@@ -1377,10 +1377,30 @@ async function setHidden(id, on){
   render();
   if (!lad) return;
   try{
-    const d = await server("updateLad", lad.name, {trade: on ? `${lad.code} ${hidTag(iso(new Date()))}`.trim() : lad.code});
+    const d = await server("updateLad", lad.name, {trade: on ? `${lad.code} ${hidTag(await hideFromDate(lad))}`.trim() : lad.code});
     if (d && d.lads){ S.hidden = S.hidden.filter(x => x !== id); setLadData(d); render(); }
   }catch(e){ setStatus(errText(e, "Saved on this phone only. Try again with signal")); }
   kvSet("hiddenLads", S.hidden).catch(() => {});
+}
+// hidden from the day after they were last in this week (Monday if not in at all), never later than today,
+// so a lad who hasn't been in this week drops off this week's timesheet straight away
+async function hideFromDate(lad){
+  const today = iso(new Date()), monD = mondayOf(new Date()), mon = iso(monD);
+  const mine = ((await wdWeekTicks(mon).catch(() => null)) || {})[lad.id] || {};
+  const sameWeek = S.tsWeek === mon;
+  let last = -1;
+  DAYS.forEach((d, i) => { if (dayIso(monD, i) < today && (mine[d] || (sameWeek && hasH(lad, i)))) last = i; });
+  const from = dayIso(monD, last + 1);
+  return from < today ? from : today;
+}
+// Starting a new week on Google clears "(hidden ...)" from the trades, so put each hidden lad's tag back afterwards
+async function keepHidden(before, d){
+  for (const h of before){
+    const l = buildLads(d).lads.find(x => x.id === h.id);
+    if (!l || l.hidden) continue;
+    try{ const r = await server("updateLad", l.name, {trade: `${l.code} ${hidTag(h.from)}`.trim()}); if (r && r.lads) d = r; }catch(e){}
+  }
+  return d;
 }
 // move lads hidden on this device before hiding was shared onto the timesheet
 async function syncHidden(){
@@ -1776,7 +1796,8 @@ $("view").addEventListener("click", async ev => {
     await tracked(rawServer("archiveWeek")).finally(() => busy(-1));   // no auto retry, so it never runs twice
     saved = true;
     S.newWeekMsg = "Week saved. Clearing the timesheet for the new week…"; render();
-    setLadData(await server("startNewWeek", iso(next)));
+    const wasHidden = (S.allLads || []).filter(l => l.hidden).map(l => ({id: l.id, from: l.hiddenFrom}));
+    setLadData(await keepHidden(wasHidden, await server("startNewWeek", iso(next))));
     S.newWeekMsg = null; render(); setStatus("Week saved. New week started", true);
   }catch(e){
     S.newWeekMsg = null; render();
