@@ -4237,6 +4237,11 @@ async function fixPourKeys(){
   await kvSet("pourPending", out);
 }
 const pourName = id => id[0] === "C" ? ((PLAN.names || {})[id] || id) : "Wall " + ((PLAN.names || {})[id] || parseInt(id.slice(1), 10));
+// short name for tables and lists: "27b" for a wall section, "C12 (C3)" for a column
+const pourShort = id => {
+  if (id[0] === "C"){ const n = (PLAN.names || {})[id] || id, m = n.match(/Column (\S+) \((\S+)\)/); return m ? `${m[2]} (${m[1]})` : n.replace("Column ", ""); }
+  return pourName(id).replace("Wall ", "").replace(" / ", "/") + (/[b-g]$/.test(id) ? id.slice(-1) : "");
+};
 // wall length (m) and thickness (mm) from the drawing; door openings are left out
 function pourSize(id){
   const parts = PLAN.els.filter(e => e.i === id); if (!parts.length) return null;
@@ -4681,7 +4686,7 @@ async function pourPdf(btn){
       if (y + rh > A4H - M - 14) head();
       if (i % 2 === 0){ doc.setFillColor(220, 230, 242); doc.rect(M, y, A4W - 2 * M, rh, "F"); }
       doc.setFont("helvetica", "bold"); doc.setFontSize(8.5); doc.setTextColor(...NAVY);
-      const cells = [pourName(id).replace("Wall ", "").replace(" / ", "/"), id[0] === "C" ? (PLAN.els.find(e => e.i === id) || {}).r : pourWhere(id), st === "today" ? "Today" : "Poured", dmy(p.date), s ? s.len.toFixed(2) : "", s ? String(s.thk) : "", num(p.height) ? String(num(p.height)) : "", v ? m3(v.v) + (v.est ? "*" : "") : ""];
+      const cells = [pourShort(id), id[0] === "C" ? (PLAN.els.find(e => e.i === id) || {}).r : pourWhere(id), st === "today" ? "Today" : "Poured", dmy(p.date), s ? s.len.toFixed(2) : "", s ? String(s.thk) : "", num(p.height) ? String(num(p.height)) : "", v ? m3(v.v) + (v.est ? "*" : "") : ""];
       let x = M + 2;
       cells.forEach((c, j) => { doc.setFont("helvetica", j === 0 ? "bold" : "normal"); doc.setTextColor(j === 0 ? NAVY[0] : 30, j === 0 ? NAVY[1] : 30, j === 0 ? NAVY[2] : 30);
         doc.text(doc.splitTextToSize(String(c || ""), cols[j][1] - 2)[0] || "", x, y + 4.8); x += cols[j][1]; });
@@ -4698,7 +4703,7 @@ async function pourPdf(btn){
     }
     const left = ids.filter(id => !pourState(P[id])).sort((a, b) => (a[0] === b[0] ? parseInt(a.slice(1)) - parseInt(b.slice(1)) : a[0] === "W" ? -1 : 1));
     if (left.length){
-      const txt = doc.splitTextToSize(`Not poured yet (${left.length}): ` + left.map(pourName).map(n => n.replace("Wall ", "")).join(", "), A4W - 2 * M - 4);
+      const txt = doc.splitTextToSize(`Not poured yet (${left.length}): ` + left.map(pourShort).join(", "), A4W - 2 * M - 4);
       if (y + 20 + txt.length * 4 > A4H - M) head(); else y += 18;
       doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(80); doc.text(txt, M + 2, y);
     }
@@ -4756,10 +4761,12 @@ async function pourSheet(btn, size, print){
     doc.setLineWidth(mm(0.15)); doc.setDrawColor(185, 192, 205); doc.setLineDashPattern([mm(2), mm(1.2)], 0);
     doc.setFontSize(fs(7)); doc.setTextColor(...NAVY);
     for (const x of Object.values(PLAN.gx)) doc.line(px(x), py(Y1 - 1200), px(x), py(Y0 + 1500));
-    for (const y of Object.values(PLAN.gy)) doc.line(px(X0 + 1500), py(y), px(X1 - 500), py(y));
+    // grid rows below the plan box (e.g. A on the first floor) would sit on the key and table, so leave them out
+    const rowIn = y => py(y) + mm(2.6) < mm(bandTop);
+    for (const y of Object.values(PLAN.gy)) if (rowIn(y)) doc.line(px(X0 + 1500), py(y), px(X1 - 500), py(y));
     doc.setLineDashPattern([], 0); doc.setDrawColor(...NAVY); doc.setLineWidth(mm(0.25));
     for (const [n, x] of Object.entries(PLAN.gx)){ doc.circle(px(x), py(Y0 + 800), mm(2.4), "S"); doc.text(n, px(x), py(Y0 + 800) + mm(0.9), {align: "center"}); }
-    for (const [n, y] of Object.entries(PLAN.gy)){ doc.circle(px(X0 + 800), py(y), mm(2.4), "S"); doc.text(n, px(X0 + 800), py(y) + mm(0.9), {align: "center"}); }
+    for (const [n, y] of Object.entries(PLAN.gy)) if (rowIn(y)){ doc.circle(px(X0 + 800), py(y), mm(2.4), "S"); doc.text(n, px(X0 + 800), py(y) + mm(0.9), {align: "center"}); }
     // walls
     const FILL = {"": [150, 150, 150], today: [40, 180, 70], poured: [255, 224, 0]};
     const rect = (e, c, hl) => { doc.setFillColor(...(Array.isArray(c) ? c : [c, c, c]));
@@ -4827,7 +4834,7 @@ async function pourSheet(btn, size, print){
     rows.forEach((id, i) => {
       const b = Math.floor(i / L.per), r = i % L.per, x = M + b * bw, ry = y0 + r * rh, p = P[id], v = pourVol(id, p);
       if (r % 2 === 0){ doc.setFillColor(220, 230, 242); doc.rect(mm(x), mm(ry), mm(bw), mm(rh), "F"); }
-      const nm = pourName(id).replace("Wall ", "").replace(" / ", "/") + (/[b-g]$/.test(id) && id[0] === "W" ? id.slice(-1) : "");
+      const nm = pourShort(id);
       doc.setFont("helvetica", "bold"); doc.setFontSize(fs(6.6)); doc.setTextColor(...NAVY); doc.text(nm, mm(x + 1.5), mm(ry + 2.7));
       doc.setFont("helvetica", "normal"); doc.setTextColor(30);
       doc.text(dmy(p.date) + (pourState(p) === "today" ? " (today)" : ""), mm(x + 13), mm(ry + 2.7));
@@ -4835,7 +4842,7 @@ async function pourSheet(btn, size, print){
     });
     y = y0 + L.per * rh + 3;
     doc.setFont("helvetica", "normal"); doc.setFontSize(fs(7)); doc.setTextColor(80);
-    if (left.length){ const txt = doc.splitTextToSize(`Not poured yet (${left.length}): ` + left.map(pourName).map(n => n.replace("Wall ", "")).join(", "), mm(W - 2 * M)); doc.text(txt, mm(M), mm(y + 1)); y += txt.length * 3.1 + 1; }
+    if (left.length){ const txt = doc.splitTextToSize(`Not poured yet (${left.length}): ` + left.map(pourShort).join(", "), mm(W - 2 * M)); doc.text(txt, mm(M), mm(y + 1)); y += txt.length * 3.1 + 1; }
     doc.setFontSize(fs(6.5)); doc.setTextColor(110);
     doc.text(doc.splitTextToSize(`Tags show wall number, pour date and concrete. * = estimated from the drawing size and pour height (door openings left out); others are docket figures. A letter after a number (32b) is a separate section of the same wall. Plan is not to scale, use the OCSC drawings to set out. Printed ${stamp}.`, mm(W - 2 * M)), mm(M), mm(y + 2.5));
     const name = `Pour record ${floorName()} ${size.toUpperCase()} ${today.toISOString().slice(0, 10)}.pdf`;
@@ -4930,7 +4937,7 @@ async function pourReport(btn){
       const rh = extra ? 10.4 : 6.2;
       if (y + rh > H - 16){ newPage("Pour schedule (cont.)"); th(); }
       if (i % 2 === 0){ doc.setFillColor(220, 230, 242); doc.rect(M, y, CW, rh, "F"); }
-      const cells = [pourName(id).replace("Wall ", "").replace(" / ", "/") + (id[0] === "W" && /[b-g]$/.test(id) ? id.slice(-1) : ""), isC ? (PLAN.els.find(e => e.i === id) || {}).r : pourWhere(id), dmy(p.date) + (st === "today" ? " (today)" : ""),
+      const cells = [pourShort(id), isC ? (PLAN.els.find(e => e.i === id) || {}).r : pourWhere(id), dmy(p.date) + (st === "today" ? " (today)" : ""),
         s ? s.len.toFixed(2) : "", s ? String(s.thk) : "", num(p.height) ? String(num(p.height)) : "", v ? m3(v.v) + (v.est ? "*" : "") : "", String((pics[id] || []).length || (p.photos || []).length || "")];
       let x = M + 2;
       cells.forEach((c, j) => { doc.setFont("helvetica", j === 0 ? "bold" : "normal"); doc.setFontSize(8); doc.setTextColor(j === 0 ? 1 : 30, j === 0 ? 32 : 30, j === 0 ? 96 : 30);
@@ -4943,7 +4950,7 @@ async function pourReport(btn){
     doc.text(`${poured.length} poured`, M + 2, y + 6.5); doc.text(`Total concrete: ${m3(tot)} m3${anyEst ? "*" : ""}`, W - M - 2, y + 6.5, {align: "right"}); y += 10;
     if (left.length){
       need(24); y += 3; doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.setTextColor(...NAVY);
-      const txt = doc.splitTextToSize(`Not poured yet (${left.length}): ` + left.map(pourName).map(t => t.replace("Wall ", "")).join(", "), CW);
+      const txt = doc.splitTextToSize(`Not poured yet (${left.length}): ` + left.map(pourShort).join(", "), CW);
       doc.text(txt, M, y); y += txt.length * 4.2;
     }
     // photos: three across, each captioned with its wall and pour date
@@ -4961,7 +4968,7 @@ async function pourReport(btn){
         }
         y += rowH;
       }
-      if (noPics.length){ need(10); doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(110); doc.text(`Photos couldn't be loaded for: ${noPics.map(pourName).map(t => t.replace("Wall ", "")).join(", ")}.`, M, y + 3); }
+      if (noPics.length){ need(10); doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(110); doc.text(`Photos couldn't be loaded for: ${noPics.map(pourShort).join(", ")}.`, M, y + 3); }
     }
     // footers (the plan page is A3, the rest A4)
     const total = doc.getNumberOfPages();
