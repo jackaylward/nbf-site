@@ -2985,6 +2985,17 @@ const VO_SEEDS = [{
     x_qty: "1 no. beam B3a, 200 x 700 mm, 5830 mm clear. Steel per SE-16101 Rev 02: 24 no. H10 links (mark 38) at 250 centres; 2 no. H16 top (41); 2 no. H25 bottom in each of layers B1 and B2 (42); 3 x 2 no. H12 each face (44); U-bars 2 no. H25 (39) and 3 no. H12 (43) at the wall end, 2 no. H25 (40) at the C1 end. 1 no. 250 x 200 mm pocket broken out at the wall end. 4 no. starter bars drilled and resin-fixed (2 no. into column C1, 2 no. into the Wall 31 / Wall 24 junction)",
     x_plant: "Electric breaker, drill, props and decking",
     x_days: "20/10/2026 07:00 to 17:00; 20/10/2026 07:00 to 17:00; 21/10/2026 07:00 to 17:00"},
+}, {
+  // Fri 16 Oct, 1 hour: Doru drilled and resin-fixed 2 holding-down bolts in Wall 16 at grid 7/G for the steel beam
+  key: "voSeedBoltsW16", ids: ["dw-vo-bolts-w16"], photos: [], whoName: "Doru",
+  days: [["2026-10-16", "08:00", "09:00", "Time: Friday 16 October 2026, 1 hour, 1 general operative (Doru), 1 man-hour"]],
+  who: "doru", location: "Zone 2: top of Wall 16 at gridline 7 / Grid G, bearing for the steel beam",
+  work: d => `Drilling and fixing 2 no. threaded bolts (studs with nuts) into the top of Wall 16 at gridline 7 / Grid G, Zone 2, to hold down the steel beam where it bears on the wall, as shown in the attached photographs. ${d}.`,
+  det: {x_zone: "Zone 2",
+    x_why: "Fixing bolts for the structural steelwork is steel erection work, not in-situ formwork, steel fixing or concrete placing. It is outside NBF's agreed scope and price and is to be valued using BOQ or pro-rata rates",
+    x_co: "JJ Rhatigan",
+    x_qty: "2 no. bolts drilled and fixed into the top of Wall 16 for the steel beam bearing",
+    x_plant: "Hammer drill"},
 }];
 async function seedVariations(){
   try{ if (S.voSeeding || !RS("dayworks") || !RS("dayworks").list || !(S.lads || []).length) return; }catch(e){ return; }
