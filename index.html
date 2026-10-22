@@ -403,9 +403,8 @@ const WHITE_LOGO = document.getElementById("logo").src;
 const BUILTIN_PHOTOS = {};
 // operatives added from here once (Jack, 14/10/2026); their faces are already in the Drive photo folder
 const LAD_SEEDS = [
-  {key: "seedConcreteLads2", agency: "Concrete Lads 2", trade: "CF", names: ["Eusebiu Balasca", "Iulian Balasca", "Giorgi Kharbedia", "Tornike Katcharava", "Sorin Merchidan"]},
-  // Carpenters started 19/10/2026, agency not yet known (set later with Edit beside each one)
-  {key: "seedCarpenters19Oct", agency: "", trade: "C", names: ["Ruslan Bizgan", "Ioan Damoc", "Iurie Nisfoianu"]}
+  // earlier seeds (Concrete Lads 2, carpenters 19/10) are done and removed, so lads deleted since are not added back
+  {key: "seedDragos22Oct", agency: "Dragos", trade: "CL", names: ["Vitalie Ionasco"]}
 ];
 const HID_RE = /\s*\(hidden(?:\s+(\d{4}-\d{2}-\d{2}))?\)\s*$/i;
 const hidTag = from => from ? `(hidden ${from})` : "(hidden)";
