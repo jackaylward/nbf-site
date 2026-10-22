@@ -1266,6 +1266,13 @@ async function editLad(lad){
   m.querySelector("#ladName").focus();
 }
 async function removeLadFlow(lad){
+  // someone who was in this week stays on this week's timesheet: hide him from the day after he was last in instead
+  const from = await hideFromDate(lad);
+  if (from > iso(mondayOf(new Date()))){
+    const ok = await ask(`${lad.name} was in this week, so he stays on this week's timesheet. He'll be hidden from ${fmtDmy(from)} on and drop off the timesheet from next week.`, "Hide him", false);
+    if (ok) setHidden(lad.id, true);
+    return;
+  }
   const ok = await ask(`Remove ${lad.name}? They'll come off the attendance list and the timesheet, and their hours and photo will be deleted. Past attendance is kept.`, "Remove", true);
   if (!ok) return;
   setStatus("Removing…");
@@ -1381,16 +1388,16 @@ async function setHidden(id, on){
   }catch(e){ setStatus(errText(e, "Saved on this phone only. Try again with signal")); }
   kvSet("hiddenLads", S.hidden).catch(() => {});
 }
-// hidden from the day after they were last in this week (Monday if not in at all), never later than today,
+// hidden from the day after they were last in this week (today counts), or from Monday if not in at all,
 // so a lad who hasn't been in this week drops off this week's timesheet straight away
 async function hideFromDate(lad){
   const today = iso(new Date()), monD = mondayOf(new Date()), mon = iso(monD);
   const mine = ((await wdWeekTicks(mon).catch(() => null)) || {})[lad.id] || {};
   const sameWeek = S.tsWeek === mon;
   let last = -1;
-  DAYS.forEach((d, i) => { if (dayIso(monD, i) < today && (mine[d] || (sameWeek && hasH(lad, i)))) last = i; });
+  DAYS.forEach((d, i) => { if (dayIso(monD, i) <= today && (mine[d] || (sameWeek && hasH(lad, i)))) last = i; });
   const from = dayIso(monD, last + 1);
-  return from < today ? from : today;
+  return from < today || last >= 0 ? from : today;
 }
 // Starting a new week on Google clears "(hidden ...)" from the trades, so put each hidden lad's tag back afterwards
 async function keepHidden(before, d){
@@ -1409,7 +1416,7 @@ async function syncHidden(){
     if (!lad){ S.hidden = S.hidden.filter(x => x !== id); continue; }
     if (lad.hidden){ S.hidden = S.hidden.filter(x => x !== id); continue; }
     try{
-      const d = await server("updateLad", lad.name, {trade: `${lad.code} ${hidTag(iso(new Date()))}`.trim()});
+      const d = await server("updateLad", lad.name, {trade: `${lad.code} ${hidTag(await hideFromDate(lad))}`.trim()});
       if (d && d.lads){ S.hidden = S.hidden.filter(x => x !== id); setLadData(d); }
     }catch(e){ break; }
   }
