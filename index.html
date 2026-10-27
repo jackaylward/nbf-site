@@ -2997,6 +2997,20 @@ const VO_SEEDS = [{
     x_co: "JJ Rhatigan",
     x_qty: "2 no. bolts drilled and fixed into the top of Wall 16 for the steel beam bearing",
     x_plant: "Hammer drill"},
+}, {
+  // B3b (SE-16101 Rev 02): break-outs at Wall 43/Wall 16 (Tue 20 Oct, MEWP) and Wall 42 (Fri 23 and Tue 27 Oct, half days), decking Fri 23 Oct.
+  // Steel cage and starter bars not yet done; Jack will update this record when they are.
+  key: "voSeedBeamB3b", ids: ["dw-vo-beam-b3b"], photos: [], whoName: "Doru (break-outs), Cornel and Ion Gusuta (decking)", crew: {operatives: 1},
+  days: [["2026-10-20", "07:00", "17:00", "Time: Tuesday 20 October 2026, 07:00 to 17:00, Doru, breaking out the top of Wall 43 where it meets Wall 16, from a MEWP, 10 man-hours; Friday 23 October 2026, 07:00 to 12:00, Doru, breaking out Wall 42 (first half), 5 man-hours; Friday 23 October 2026, 12:00 to 17:00, Cornel and Ion Gusuta, decking, 10 man-hours (entered twice below, once for each man); Tuesday 27 October 2026, 07:00 to 12:00, Doru, breaking out Wall 42 (second half), 5 man-hours. Total 30 man-hours to date"]],
+  who: "", location: "Ground floor, Zone 3: beam B3b (200 x 700 mm RC downstand beam) on top of the ground floor walls at first floor level, gridlines 5 to 6, from Wall 42 to Wall 43 at its junction with Wall 16",
+  work: d => `Beam B3b, a 200 x 700 mm deep reinforced concrete beam added by the engineer on SE-16101 Rev 02 (15 October 2026), running from Wall 42 to Wall 43. As shown in the attached photographs: (1) breaking out the top of Wall 43 where it meets Wall 16 with a breaker, working from a MEWP, to form the pocket for the beam to sit into (one full day); (2) breaking out the top of Wall 42 for the pocket at the other end (two half days); (3) putting up the decking and props to carry the beam (half a day). The steel cage and starter bars are still to be made and fixed. ${d}.`,
+  det: {x_zone: "Zone 3",
+    x_why: "Late design change. Beam B3b was first detailed on SE-16101 Rev 02 (P09, 15 October 2026, 'reinforcement for beam B3 added'); before that revision no steel drawing showed any reinforcement for B3, so the beam was not in the work as set out and priced. Breaking out the tops of the finished walls for the pockets, and the decking and propping to carry the beam, are extra work arising from the change and are outside NBF's agreed scope and price. The beam formwork and reinforcement are to be added to the remeasure",
+    x_drg: "SE-16101 Rev 02 (P09, 15.10.26), B3 beam elevation B3b and typical detail; SE-10031 (B3, 200 x 700 mm RC downstand beam)",
+    x_co: "JJ Rhatigan",
+    x_qty: "1 no. beam B3b, 200 x 700 mm, gridlines 5 to 6 (no figured length on SE-16101). Steel per SE-16101 Rev 02: 27 no. H10 links (mark 38) at 250 centres; 2 no. H16 top (47); 2 no. H25 bottom in each of layers B1 and B2 (49); 3 x 2 no. H12 each face (48); U-bars 2 no. H25 (39) at both ends; 2 no. H16 resin dowels (46), 400 mm embedment. 2 no. 250 x 200 mm pockets broken out (Wall 43 at Wall 16, and Wall 42)",
+    x_plant: "Electric breaker, MEWP, props and decking",
+    x_days: "23/10/2026 07:00 to 12:00; 23/10/2026 12:00 to 17:00; 23/10/2026 12:00 to 17:00; 27/10/2026 07:00 to 12:00"},
 }];
 async function seedVariations(){
   try{ if (S.voSeeding || !RS("dayworks") || !RS("dayworks").list || !(S.lads || []).length) return; }catch(e){ return; }
