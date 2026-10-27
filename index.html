@@ -2513,7 +2513,7 @@ async function loadRecords(kind, quiet){
     cacheSet("records:" + kind, st.list);
     // moveSiteRecords() was a one-off and is switched off
     if (kind === "works") seedDailyRecords();
-    if (kind === "dayworks"){ unmoveLadderRecord(); seedVariations().then(patchWall70).then(patchFrameW33).then(oneOffFixes14Oct).then(seedCraneDelays).then(patchProtestDelay).then(rewordSeeded).then(rewordR115).then(patchInfill150).then(dropStaleRewords).then(stripValuingAll).then(kangoAll); }
+    if (kind === "dayworks"){ unmoveLadderRecord(); seedVariations().then(patchWall70).then(patchFrameW33).then(oneOffFixes14Oct).then(seedCraneDelays).then(patchProtestDelay).then(rewordSeeded).then(rewordR115).then(patchInfill150).then(dropStaleRewords).then(stripValuingAll).then(kangoAll).then(patchB3bSteel); }
   }catch(e){
     st.loadFailed = !st.list;
     if (!quiet) connectionTrouble();
@@ -2999,18 +2999,18 @@ const VO_SEEDS = [{
     x_plant: "Hammer drill"},
 }, {
   // B3b (SE-16101 Rev 02): break-outs at Wall 43/Wall 16 (Tue 20 Oct, MEWP) and Wall 42 (Fri 23 and Tue 27 Oct, half days), decking Fri 23 Oct.
-  // Steel cage and starter bars not yet done; Jack will update this record when they are.
-  key: "voSeedBeamB3b", ids: ["dw-vo-beam-b3b"], photos: [], whoName: "Doru (break-outs), Cornel and Ion Gusuta (decking)", crew: {operatives: 1},
-  days: [["2026-10-20", "07:00", "17:00", "Time: Tuesday 20 October 2026, 07:00 to 17:00, Doru, breaking out the top of Wall 43 where it meets Wall 16, from a MEWP, 10 man-hours; Friday 23 October 2026, 07:00 to 12:00, Doru, breaking out Wall 42 (first half), 5 man-hours; Friday 23 October 2026, 12:00 to 17:00, Cornel and Ion Gusuta, decking, 10 man-hours (entered twice below, once for each man); Tuesday 27 October 2026, 07:00 to 12:00, Doru, breaking out Wall 42 (second half), 5 man-hours. Total 30 man-hours to date"]],
+  // Steel cage made up and placed by Radu Pop, Tue 27 Oct, 5 hours (Jack: 30 hours in total, decking half a day = 5 hours).
+  key: "voSeedBeamB3b", ids: ["dw-vo-beam-b3b"], photos: [], whoName: "Doru (break-outs), Cornel and Ion Gusuta (decking), Radu Pop (fixer, steel)", crew: {operatives: 1},
+  days: [["2026-10-20", "07:00", "17:00", "Time: Tuesday 20 October 2026, 07:00 to 17:00, Doru, breaking out the top of Wall 43 where it meets Wall 16, from a MEWP, 10 man-hours; Friday 23 October 2026, 07:00 to 12:00, Doru, breaking out Wall 42 (first half), 5 man-hours; Friday 23 October 2026, 12:00 to 17:00, Cornel and Ion Gusuta, decking, 5 hours; Tuesday 27 October 2026, 07:00 to 12:00, Doru, breaking out Wall 42 (second half), 5 man-hours; Tuesday 27 October 2026, 12:00 to 17:00, Radu Pop (fixer), making up and placing the steel cage, 5 man-hours. Total 30 hours"]],
   who: "", location: "Ground floor, Zone 3: beam B3b (200 x 700 mm RC downstand beam) on top of the ground floor walls at first floor level, gridlines 5 to 6, from Wall 42 to Wall 43 at its junction with Wall 16",
-  work: d => `Beam B3b, a 200 x 700 mm deep reinforced concrete beam added by the engineer on SE-16101 Rev 02 (15 October 2026), running from Wall 42 to Wall 43. As shown in the attached photographs: (1) breaking out the top of Wall 43 where it meets Wall 16 with a Kango, working from a MEWP, to form the pocket for the beam to sit into (one full day); (2) breaking out the top of Wall 42 for the pocket at the other end (two half days); (3) putting up the decking and props to carry the beam (half a day). The steel cage and starter bars are still to be made and fixed. ${d}.`,
+  work: d => `Beam B3b, a 200 x 700 mm deep reinforced concrete beam added by the engineer on SE-16101 Rev 02 (15 October 2026), running from Wall 42 to Wall 43. As shown in the attached photographs: (1) breaking out the top of Wall 43 where it meets Wall 16 with a Kango, working from a MEWP, to form the pocket for the beam to sit into (one full day); (2) breaking out the top of Wall 42 for the pocket at the other end (two half days); (3) putting up the decking and props to carry the beam (half a day); (4) making up the steel cage and placing it in position on the decking (half a day). ${d}.`,
   det: {x_zone: "Zone 3",
     x_why: "Late design change. Beam B3b was first detailed on SE-16101 Rev 02 (P09, 15 October 2026, 'reinforcement for beam B3 added'); before that revision no steel drawing showed any reinforcement for B3, so the beam was not in the work as set out and priced. Breaking out the tops of the finished walls for the pockets, and the decking and propping to carry the beam, are extra work arising from the change and are outside NBF's agreed scope and price. The beam formwork and reinforcement are to be added to the remeasure",
     x_drg: "SE-16101 Rev 02 (P09, 15.10.26), B3 beam elevation B3b and typical detail; SE-10031 (B3, 200 x 700 mm RC downstand beam)",
     x_co: "JJ Rhatigan",
     x_qty: "1 no. beam B3b, 200 x 700 mm, gridlines 5 to 6 (no figured length on SE-16101). Steel per SE-16101 Rev 02: 27 no. H10 links (mark 38) at 250 centres; 2 no. H16 top (47); 2 no. H25 bottom in each of layers B1 and B2 (49); 3 x 2 no. H12 each face (48); U-bars 2 no. H25 (39) at both ends; 2 no. H16 resin dowels (46), 400 mm embedment. 2 no. 250 x 200 mm pockets broken out (Wall 43 at Wall 16, and Wall 42)",
     x_plant: "Kango, MEWP, props and decking",
-    x_days: "23/10/2026 07:00 to 12:00; 23/10/2026 12:00 to 17:00; 23/10/2026 12:00 to 17:00; 27/10/2026 07:00 to 12:00"},
+    x_days: "23/10/2026 07:00 to 12:00; 23/10/2026 12:00 to 17:00; 27/10/2026 07:00 to 12:00; 27/10/2026 12:00 to 17:00"},
 }, {
   // Thu 22 Oct, 1 hour: Cornel drilled and fixed 2 bolts in the top of the end of Wall 12 for the steel beam from column C1
   key: "voSeedBoltsW12", ids: ["dw-vo-bolts-w12"], photos: [], trade: "Carp", whoName: "Cornel",
@@ -3278,6 +3278,27 @@ async function seedDailyRecords(){
 // one-off fix (Jack, 16 Oct): reword the frame, beams, infill and B4 deck variations to match the R115 package
 // (Ducon notes, remeasure, BOQ or pro-rata rates). Keeps the work text, times and photos as saved.
 // one-off fix (Jack, 16 Oct): VO-023 infill gaps average 150 mm, not 200 mm (about 0.35 m3 of mortar)
+// one-off fix (Jack, 27 Oct): B3b steel cage placed by Radu Pop (5 hours today); decking counted as 5 hours; 30 hours in total.
+// Only saves while the saved copy still lacks Radu Pop, so other devices save nothing once Google has it.
+async function patchB3bSteel(){
+  try{
+    if (!RS("dayworks") || !RS("dayworks").list || await kvGet("fixB3bSteel")) return;
+    const K = KINDS.dayworks, v = VO_SEEDS.find(x => x.key === "voSeedBeamB3b");
+    const r = mergedRecords("dayworks").find(x => x.id === v.ids[0]);
+    if (!r) return;
+    if (/Radu Pop/.test(String(r.description || ""))){ await kvSet("fixB3bSteel", true); return; }
+    const rec = {};
+    K.textFields.forEach(k => rec[k] = r[k] == null ? "" : r[k]);
+    ["chippies", "fixers", "operatives"].forEach(k => rec[k] = +r[k] || 0);
+    rec.other = v.whoName;
+    const kept = {};
+    Object.entries(parseDet(r.description).det).forEach(([k, val]) => { if (val) kept["x_" + k] = val; });
+    rec.description = composeDet(v.work(v.days[0][3]), {...rec, ...kept, x_days: v.det.x_days});
+    await queueRecordSave("dayworks", rec, [], []);
+    await kvSet("fixB3bSteel", true);
+    if (S.view === "dayworks") render();
+  }catch(e){}
+}
 async function patchInfill150(){
   try{
     if (!RS("dayworks") || !RS("dayworks").list || await kvGet("fixInfill150")) return;
