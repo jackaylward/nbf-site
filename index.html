@@ -630,6 +630,10 @@ function agColor(a){
   const s = agSlot(a);
   return s >= 0 ? AG_PALETTE[s % AG_PALETTE.length] : "#5F6B7A";
 }
+// the agency tabs keep their old names, but each one prints the agency in that slot of the Settings list
+// (e.g. "Spare Agency 2" is JB Structures), so the PDF list shows the agency name
+const TAB_SLOT = {"DCOR":0,"Talcon":1,"Adebura":2,"Dragos":3,"Petru Pirtac":4,"Aitken":5,"Spare Agency 1":6,"Spare Agency 2":7};
+const tabAgency = n => (n in TAB_SLOT && (S.agencyList || [])[TAB_SLOT[n]]) || n;
 // the agencies to pick from: the Settings list, plus any a lad is still on
 function agencyOptions(){
   const base = (S.agencyList && S.agencyList.length) ? S.agencyList : AG_ORDER;
@@ -1724,7 +1728,7 @@ function timesheetHtml(){
       ${S.sheetUrl ? `<a class="btn ghost" href="${esc(S.sheetUrl)}" target="_blank" rel="noopener">Open in Google Sheets</a>` : ""}
       ${S.pastWeeks && S.pastWeeks.length ? pastPicker() : ""}
       <span class="grow"></span>
-      <label class="field">PDF of<select id="tsTab">${(S.tsTabs && S.tsTabs.length ? S.tsTabs : ["Timesheet"]).map(n => `<option value="${esc(n)}">${n === "Timesheet" ? "Whole timesheet" : esc(n) + " only"}</option>`).join("")}</select></label>
+      <label class="field">PDF of<select id="tsTab">${(S.tsTabs && S.tsTabs.length ? S.tsTabs : ["Timesheet"]).map(n => `<option value="${esc(n)}">${n === "Timesheet" ? "Whole timesheet" : esc(tabAgency(n)) + " only"}</option>`).join("")}</select></label>
       ${pdfBtn("timesheet", "Save as PDF")}
     </div>
     <p class="muted small" style="margin:10px 0 0">Anything over the paid hours in a day shows <span class="ot" style="margin:0">yellow</span> as overtime. Overtime starts at 17:00: after 9.5 hours a day, or after 10 for JB Structures (no break deducted).</p>
