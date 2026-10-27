@@ -417,8 +417,8 @@ function shownOn(l, date, isIn){
 }
 const dayIso = (week, i) => { const d = new Date(week); d.setDate(d.getDate() + i); return iso(d); };
 const hasH = (l, i) => typeof l.hours[i] === "number" && l.hours[i] > 0;
-// overtime starts at 18:00: JB Structures (no break) 07:00 to 18:00 = 11 hours; everyone else 10.5 (Settings!B1)
-const JB_PAID = 11;
+// overtime starts at 17:00: JB Structures (no break) 07:00 to 17:00 = 10 hours; everyone else 9.5 (Settings!B1)
+const JB_PAID = 10;
 const paidFor = l => /^\s*jb\s*structures/i.test((l && l.agency) || "") ? JB_PAID : S.paidHours;
 const AG_COLORS = {"DCOR Construction":"#012060","Talcon Group":"#1F6FB2","Adebura":"#2E7D4F","Dragos":"#7B3FA0","Petru Pirtac":"#B03A5B","Aitken":"#2F6F7A"};
 const AG_ORDER = Object.keys(AG_COLORS);
@@ -602,7 +602,7 @@ function pickImages(){
 const S = {
   view: "home",
   brand: {name:"New Bridge Form", color:"#012060", logo:""},
-  lads: [], agencies: [], hasHours: false, paidHours: 10.5, tsWeek: "", sheetUrl: "", agencyList: [],
+  lads: [], agencies: [], hasHours: false, paidHours: 9.5, tsWeek: "", sheetUrl: "", agencyList: [],
   ladPhotos: {}, allLads: [], hidden: [],
   att: {week: mondayOf(new Date()), day: Math.min((new Date().getDay()+6)%7, 5), mode: "day", ticks: {}, loaded: null, edit: false},
   tools: null, toolPhotos: null, toolFilter: {q:"", status:""}, openTool: null,
@@ -612,7 +612,7 @@ const S = {
 function setLadData(d){
   S.lastLadData = d;
   if (d && d.trades) setTrades(d.trades);
-  S.hasHours = !!d.hasHours; S.paidHours = d.paidHours || 10.5; S.tsWeek = d.weekStart || ""; S.sheetUrl = d.sheetUrl || "";
+  S.hasHours = !!d.hasHours; S.paidHours = d.paidHours || 9.5; S.tsWeek = d.weekStart || ""; S.sheetUrl = d.sheetUrl || "";
   S.agencyList = d.agencies || [];
   const b = buildLads(d);
   S.allLads = b.lads;
@@ -1727,7 +1727,7 @@ function timesheetHtml(){
       <label class="field">PDF of<select id="tsTab">${(S.tsTabs && S.tsTabs.length ? S.tsTabs : ["Timesheet"]).map(n => `<option value="${esc(n)}">${n === "Timesheet" ? "Whole timesheet" : esc(n) + " only"}</option>`).join("")}</select></label>
       ${pdfBtn("timesheet", "Save as PDF")}
     </div>
-    <p class="muted small" style="margin:10px 0 0">Anything over the paid hours in a day shows <span class="ot" style="margin:0">yellow</span> as overtime. Overtime starts at 18:00: after 10.5 hours a day, or after 11 for JB Structures (no break deducted).</p>
+    <p class="muted small" style="margin:10px 0 0">Anything over the paid hours in a day shows <span class="ot" style="margin:0">yellow</span> as overtime. Overtime starts at 17:00: after 9.5 hours a day, or after 10 for JB Structures (no break deducted).</p>
   </div>
   ${pdfResult("timesheet")}
   <div class="ts-total" style="margin-bottom:14px"><span>Week total, ${t.working} lads</span><span><b id="grandSum">${fmtH(t.hours)}</b> hrs <span class="ot" id="grandOt" ${t.ot > 0 ? "" : "hidden"}>${fmtH(t.ot)} OT</span></span></div>
