@@ -3022,6 +3022,18 @@ const VO_SEEDS = [{
     x_co: "JJ Rhatigan",
     x_qty: "2 no. bolts drilled and fixed into the top of the end of Wall 12 for the steel beam bearing (beam from column C1 to Wall 12)",
     x_plant: "Hammer drill"},
+}, {
+  // Fri 23 Oct, 1 hour: Cornel set 3 bolts through holes in the ply shutter at the C1 end of beam B3a, cast in with the B3a pour, for the steel beam from C1 to Wall 12
+  key: "voSeedBoltsC1B3a", ids: ["dw-vo-bolts-c1-b3a"], photos: [], trade: "Carp", whoName: "Cornel",
+  days: [["2026-10-23", "08:00", "09:00", "Time: Friday 23 October 2026, 1 hour, 1 carpenter (Cornel), 1 man-hour"]],
+  who: "cornel", location: "Zone 3: column C1, side facing Wall 12, at the end of beam B3a",
+  work: d => `Setting 3 no. bolts into the side of column C1 facing Wall 12, cast in with the pour of beam B3a (200 x 700 mm RC beam, SE-16101 Rev 02), to take the steel beam that runs from column C1 to Wall 12. Three holes were drilled in the ply shutter and the bolts fixed through them to hold them in position during the pour, as shown in the attached photographs (with the shutter on, and after it was struck). ${d}.`,
+  det: {x_zone: "Zone 3",
+    x_why: "Setting cast-in bolts for the structural steelwork is steel erection work, not in-situ formwork, steel fixing or concrete placing. It is outside NBF's agreed scope and price",
+    x_drg: "SE-16101 Rev 02 (beam B3a)",
+    x_co: "JJ Rhatigan",
+    x_qty: "3 no. bolts cast into the side of column C1 with the beam B3a pour, through 3 no. holes drilled in the ply shutter, for the steel beam from column C1 to Wall 12",
+    x_plant: "Drill"},
 }];
 async function seedVariations(){
   try{ if (S.voSeeding || !RS("dayworks") || !RS("dayworks").list || !(S.lads || []).length) return; }catch(e){ return; }
