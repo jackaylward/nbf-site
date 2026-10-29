@@ -3259,6 +3259,11 @@ const WD_SEEDS = [{
   location: "Zone 2 and Zone 3 ground floor",
   work: "Concrete pour to Walls 37 and 50, ground floor. Wall 22 was reshuttered and closed in preparation for a top-up pour, which was poured with Walls 37 and 50.",
   det: {x_notes: "No photographs were recorded with this entry."},
+}, {
+  key: "wdSeed20261028", rev: "wdSeed20261028r1", id: "wd-seed-2026-10-28", date: "2026-10-28",
+  location: "Zone 2 and Zone 3",
+  work: "Concrete pour to Walls 36 and 37, the upstand to Wall 17, and the corbel to Wall 50 (for Wall 33). The corbel to Wall 26 was not poured, as the deck was 90 mm low: the brackets were set at 2.01 m instead of the required 2.1 m. All operatives worked in Zone 3 towards completion in advance of the precast units, scheduled for Friday 30 October 2026.",
+  det: {x_notes: "The corbel to Wall 26 remains to be poured once the deck has been corrected. No photographs were recorded with this entry."},
 }];
 async function seedDailyRecords(){
   try{ if (S.wdSeeding || !RS("works") || !RS("works").list) return; }catch(e){ return; }
