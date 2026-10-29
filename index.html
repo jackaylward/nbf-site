@@ -3050,7 +3050,7 @@ const VO_SEEDS = [{
     x_drg: "SE-26103 (RC Wall Elevation 13, builders work setting out, P01 For Information, 25.08.26); SE-26003 Rev 01 (Wall 13 reinforcement, P09 For Construction, no slots shown)",
     x_co: "JJ Rhatigan",
     x_qty: "Wall 13: 2 no. slots under the first floor slab, 702 x 152 mm and 452 x 152 mm, 172 mm apart, 1814 mm from the wall end, per SE-26103. Shutters opened and reclosed, steel cut at the 2 no. slots",
-    x_plant: "Hand tools, cordless saw and grinder"},
+    x_plant: "Hand tools, skillsaw and grinder"},
 }];
 async function seedVariations(){
   try{ if (S.voSeeding || !RS("dayworks") || !RS("dayworks").list || !(S.lads || []).length) return; }catch(e){ return; }
@@ -3309,11 +3309,11 @@ async function seedDailyRecords(){
 // Only saves while the saved copy still lacks Radu Pop, so other devices save nothing once Google has it.
 async function patchBoxOutsW13(){
   try{
-    if (!RS("dayworks") || !RS("dayworks").list || await kvGet("fixBoxOutsW13c")) return;
+    if (!RS("dayworks") || !RS("dayworks").list || await kvGet("fixBoxOutsW13d")) return;
     const K = KINDS.dayworks, v = VO_SEEDS.find(x => x.key === "voSeedBoxOutsW13W14");
     const r = mergedRecords("dayworks").find(x => x.id === v.ids[0]);
     if (!r) return;
-    if (!/Wall 14|Walls 13 and 14|Vladut|Vexhi \(/.test(String(r.description || "") + String(r.location || "") + String(r.other || ""))){ await kvSet("fixBoxOutsW13c", true); return; }
+    if (!/Wall 14|Walls 13 and 14|Vladut|Vexhi \(|ordless saw/.test(String(r.description || "") + String(r.location || "") + String(r.other || ""))){ await kvSet("fixBoxOutsW13d", true); return; }
     const rec = {};
     K.textFields.forEach(k => rec[k] = r[k] == null ? "" : r[k]);
     ["chippies", "fixers", "operatives"].forEach(k => rec[k] = +r[k] || 0);
@@ -3323,7 +3323,7 @@ async function patchBoxOutsW13(){
     Object.entries(parseDet(r.description).det).forEach(([k, val]) => { if (val) kept["x_" + k] = val; });
     rec.description = composeDet(v.work(v.days[0][3]), {...rec, ...kept, ...v.det, x_days: ""});
     await queueRecordSave("dayworks", rec, [], []);
-    await kvSet("fixBoxOutsW13c", true);
+    await kvSet("fixBoxOutsW13d", true);
     if (S.view === "dayworks") render();
   }catch(e){}
 }
