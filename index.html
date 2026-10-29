@@ -3041,8 +3041,8 @@ const VO_SEEDS = [{
     x_plant: "Drill"},
 }, {
   // Thu 29 Oct, 10:00 to 14:00: shutters to Wall 13 closed on the site engineer's say-so, then box outs confirmed at 09:45; reopened, steel cut, boxes fixed, reclosed before the 15:00 pour
-  key: "voSeedBoxOutsW13W14", ids: ["dw-vo-boxouts-w13-w14"], photos: [], whoName: "Victor Gudumac (cutting steel), Vexhi and Vladut (box outs)", crew: {operatives: 1},
-  days: [["2026-10-29", "10:00", "14:00", "Time: Thursday 29 October 2026, 10:00 to 14:00, 3 operatives: Victor Gudumac cutting the steel, Vexhi and Vladut making and fixing the box outs, 4 hours each, 12 man-hours"]],
+  key: "voSeedBoxOutsW13W14", ids: ["dw-vo-boxouts-w13-w14"], photos: [], whoName: "Victor Gudumac (fixer, cutting steel), Vexhi (chippy, box outs)", crew: {chippies: 1, fixers: 1},
+  days: [["2026-10-29", "10:00", "14:00", "Time: Thursday 29 October 2026, 10:00 to 14:00, 1 fixer (Victor Gudumac) cutting the steel and 1 chippy (Vexhi) making and fixing the box outs, 4 hours each, 8 man-hours"]],
   who: "", location: "Ground floor, Zone 3: Wall 13, 2 no. slots at the top of the wall under the first floor slab",
   work: d => `Opening back up the closed wall shutters to Wall 13, cutting the steel, making and fixing 2 no. timber box outs for the slots under the first floor slab (702 x 152 mm and 452 x 152 mm, per SE-26103), and closing the shutters again before the 15:00 pour, as shown in the attached photographs. The site engineer told the operatives on the evening of 28 October and again on the morning of 29 October that the shutters could be closed, and they were closed. At about 09:45 on 29 October the operatives were told that box outs were needed in this wall. ${d}.`,
   det: {x_zone: "Zone 3",
@@ -3050,8 +3050,7 @@ const VO_SEEDS = [{
     x_drg: "SE-26103 (RC Wall Elevation 13, builders work setting out, P01 For Information, 25.08.26); SE-26003 Rev 01 (Wall 13 reinforcement, P09 For Construction, no slots shown)",
     x_co: "JJ Rhatigan",
     x_qty: "Wall 13: 2 no. slots under the first floor slab, 702 x 152 mm and 452 x 152 mm, 172 mm apart, 1814 mm from the wall end, per SE-26103. Shutters opened and reclosed, steel cut at the 2 no. slots",
-    x_plant: "Hand tools, cordless saw and grinder",
-    x_days: "29/10/2026 10:00 to 14:00; 29/10/2026 10:00 to 14:00"},
+    x_plant: "Hand tools, cordless saw and grinder"},
 }];
 async function seedVariations(){
   try{ if (S.voSeeding || !RS("dayworks") || !RS("dayworks").list || !(S.lads || []).length) return; }catch(e){ return; }
@@ -3310,20 +3309,21 @@ async function seedDailyRecords(){
 // Only saves while the saved copy still lacks Radu Pop, so other devices save nothing once Google has it.
 async function patchBoxOutsW13(){
   try{
-    if (!RS("dayworks") || !RS("dayworks").list || await kvGet("fixBoxOutsW13")) return;
+    if (!RS("dayworks") || !RS("dayworks").list || await kvGet("fixBoxOutsW13b")) return;
     const K = KINDS.dayworks, v = VO_SEEDS.find(x => x.key === "voSeedBoxOutsW13W14");
     const r = mergedRecords("dayworks").find(x => x.id === v.ids[0]);
     if (!r) return;
-    if (!/Wall 14|Walls 13 and 14/.test(String(r.description || "") + String(r.location || ""))){ await kvSet("fixBoxOutsW13", true); return; }
+    if (!/Wall 14|Walls 13 and 14|Vladut/.test(String(r.description || "") + String(r.location || "") + String(r.other || ""))){ await kvSet("fixBoxOutsW13b", true); return; }
     const rec = {};
     K.textFields.forEach(k => rec[k] = r[k] == null ? "" : r[k]);
     ["chippies", "fixers", "operatives"].forEach(k => rec[k] = +r[k] || 0);
-    rec.location = v.location;
+    rec.location = v.location; rec.other = v.whoName;
+    Object.assign(rec, {chippies: 0, fixers: 0, operatives: 0}, v.crew);
     const kept = {};
     Object.entries(parseDet(r.description).det).forEach(([k, val]) => { if (val) kept["x_" + k] = val; });
-    rec.description = composeDet(v.work(v.days[0][3]), {...rec, ...kept, ...v.det});
+    rec.description = composeDet(v.work(v.days[0][3]), {...rec, ...kept, ...v.det, x_days: ""});
     await queueRecordSave("dayworks", rec, [], []);
-    await kvSet("fixBoxOutsW13", true);
+    await kvSet("fixBoxOutsW13b", true);
     if (S.view === "dayworks") render();
   }catch(e){}
 }
