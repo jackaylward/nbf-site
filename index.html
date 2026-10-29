@@ -1391,7 +1391,7 @@ async function setHidden(id, on){
     const d = await server("updateLad", lad.name, {trade: on ? `${lad.code} ${hidTag(await hideFromDate(lad))}`.trim() : lad.code});
     if (d && d.lads){ S.hidden = S.hidden.filter(x => x !== id); setLadData(d); render(); }
   }catch(e){ setStatus(errText(e, "Saved on this phone only. Try again with signal")); }
-  kvSet("hiddenLads", S.hidden).catch(() => {});
+  kvSet("hiddenLads2", S.hidden).catch(() => {});
 }
 // hidden from the day after they were last in this week (today counts), or from Monday if not in at all,
 // so a lad who hasn't been in this week drops off this week's timesheet straight away
@@ -1413,7 +1413,8 @@ async function keepHidden(before, d){
   }
   return d;
 }
-// move lads hidden on this device before hiding was shared onto the timesheet
+// push hides that could not reach Google (no signal) once it answers. Kept under "hiddenLads2": the old
+// "hiddenLads" list held hides from before sharing worked, and re-pushing it hid lads unhidden on another device
 async function syncHidden(){
   const local = [...(S.hidden || [])];
   for (const id of local){
@@ -1425,7 +1426,7 @@ async function syncHidden(){
       if (d && d.lads){ S.hidden = S.hidden.filter(x => x !== id); setLadData(d); }
     }catch(e){ break; }
   }
-  kvSet("hiddenLads", S.hidden).catch(() => {});
+  kvSet("hiddenLads2", S.hidden).catch(() => {});
   render();
 }
 $("view").addEventListener("click", ev => {
@@ -6239,7 +6240,7 @@ go((() => {
   }catch(e){ return "home"; }
 })());
 (async () => {
-  try{ S.hidden = (await kvGet("hiddenLads")) || []; }catch(e){ S.hidden = []; }
+  try{ S.hidden = (await kvGet("hiddenLads2")) || []; kvSet("hiddenLads", null).catch(() => {}); }catch(e){ S.hidden = []; }
   const cached = await cacheGet("boot");
   const cachedPhotos = await cacheGet("ladPhotos");
   if (cachedPhotos){ S.ladPhotos = cachedPhotos; S.photosLoaded = true; }
