@@ -3178,6 +3178,18 @@ const VO_SEEDS = [{
     x_co: "JJ Rhatigan",
     x_qty: "Wall 13: 2 no. slots under the first floor slab, 702 x 152 mm and 452 x 152 mm, 172 mm apart, 1814 mm from the wall end, per SE-26103. Shutters opened and reclosed, steel cut at the 2 no. slots",
     x_plant: "Hand tools, skillsaw and grinder"},
+}, {
+  // Fri 30 Oct, all day: Doru broke out the B1 corbel on Wall 26 for 800 mm back from Wall 27, around the corbel steel, so bars can run into the new small beam across to Wall 31 (engineer's instruction, not on the drawings)
+  key: "voSeedCorbelW26BreakOut", ids: ["dw-vo-corbel-w26-breakout"], photos: [], whoName: "Doru-Ciprian Zamfir",
+  days: [["2026-10-30", "07:00", "17:00", "Time: Friday 30 October 2026, 07:00 to 17:00, 1 operative (Doru-Ciprian Zamfir), 10 man-hours"]],
+  who: "doru", location: "First floor, Zone 3: corbel B1 on Wall 26 at grid 4 / J, at the corner with Wall 27, and the new beam across to Wall 31 where it meets Wall 9",
+  work: d => `Breaking out the cast corbel B1 (150 x 200 mm deep RC corbel beam) on Wall 26 with a Kango, for 800 mm back along Wall 26 from Wall 27, around the corbel steel and keeping the bars in place. This was done so the new bars can run into the corbel and tie in the small beam the site engineer asked for, running from the end of the Wall 26 corbel across to Wall 31 where Wall 31 meets Wall 9, as shown in the attached photographs. ${d}.`,
+  det: {x_zone: "Zone 3",
+    x_why: "Late design change. The issued drawings stop corbel B1 at the corner of Wall 26 and Wall 27: the first floor GA (SE-10031) shows B1 along Wall 26 only, the Wall 26 corbel elevation (SE-26009) runs from grid 1 to grid 4 only, and the Wall 9 elevation (SE-26002) shows no corbel or beam. The beam across to Wall 31 was asked for by the site engineer after the corbel was cast. Breaking out the finished corbel to take the new bars is extra work arising from the change and is outside NBF's agreed scope and price. The new beam formwork and reinforcement are to be added to the remeasure",
+    x_drg: "SE-10031 (first floor GA, B1 150 x 200 mm deep RC corbel beam); SE-26009 (Wall 26 elevation and corbel elevation, grids 1 to 4, P09 For Construction); SE-26002 (Wall 9 elevation, no corbel shown)",
+    x_co: "JJ Rhatigan",
+    x_qty: "Corbel B1 on Wall 26 broken out for 800 mm back from Wall 27, 150 x 200 mm section, around the existing corbel steel",
+    x_plant: "Kango"},
 }];
 async function seedVariations(){
   try{ if (S.voSeeding || !RS("dayworks") || !RS("dayworks").list || !(S.lads || []).length) return; }catch(e){ return; }
