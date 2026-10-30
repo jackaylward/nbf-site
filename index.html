@@ -152,7 +152,7 @@ nav.tabs button[data-badge]:not([data-badge=""])::after{content:attr(data-badge)
 .hours input:focus{border-color:var(--ink);outline:none}
 .hours input.over{background:var(--yellow);border-color:#e0c900;font-weight:700}
 .hours input.bad{border-color:var(--warn)}
-.notes{width:100%;margin-top:8px;border:1px solid var(--line);border-radius:9px;padding:8px 10px;font-size:.9rem;color:var(--ink);background:var(--card)}
+.notes{width:100%;margin-top:8px;border:1px solid var(--line);border-radius:9px;padding:8px 10px;font-size:.9rem;color:var(--ink);background:var(--card);display:block;resize:none;overflow:hidden;line-height:1.35;white-space:pre-wrap;overflow-wrap:anywhere;field-sizing:content;min-height:2.4em;font-family:inherit}
 .ts-total{flex-wrap:wrap;gap:6px 12px;display:flex;justify-content:space-between;align-items:center;padding:14px 18px;background:var(--brand);color:#fff;border-radius:var(--radius);font-weight:600;margin:0 0 16px;text-transform:uppercase;letter-spacing:.05em}
 .ts-total b{font-family:"Barlow Condensed",sans-serif;font-size:2rem;letter-spacing:0}
 @media (min-width:1100px){
@@ -750,11 +750,13 @@ function go(view){
   if (view === "dayworks" || view === "works"){ loadRecords(view); refreshJobs().then(() => { if (S.view === view && RS(view).view === "list") render(); }); }
 }
 $("tabs").addEventListener("click", ev => { const b = ev.target.closest("button"); if (b) go(b.dataset.view); });
+// timesheet notes grow downwards to show all the text (for browsers without field-sizing)
+function fitNotes(t){ if (CSS.supports && CSS.supports("field-sizing", "content")) return; t.style.height = "auto"; t.style.height = t.scrollHeight + 2 + "px"; }
 function render(){
   const v = $("view");
   if (S.view === "home") v.innerHTML = homeHtml();
   if (S.view === "attendance") v.innerHTML = attendanceHtml();
-  if (S.view === "timesheet") v.innerHTML = timesheetHtml();
+  if (S.view === "timesheet"){ v.innerHTML = timesheetHtml(); v.querySelectorAll("textarea.notes").forEach(fitNotes); }
   if (S.view === "dayworks" && S.dwTab === "records") v.innerHTML = siteRecordsHtml();
   else if (S.view === "dayworks" || S.view === "works") v.innerHTML = recordsHtml(S.view);
   if (S.view === "talks") v.innerHTML = talksHtml();
@@ -1657,7 +1659,7 @@ function pastHtml(){
           <div class="tot"><b>${fmtH(lt.sum)}</b> hrs<span class="ot" ${lt.ot > 0 ? "" : "hidden"}>${fmtH(lt.ot)} OT</span></div></div>
         <div class="hours">${DAYS.map((x,i) => { const v = l.hours[i]; const over = typeof v === "number" && v > paid;
           return `<label>${DAY_LABEL[i]}<input value="${v === "" || v == null ? "" : v}" readonly class="${over ? "over" : ""}" aria-label="${esc(l.name)} ${DAY_LABEL[i]} hours"></label>`; }).join("")}</div>
-        ${l.notes ? `<input class="notes" value="${esc(l.notes)}" readonly aria-label="${esc(l.name)} notes">` : ""}
+        ${l.notes ? `<textarea class="notes" rows="1" readonly aria-label="${esc(l.name)} notes">${esc(l.notes)}</textarea>` : ""}
       </div>`;
     }).join("");
     gSum += aSum; gOt += aOt;
@@ -1713,7 +1715,7 @@ function timesheetHtml(){
           <div class="tot"><b data-sum>${fmtH(lt.sum)}</b> hrs<span class="ot" data-ot ${lt.ot > 0 ? "" : "hidden"}>${fmtH(lt.ot)} OT</span></div></div>
         <div class="hours">${DAYS.map((d,i) => { const v = l.hours[i]; const over = typeof v === "number" && v > paidFor(l);
           return `<label>${DAY_LABEL[i]}<input inputmode="decimal" data-h="${i}" value="${v === "" || v == null ? "" : v}" ${S.edit ? "" : "readonly"} class="${over ? "over" : ""}" aria-label="${esc(l.name)} ${DAY_LABEL[i]} hours"></label>`; }).join("")}</div>
-        <input class="notes" data-notes placeholder="Notes" value="${esc(l.notes)}" ${S.edit ? "" : "readonly"} aria-label="${esc(l.name)} notes">
+        <textarea class="notes" data-notes rows="1" placeholder="Notes" ${S.edit ? "" : "readonly"} aria-label="${esc(l.name)} notes">${esc(l.notes)}</textarea>
       </div>`;
     }).join("");
     return `<section class="group" style="--c:${color}"><h2><span class="gname">${esc(agency)}</span><span data-agsum="${esc(agency)}">${fmtH(aSum)} hrs${aOt > 0 ? `, ${fmtH(aOt)} OT` : ""}</span></h2>${rows}</section>`;
@@ -1750,6 +1752,7 @@ function refreshTotals(l, row){
   $("grandSum").textContent = fmtH(t.hours);
   $("grandOt").textContent = fmtH(t.ot) + " OT"; $("grandOt").hidden = !(t.ot > 0);
 }
+$("view").addEventListener("input", ev => { if (ev.target.matches && ev.target.matches("textarea.notes")) fitNotes(ev.target); });
 $("view").addEventListener("change", async ev => {
   if (S.view !== "timesheet") return;
   const el = ev.target;
@@ -1788,6 +1791,7 @@ $("view").addEventListener("change", async ev => {
     queueSave(() => server("setHours", lad.name, DAYS[i], v));
   }
   if (el.hasAttribute("data-notes")){
+    fitNotes(el);
     lad.notes = el.value;
     queueSave(() => server("setNotes", lad.name, el.value));
   }
