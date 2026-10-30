@@ -841,11 +841,12 @@ $("view").addEventListener("click", async ev => {
   if (key === "attendance") return runPdf(key, () => makeHeadcountPdf());
   if (key === "timesheet"){
     const tab = $("tsTab") ? $("tsTab").value : "Timesheet";
-    return runPdf(key, () => server("makeTimesheetPdf", tab));
+    return runPdf(key, () => makeTimesheetPdfApp({week: S.tsWeek, paid: S.paidHours, lads: S.lads, agencies: S.agencies, agency: tab === "Timesheet" ? "" : tabAgency(tab)}));
   }
   if (key === "pastts" && S.past){
-    const week = S.past.week, tab = $("pastTab") ? $("pastTab").value : "Timesheet";
-    return runPdf(key, () => server("makePastTimesheetPdf", week, tab));
+    const d = S.past.data, tab = $("pastTab") ? $("pastTab").value : "Timesheet", b = buildLads(d);
+    const ag = tab === "Timesheet" ? "" : ((tab in TAB_SLOT && (d.agencies || [])[TAB_SLOT[tab]]) || tab);
+    return runPdf(key, () => makeTimesheetPdfApp({week: d.weekStart || S.past.week, paid: d.paidHours || S.paidHours, lads: b.lads, agencies: b.agencies, agency: ag}));
   }
   if (key === "tools") return runPdf(key, () => server("makeToolsPdf", filteredTools().map(x => x.id), logo));
   if (key === "tool") return runPdf(key, () => server("makeToolsPdf", [b.dataset.id], logo));
@@ -1021,6 +1022,128 @@ async function hcFace(l, px){
   };
   const im = await loadImg(ladPhoto(l));
   try{ return draw(im); }catch(e){ return draw(null); }
+}
+// Weekly timesheet PDF drawn in the app (Jack, 30/10/2026), so long notes wrap and their rows grow
+// instead of being cut off as in the Google Sheets export. One table, a band per agency, A4 landscape.
+async function makeTimesheetPdfApp(o){
+  const jsPDF = await loadJsPdf();
+  const logo = await navyLogo();
+  const paidOf = l => /^\s*jb\s*structures/i.test(l.agency || "") ? JB_PAID : o.paid;
+  const num = x => typeof x === "number" ? x : 0;
+  const lads = o.lads.filter(l => !o.agency || l.agency === o.agency);
+  const agencies = o.agencies.map(a => a[0]).filter(a => lads.some(l => l.agency === a));
+  const tot = l => { const h = (l.hours || []).map(num); return {sum: h.reduce((a, x) => a + x, 0), ot: h.reduce((a, x) => a + Math.max(0, x - paidOf(l)), 0)}; };
+  const wk = fromIso(o.week) || new Date(o.week);
+  const dd = String(wk.getDate()).padStart(2, "0"), mm = String(wk.getMonth() + 1).padStart(2, "0"), yy = String(wk.getFullYear());
+  const fileName = `Timesheet_w-c_${dd}-${mm}-${yy.slice(2)}${o.agency ? "_" + o.agency.replace(/[^A-Za-z0-9]+/g, "-") : ""}.pdf`;
+
+  const doc = new jsPDF({unit: "mm", format: "a4", orientation: "landscape"});
+  doc.setProperties({title: `Timesheet week starting ${dd}/${mm}/${yy}${o.agency ? " " + o.agency : ""}`, author: "New Bridge Form"});
+  const W = 297, H = 210, M = 10, BOTTOM = H - 14;
+  const plain = v => String(v).normalize("NFD").replace(/[̀-ͯ]/g, "");   // the PDF font has no ă, ș etc.
+  const txt = (v, x, y, op) => doc.text(plain(v), x, y, op);
+  const font = (style, size, color) => { doc.setFont("helvetica", style); doc.setFontSize(size); doc.setTextColor(color); };
+  const YELLOW = "#FFE600";
+  // columns: No, Name, Trade, Mon..Sat, Total, Overtime, Notes (notes take the rest)
+  const cw = [8, 50, 13, 13, 13, 13, 13, 13, 13, 19, 19];
+  cw.push(W - 2 * M - cw.reduce((a, b) => a + b, 0));
+  const cx = cw.map((_, i) => M + cw.slice(0, i).reduce((a, b) => a + b, 0));
+  const NOTE_W = cw[11] - 3, LINE = 3.6, RH = 6.4;
+
+  let y = 0, page = 0;
+  const header = () => {
+    if (page) doc.addPage();
+    page++;
+    if (logo){ const lw = 46, lh = lw * logo.r; doc.addImage(logo.url, "PNG", M, 18 - lh, lw, lh, "nbflogo", "FAST"); }
+    else { font("bold", 15, HC_NAVY); txt("NEW BRIDGE FORM", M, 15); }
+    font("bold", 15, HC_NAVY); txt(o.agency ? `WEEKLY TIMESHEET  ${o.agency.toUpperCase()}` : "WEEKLY TIMESHEET", W - M, 12, {align: "right"});
+    font("normal", 9.5, HC_GREY); txt(HC_SITE, W - M, 17.5, {align: "right"});
+    font("normal", 10, "#000000"); txt(`Week starting: ${dd}/${mm}/${yy}`, M, 26);
+    txt(`Total lads: ${lads.length}`, M + 70, 26);
+    doc.setDrawColor(HC_NAVY); doc.setLineWidth(0.42); doc.line(M, 29, W - M, 29);
+    y = 32;
+    const heads = ["No.", "Name", "Trade", ...DAY_LABEL, "Total Hours", "Overtime", "Notes"];
+    heads.forEach((h, i) => {
+      doc.setFillColor(HC_NAVY); doc.setDrawColor(HC_NAVY); doc.rect(cx[i], y, cw[i], 7, "FD");
+      font("bold", 8.6, "#FFFFFF"); txt(h, i === 1 || i === 11 ? cx[i] + 1.5 : cx[i] + cw[i] / 2, y + 4.7, i === 1 || i === 11 ? {} : {align: "center"});
+    });
+    y += 7;
+  };
+  const cell = (i, h, v, op = {}) => {
+    doc.setFillColor(op.fill || "#FFFFFF"); doc.setDrawColor(HC_LINE); doc.setLineWidth(0.2); doc.rect(cx[i], y, cw[i], h, "FD");
+    if (v === "" || v == null) return;
+    font(op.bold ? "bold" : "normal", op.size || 9, op.color || "#000000");
+    if (Array.isArray(v)) v.forEach((ln, k) => txt(ln, cx[i] + 1.5, y + 2.2 + LINE * (k + 0.75)));
+    else if (op.left) txt(v, cx[i] + 1.5, y + h / 2 + 1.2);
+    else txt(v, cx[i] + cw[i] / 2, y + h / 2 + 1.2, {align: "center"});
+  };
+  header();
+  let gSum = 0, gOt = 0;
+  const dayTot = DAYS.map(() => 0);
+  agencies.forEach(ag => {
+    const rows = lads.filter(l => l.agency === ag);
+    const color = agColor(ag);
+    const aT = rows.reduce((a, l) => { const t = tot(l); return {sum: a.sum + t.sum, ot: a.ot + t.ot}; }, {sum: 0, ot: 0});
+    if (y + RH * 2 > BOTTOM) header();
+    // agency band
+    doc.setFillColor(HC_TINT); doc.setDrawColor(HC_LINE); doc.rect(M, y, W - 2 * M, RH, "FD");
+    doc.setFillColor(color); doc.rect(M, y, 1.6, RH, "F");
+    font("bold", 9.5, color); txt(ag, cx[0] + 3, y + RH / 2 + 1.2);
+    font("bold", 9, HC_NAVY); txt(`${rows.length} ${rows.length === 1 ? "lad" : "lads"}`, cx[2] + 1.5, y + RH / 2 + 1.2);
+    txt(fmtH(aT.sum), cx[9] + cw[9] / 2, y + RH / 2 + 1.2, {align: "center"});
+    if (aT.ot > 0) txt(fmtH(aT.ot), cx[10] + cw[10] / 2, y + RH / 2 + 1.2, {align: "center"});
+    y += RH;
+    rows.forEach((l, n) => {
+      font("normal", 8.6, "#000000");
+      const notes = l.notes ? doc.splitTextToSize(plain(l.notes), NOTE_W) : [];
+      const h = Math.max(RH, notes.length * LINE + 2.4);
+      if (y + h > BOTTOM) header();
+      const t = tot(l);
+      cell(0, h, n + 1);
+      cell(1, h, l.name, {left: true, bold: true, size: 8.8});
+      cell(2, h, l.code || "", {bold: true, color: HC_NAVY});
+      DAYS.forEach((_, i) => {
+        const v = l.hours[i], has = typeof v === "number";
+        if (has) dayTot[i] += v;
+        cell(3 + i, h, has ? fmtH(v) : "", has && v > paidOf(l) ? {fill: YELLOW, bold: true, color: HC_NAVY} : {});
+      });
+      cell(9, h, t.sum > 0 ? fmtH(t.sum) : "", {bold: true, color: HC_NAVY});
+      cell(10, h, t.ot > 0 ? fmtH(t.ot) : "", t.ot > 0 ? {fill: YELLOW, bold: true, color: HC_NAVY} : {});
+      cell(11, h, notes, {size: 8.6});
+      y += h;
+    });
+    gSum += aT.sum; gOt += aT.ot;
+  });
+  // week total
+  if (y + RH > BOTTOM) header();
+  doc.setFillColor(HC_NAVY); doc.rect(M, y, W - 2 * M, RH + 0.6, "F");
+  font("bold", 9.5, "#FFFFFF");
+  txt("TOTAL", cx[0] + 1.5, y + RH / 2 + 1.5); txt(`${lads.length} lads`, cx[1] + 30, y + RH / 2 + 1.5);
+  DAYS.forEach((_, i) => txt(fmtH(dayTot[i]), cx[3 + i] + cw[3 + i] / 2, y + RH / 2 + 1.5, {align: "center"}));
+  txt(fmtH(gSum), cx[9] + cw[9] / 2, y + RH / 2 + 1.5, {align: "center"});
+  txt(fmtH(gOt), cx[10] + cw[10] / 2, y + RH / 2 + 1.5, {align: "center"});
+  y += RH + 4;
+  font("normal", 8, HC_GREY);
+  if (y < BOTTOM) txt(`Yellow = overtime: hours over ${fmtH(o.paid)} a day, or over ${fmtH(JB_PAID)} for JB Structures (no break deducted).`, M, y + 2);
+  for (let p = 1; p <= page; p++){
+    doc.setPage(p);
+    doc.setDrawColor(HC_LINE); doc.setLineWidth(0.2); doc.line(M, H - 10, W - M, H - 10);
+    font("normal", 8, HC_GREY);
+    txt(`New Bridge Form  |  ${HC_SITE}  |  Timesheet week starting ${dd}/${mm}/${yy}`, M, H - 6);
+    txt(`Page ${p} of ${page}`, W - M, H - 6, {align: "right"});
+  }
+
+  const blob = doc.output("blob");
+  const blobUrl = URL.createObjectURL(blob);
+  let file = null;
+  try{ file = new File([blob], fileName, {type: "application/pdf"}); }catch(e){}
+  const dataUrl = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(blob); });
+  try{
+    const up = await server("saveHeadcountPdf", String(dataUrl).replace(/^data:[^,]*;base64,/, "data:application/pdf;base64,"), fileName);
+    return {url: up.url, name: up.name, blobUrl, file};
+  }catch(e){
+    return {url: "", name: fileName, blobUrl, file, note: "Saved on this device only, so there's no share link. Download it and send it from your Downloads."};
+  }
 }
 async function makeHeadcountPdf(){
   if (!S.booted || !A.ready) throw new Error("Attendance is still loading. Try again in a moment.");
