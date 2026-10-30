@@ -2645,7 +2645,7 @@ async function loadRecords(kind, quiet){
     cacheSet("records:" + kind, st.list);
     // moveSiteRecords() was a one-off and is switched off
     if (kind === "works") seedDailyRecords();
-    if (kind === "dayworks"){ unmoveLadderRecord(); seedVariations().then(patchWall70).then(patchFrameW33).then(oneOffFixes14Oct).then(seedCraneDelays).then(patchProtestDelay).then(rewordSeeded).then(rewordR115).then(patchInfill150).then(dropStaleRewords).then(stripValuingAll).then(kangoAll).then(patchB3bSteel).then(patchBoxOutsW13); }
+    if (kind === "dayworks"){ unmoveLadderRecord(); seedVariations().then(patchWall70).then(patchFrameW33).then(oneOffFixes14Oct).then(seedCraneDelays).then(patchProtestDelay).then(rewordSeeded).then(rewordR115).then(patchInfill150).then(dropStaleRewords).then(stripValuingAll).then(kangoAll).then(patchB3bSteel).then(patchBoxOutsW13).then(patchKGuardLen); }
   }catch(e){
     st.loadFailed = !st.list;
     if (!quiet) connectionTrouble();
@@ -3194,13 +3194,13 @@ const VO_SEEDS = [{
   // Tue 27 Oct, 1 hour: Vitalie put up red K-guard edge barriers along the open (leading) edges of the Zone 2 first floor slab, as highlighted on Jack's pour plan; length to follow from the QS measure
   key: "voSeedKGuardZ2FF", ids: ["dw-vo-kguard-z2-ff"], photos: [], whoName: "Vitalie Nicoara",
   days: [["2026-10-27", "08:00", "09:00", "Time: Tuesday 27 October 2026, 1 hour, 1 general operative (Vitalie Nicoara), 1 man-hour"]],
-  who: "vitalie", location: "First floor slab, Zone 2: open (leading) edges of the slab, as highlighted on the pour plan",
+  who: "vitalie", location: "First floor slab, Zone 2: open (leading) edge on grid I above Wall 51, bay 9 to 10, as highlighted on the pour plan",
   work: d => `Putting up red K-guard edge protection barriers along the open (leading) edges of the Zone 2 first floor slab, in the area highlighted on the pour plan, to protect the edges while the slab was being worked on, as shown in the attached photographs. ${d}.`,
   det: {x_zone: "Zone 2",
     x_why: "Edge protection to the open edges of the precast slab is not formwork, steel fixing or concrete placing. It is outside NBF's agreed scope and price",
-    x_drg: "Zone 2 first floor pour plan (area highlighted by NBF)",
+    x_drg: "SE-10031 Rev 05 (first floor GA); Zone 2 first floor pour plan (area highlighted by NBF)",
     x_co: "JJ Rhatigan",
-    x_qty: "Red K-guard barriers along the slab leading edges: length being measured from the pour plan, to be added",
+    x_qty: "Red K-guard barriers along the slab leading edge: 7.65 m (approx.), north slab edge on grid I above Wall 51, bay 9 to 10, from the face of the grid 9 wall to the grid 10 wall at column C1 (7,650 clear per SE-10031 Rev 05)",
     x_plant: "Hand tools"},
 }];
 async function seedVariations(){
@@ -3475,6 +3475,25 @@ async function patchBoxOutsW13(){
     rec.description = composeDet(v.work(v.days[0][3]), {...rec, ...kept, ...v.det, x_days: ""});
     await queueRecordSave("dayworks", rec, [], []);
     await kvSet("fixBoxOutsW13d", true);
+    if (S.view === "dayworks") render();
+  }catch(e){}
+}
+async function patchKGuardLen(){
+  try{
+    if (!RS("dayworks") || !RS("dayworks").list || await kvGet("fixKGuardLen")) return;
+    const K = KINDS.dayworks, v = VO_SEEDS.find(x => x.key === "voSeedKGuardZ2FF");
+    const r = mergedRecords("dayworks").find(x => x.id === v.ids[0]);
+    if (!r) return;
+    if (!/being measured/.test(String(r.description || ""))){ await kvSet("fixKGuardLen", true); return; }
+    const rec = {};
+    K.textFields.forEach(k => rec[k] = r[k] == null ? "" : r[k]);
+    ["chippies", "fixers", "operatives"].forEach(k => rec[k] = +r[k] || 0);
+    rec.location = v.location;
+    const kept = {};
+    Object.entries(parseDet(r.description).det).forEach(([k, val]) => { if (val) kept["x_" + k] = val; });
+    rec.description = composeDet(v.work(v.days[0][3]), {...rec, ...kept, x_qty: v.det.x_qty, x_drg: v.det.x_drg});
+    await queueRecordSave("dayworks", rec, [], []);
+    await kvSet("fixKGuardLen", true);
     if (S.view === "dayworks") render();
   }catch(e){}
 }
