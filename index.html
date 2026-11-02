@@ -3202,6 +3202,18 @@ const VO_SEEDS = [{
     x_co: "JJ Rhatigan",
     x_qty: "Red K-guard barriers along the slab leading edge: 7.65 m (approx.), north slab edge on grid I above Wall 51, bay 9 to 10, from the face of the grid 9 wall to the grid 10 wall at column C1 (7,650 clear per SE-10031 Rev 05)",
     x_plant: "Hand tools"},
+}, {
+  // Tue 27 Oct, 1 hour (same time as the K-guard): 4x2 timber drilled and fixed on top of the Wall 33 upstands, first floor Zone 1, agreed instead of K-guard to bring the edge up to the legal 950 mm guard-rail height
+  key: "voSeedUpstandW33Timber", ids: ["dw-vo-upstand-w33-timber"], photos: [], whoName: "Vitalie Nicoara",
+  days: [["2026-10-27", "08:00", "09:00", "Time: Tuesday 27 October 2026, 1 hour, 1 general operative (Vitalie Nicoara), 1 man-hour"]],
+  who: "vitalie", location: "First floor, Zone 1: top of the Wall 33 upstands (open slab edge)",
+  work: d => `Drilling and fixing 4x2 timber along the top of the Wall 33 upstands on the first floor, Zone 1, to bring the upstand up to the legal guard-rail height of at least 950 mm above the slab edge, as shown in the attached photographs. This was agreed on site in place of putting up K-guard edge barriers. ${d}.`,
+  det: {x_zone: "Zone 1",
+    x_why: "Edge protection to the open slab edge is not formwork, steel fixing or concrete placing. The Wall 33 upstands as built are below guard-rail height, and the Safety, Health and Welfare at Work (General Application) Regulations 2007 (S.I. No. 299 of 2007), Regulation 103(2)(d), require the top guard-rail or similar protection to be at least 950 mm above the edge. Raising the upstand with timber was agreed instead of K-guard. It is outside NBF's agreed scope and price",
+    x_drg: "SE-26016 and SE-26017 (Wall 33 elevations)",
+    x_co: "JJ Rhatigan",
+    x_qty: "4x2 timber drilled and fixed along the top of the Wall 33 upstands, first floor Zone 1, to make up the edge to at least 950 mm",
+    x_plant: "Drill"},
 }];
 async function seedVariations(){
   try{ if (S.voSeeding || !RS("dayworks") || !RS("dayworks").list || !(S.lads || []).length) return; }catch(e){ return; }
