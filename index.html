@@ -3431,6 +3431,13 @@ const WD_SEEDS = [{
   location: "Zone 2 and Zone 3",
   work: "Concrete pour to Walls 36 and 37, the upstand to Wall 17, and the corbel to Wall 50 (for Wall 33). The corbel to Wall 26 was not poured, as the deck was 90 mm low: the brackets were set at 2.01 m instead of the required 2.1 m. All operatives worked in Zone 3 towards completion in advance of the precast units, scheduled for Friday 30 October 2026.",
   det: {x_notes: "The corbel to Wall 26 remains to be poured once the deck has been corrected. No photographs were recorded with this entry."},
+}, {
+  key: "wdSeed20261102", rev: "wdSeed20261102r1", id: "wd-seed-2026-11-02", date: "2026-11-02",
+  location: "Zone 1 first floor, Zone 3 ground floor, Zone 2 first floor, Zone 3",
+  work: "Concrete pour to Wall 32, first floor, Zone 1. Installation of precast concrete units, ground floor, Zone 3. The pour to the beams at Wall 17, Zone 3, and the pour to Wall 111, Zone 2, between Grids G and H up to Wall 66, could not proceed, as recorded below.",
+  det: {x_delay: "(1) The pour to the beams at Wall 17, Zone 3, was delayed and could not proceed. (2) The pour to Wall 111, Zone 2, between Grids G and H, up to Wall 66, was held pending the issue of the connection detail for starter bars to the adjoining Phase 2 building. No drawings for these starter bars have been issued, and the wall cannot be poured until they are",
+    x_need: "Issue of the starter bar connection detail for the adjoining Phase 2 building, Wall 111", x_claim: "Yes",
+    x_notes: "One new operative, Oleg Sochirca (agency: Dragos), commenced on site. No photographs have been added to this entry yet."},
 }];
 async function seedDailyRecords(){
   try{ if (S.wdSeeding || !RS("works") || !RS("works").list) return; }catch(e){ return; }
