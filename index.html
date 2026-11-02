@@ -419,7 +419,9 @@ const dayIso = (week, i) => { const d = new Date(week); d.setDate(d.getDate() + 
 const hasH = (l, i) => typeof l.hours[i] === "number" && l.hours[i] > 0;
 // overtime starts at 17:00: JB Structures (no break) 07:00 to 17:00 = 10 hours; everyone else 9.5 (Settings!B1)
 const JB_PAID = 10;
-const paidFor = l => /^\s*jb\s*structures/i.test((l && l.agency) || "") ? JB_PAID : S.paidHours;
+// JB Structures: every hour on a Saturday is overtime (Jack, 02/11/2026), so their paid hours that day are 0
+const isJB = l => /^\s*jb\s*structures/i.test((l && l.agency) || "");
+const paidFor = (l, i, base = S.paidHours) => isJB(l) ? (i === 5 ? 0 : JB_PAID) : base;
 const AG_COLORS = {"DCOR Construction":"#012060","Talcon Group":"#1F6FB2","Adebura":"#2E7D4F","Dragos":"#7B3FA0","Petru Pirtac":"#B03A5B","Aitken":"#2F6F7A"};
 const AG_ORDER = Object.keys(AG_COLORS);
 // trades: these are the defaults; the real list comes from the Settings tab of the timesheet
@@ -904,7 +906,7 @@ function weekTotals(){
     const h = l.hours.map(x => typeof x === "number" ? x : 0);
     const sum = h.reduce((a,b)=>a+b,0);
     hours += sum; if (sum > 0) working++;
-    ot += h.reduce((a,x)=>a+Math.max(0, x - paidFor(l)), 0);
+    ot += h.reduce((a,x,i)=>a+Math.max(0, x - paidFor(l, i)), 0);
   }
   return {hours, ot, working};
 }
@@ -1028,11 +1030,11 @@ async function hcFace(l, px){
 async function makeTimesheetPdfApp(o){
   const jsPDF = await loadJsPdf();
   const logo = await navyLogo();
-  const paidOf = l => /^\s*jb\s*structures/i.test(l.agency || "") ? JB_PAID : o.paid;
+  const paidOf = (l, i) => paidFor(l, i, o.paid);
   const num = x => typeof x === "number" ? x : 0;
   const lads = o.lads.filter(l => !o.agency || l.agency === o.agency);
   const agencies = o.agencies.map(a => a[0]).filter(a => lads.some(l => l.agency === a));
-  const tot = l => { const h = (l.hours || []).map(num); return {sum: h.reduce((a, x) => a + x, 0), ot: h.reduce((a, x) => a + Math.max(0, x - paidOf(l)), 0)}; };
+  const tot = l => { const h = (l.hours || []).map(num); return {sum: h.reduce((a, x) => a + x, 0), ot: h.reduce((a, x, i) => a + Math.max(0, x - paidOf(l, i)), 0)}; };
   const wk = fromIso(o.week) || new Date(o.week);
   const dd = String(wk.getDate()).padStart(2, "0"), mm = String(wk.getMonth() + 1).padStart(2, "0"), yy = String(wk.getFullYear());
   const fileName = `Timesheet_w-c_${dd}-${mm}-${yy.slice(2)}${o.agency ? "_" + o.agency.replace(/[^A-Za-z0-9]+/g, "-") : ""}.pdf`;
@@ -1105,7 +1107,7 @@ async function makeTimesheetPdfApp(o){
       DAYS.forEach((_, i) => {
         const v = l.hours[i], has = typeof v === "number";
         if (has) dayTot[i] += v;
-        cell(3 + i, h, has ? fmtH(v) : "", has && v > paidOf(l) ? {fill: YELLOW, bold: true, color: HC_NAVY} : {});
+        cell(3 + i, h, has ? fmtH(v) : "", has && v > paidOf(l, i) ? {fill: YELLOW, bold: true, color: HC_NAVY} : {});
       });
       cell(9, h, t.sum > 0 ? fmtH(t.sum) : "", {bold: true, color: HC_NAVY});
       cell(10, h, t.ot > 0 ? fmtH(t.ot) : "", t.ot > 0 ? {fill: YELLOW, bold: true, color: HC_NAVY} : {});
@@ -1124,7 +1126,7 @@ async function makeTimesheetPdfApp(o){
   txt(fmtH(gOt), cx[10] + cw[10] / 2, y + RH / 2 + 1.5, {align: "center"});
   y += RH + 4;
   font("normal", 8, HC_GREY);
-  if (y < BOTTOM) txt(`Yellow = overtime: hours over ${fmtH(o.paid)} a day, or over ${fmtH(JB_PAID)} for JB Structures (no break deducted).`, M, y + 2);
+  if (y < BOTTOM) txt(`Yellow = overtime: hours over ${fmtH(o.paid)} a day, or over ${fmtH(JB_PAID)} for JB Structures (no break deducted), and every JB Structures hour on a Saturday.`, M, y + 2);
   for (let p = 1; p <= page; p++){
     doc.setPage(p);
     doc.setDrawColor(HC_LINE); doc.setLineWidth(0.2); doc.line(M, H - 10, W - M, H - 10);
@@ -1757,7 +1759,7 @@ $("view").addEventListener("submit", async ev => {
 // ================= timesheet =================
 function ladTotals(l){
   const h = l.hours.map(x => typeof x === "number" ? x : 0);
-  return {sum: h.reduce((a,b)=>a+b,0), ot: h.reduce((a,x)=>a+Math.max(0,x-paidFor(l)),0)};
+  return {sum: h.reduce((a,b)=>a+b,0), ot: h.reduce((a,x,i)=>a+Math.max(0,x-paidFor(l, i)),0)};
 }
 function pastPicker(){
   const list = S.pastWeeks || [];
@@ -1770,7 +1772,7 @@ function pastHtml(){
   if (P.loading) return `<div class="panel tsbar"><div class="controls" style="margin:0">${pastPicker()}</div></div>${loadingBox("Loading that week…")}`;
   const d = P.data, paid = d.paidHours || S.paidHours;
   const b = buildLads(d);
-  const tot = l => { const h = (l.hours||[]).map(x => typeof x === "number" ? x : 0); return {sum: h.reduce((a,x)=>a+x,0), ot: h.reduce((a,x)=>a+Math.max(0,x-(/^\s*jb\s*structures/i.test(l.agency || "") ? JB_PAID : paid)),0)}; };
+  const tot = l => { const h = (l.hours||[]).map(x => typeof x === "number" ? x : 0); return {sum: h.reduce((a,x)=>a+x,0), ot: h.reduce((a,x,i)=>a+Math.max(0,x-paidFor(l, i, paid)),0)}; };
   let gSum = 0, gOt = 0, working = 0;
   const groups = b.agencies.map(([agency, color]) => {
     const lads = b.lads.filter(l => l.agency === agency);
@@ -1780,7 +1782,7 @@ function pastHtml(){
       return `<div class="ts-lad">
         <div class="ts-top">${avatar(l)}<div class="who"><strong>${esc(l.name)}</strong><em>${esc(l.trade) || "&nbsp;"}</em></div>
           <div class="tot"><b>${fmtH(lt.sum)}</b> hrs<span class="ot" ${lt.ot > 0 ? "" : "hidden"}>${fmtH(lt.ot)} OT</span></div></div>
-        <div class="hours">${DAYS.map((x,i) => { const v = l.hours[i]; const over = typeof v === "number" && v > paid;
+        <div class="hours">${DAYS.map((x,i) => { const v = l.hours[i]; const over = typeof v === "number" && v > paidFor(l, i, paid);
           return `<label>${DAY_LABEL[i]}<input value="${v === "" || v == null ? "" : v}" readonly class="${over ? "over" : ""}" aria-label="${esc(l.name)} ${DAY_LABEL[i]} hours"></label>`; }).join("")}</div>
         ${l.notes ? `<textarea class="notes" rows="1" readonly aria-label="${esc(l.name)} notes">${esc(l.notes)}</textarea>` : ""}
       </div>`;
@@ -1836,7 +1838,7 @@ function timesheetHtml(){
       return `<div class="ts-lad" data-lad="${esc(l.id)}">
         <div class="ts-top">${avatar(l)}<div class="who"><strong>${esc(l.name)}</strong><em>${esc(l.trade) || "&nbsp;"}</em></div>
           <div class="tot"><b data-sum>${fmtH(lt.sum)}</b> hrs<span class="ot" data-ot ${lt.ot > 0 ? "" : "hidden"}>${fmtH(lt.ot)} OT</span></div></div>
-        <div class="hours">${DAYS.map((d,i) => { const v = l.hours[i]; const over = typeof v === "number" && v > paidFor(l);
+        <div class="hours">${DAYS.map((d,i) => { const v = l.hours[i]; const over = typeof v === "number" && v > paidFor(l, i);
           return `<label>${DAY_LABEL[i]}<input inputmode="decimal" data-h="${i}" value="${v === "" || v == null ? "" : v}" ${S.edit ? "" : "readonly"} class="${over ? "over" : ""}" aria-label="${esc(l.name)} ${DAY_LABEL[i]} hours"></label>`; }).join("")}</div>
         <textarea class="notes" data-notes rows="1" placeholder="Notes" ${S.edit ? "" : "readonly"} aria-label="${esc(l.name)} notes">${esc(l.notes)}</textarea>
       </div>`;
@@ -1857,7 +1859,7 @@ function timesheetHtml(){
       <label class="field">PDF of<select id="tsTab">${(S.tsTabs && S.tsTabs.length ? S.tsTabs : ["Timesheet"]).map(n => `<option value="${esc(n)}">${n === "Timesheet" ? "Whole timesheet" : esc(tabAgency(n)) + " only"}</option>`).join("")}</select></label>
       ${pdfBtn("timesheet", "Save as PDF")}
     </div>
-    <p class="muted small" style="margin:10px 0 0">Anything over the paid hours in a day shows <span class="ot" style="margin:0">yellow</span> as overtime. Overtime starts at 17:00: after 9.5 hours a day, or after 10 for JB Structures (no break deducted).</p>
+    <p class="muted small" style="margin:10px 0 0">Anything over the paid hours in a day shows <span class="ot" style="margin:0">yellow</span> as overtime. Overtime starts at 17:00: after 9.5 hours a day, or after 10 for JB Structures (no break deducted). Every JB Structures hour on a Saturday is overtime.</p>
   </div>
   ${pdfResult("timesheet")}
   <div class="ts-total" style="margin-bottom:14px"><span>Week total, ${t.working} lads</span><span><b id="grandSum">${fmtH(t.hours)}</b> hrs <span class="ot" id="grandOt" ${t.ot > 0 ? "" : "hidden"}>${fmtH(t.ot)} OT</span></span></div>
@@ -1908,7 +1910,7 @@ $("view").addEventListener("change", async ev => {
     if (v !== "" && !(v >= 0 && v <= 24)){ el.classList.add("bad"); setStatus("Hours must be between 0 and 24"); return; }
     el.classList.remove("bad");
     el.value = v === "" ? "" : v;
-    el.classList.toggle("over", v !== "" && v > paidFor(lad));
+    el.classList.toggle("over", v !== "" && v > paidFor(lad, i));
     lad.hours[i] = v;
     refreshTotals(lad, row);
     queueSave(() => server("setHours", lad.name, DAYS[i], v));
