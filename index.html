@@ -1400,8 +1400,10 @@ async function editLad(lad){
 async function removeLadFlow(lad){
   // someone who was in this week stays on this week's timesheet: hide him from the day after he was last in instead
   const from = await hideFromDate(lad);
-  if (from > iso(mondayOf(new Date()))){
-    const ok = await ask(`${lad.name} was in this week, so he stays on this week's timesheet. He'll be hidden from ${fmtDmy(from)} on and drop off the timesheet from next week.`, "Hide him", false);
+  // the timesheet on Google can still hold last week (not started a new week yet): hours there are kept too
+  const onSheet = DAYS.some((_, i) => hasH(lad, i));
+  if (from > iso(mondayOf(new Date())) || onSheet){
+    const ok = await ask(`${lad.name} has hours on the timesheet, so he stays on it. He'll be hidden from ${fmtDmy(from)} on and drop off the timesheet from next week.`, "Hide him", false);
     if (ok) setHidden(lad.id, true);
     return;
   }
