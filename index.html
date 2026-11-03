@@ -3438,6 +3438,14 @@ const WD_SEEDS = [{
   det: {x_delay: "(1) The pour to the beams at Wall 17, Zone 3, could not proceed, as no drawings are available for these beams. (2) The pour to Wall 111, first floor, Zone 2 (Grids G to H, up to Wall 66), is on hold pending confirmation of the number, setting-out and level of the cast-in bolts for the steel beam connection (OCSC SE-30101 Detail E), which are not dimensioned on the issued drawings",
     x_need: "Drawings for the beams at Wall 17, Zone 3; confirmation of the cast-in bolt setting-out and level for the steel beam connection, Wall 111 (OCSC SE-30101 Detail E)", x_claim: "Yes",
     x_notes: "One new operative, Oleg Sochirca (agency: Dragos), commenced on site. No photographs have been added to this entry yet."},
+}, {
+  key: "wdSeed20261103", rev: "wdSeed20261103r1", id: "wd-seed-2026-11-03", date: "2026-11-03",
+  location: "Zone 1 first floor; Zone 2; Zone 3",
+  work: "Concrete pour to Walls 2 and 5, first floor, Zone 1. Walls 56 and 66, Zone 2, could not be poured: the engineer marked the recess in Wall 66 on the incorrect side, the recess being intended for the other side of Wall 66, which was scheduled to be poured tomorrow. Edge protection (K-Guard) was installed around the open areas of the precast units, first floor, Zone 3.",
+  det: {x_scaf: "Not erected or not ready", x_scafn: "Scaffolding not ready along Wall 34, along Wall 17, and between Column C1 and Wall 9",
+    x_delay: "(1) Walls 56 and 66 could not be poured, as the recess in Wall 66 was marked by the engineer on the incorrect side. (2) The pour to Wall 111, first floor, Zone 2 (Grids G to H, up to Wall 66), remains on hold pending confirmation of the number, setting-out and level of the cast-in bolts for the steel beam connection (OCSC SE-30101 Detail E), which are not dimensioned on the issued drawings",
+    x_need: "Corrected recess marking to Wall 66; scaffolding along Wall 34, Wall 17 and between Column C1 and Wall 9; cast-in bolt details for Wall 111 (OCSC SE-30101 Detail E)", x_claim: "Yes",
+    x_notes: "The K-Guard edge protection to the open areas of the precast units, first floor, Zone 3, is to be the subject of a future variation. No photographs have been added to this entry yet."},
 }];
 async function seedDailyRecords(){
   try{ if (S.wdSeeding || !RS("works") || !RS("works").list) return; }catch(e){ return; }
