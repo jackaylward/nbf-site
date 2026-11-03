@@ -2649,7 +2649,7 @@ async function loadRecords(kind, quiet){
     cacheSet("records:" + kind, st.list);
     // moveSiteRecords() was a one-off and is switched off
     if (kind === "works") seedDailyRecords();
-    if (kind === "dayworks"){ unmoveLadderRecord(); seedVariations().then(patchWall70).then(patchFrameW33).then(oneOffFixes14Oct).then(seedCraneDelays).then(patchProtestDelay).then(rewordSeeded).then(rewordR115).then(patchInfill150).then(dropStaleRewords).then(stripValuingAll).then(kangoAll).then(patchB3bSteel).then(patchBoxOutsW13).then(patchKGuardLen).then(patchKGuardZ1).then(patchCorbelVictor); }
+    if (kind === "dayworks"){ unmoveLadderRecord(); seedVariations().then(patchWall70).then(patchFrameW33).then(oneOffFixes14Oct).then(seedCraneDelays).then(patchProtestDelay).then(rewordSeeded).then(rewordR115).then(patchInfill150).then(dropStaleRewords).then(stripValuingAll).then(kangoAll).then(patchB3bSteel).then(patchBoxOutsW13).then(patchKGuardLen).then(patchKGuardZ1).then(patchCorbelVictor).then(dropWall111Delay); }
   }catch(e){
     st.loadFailed = !st.list;
     if (!quiet) connectionTrouble();
@@ -3353,14 +3353,6 @@ const DL_SEEDS = [{
   det: {x_zone: "Zone 2", x_cause: "Waiting on concrete",
     x_causeInfo: "Concrete delivery vehicles unable to enter the site: picket at the front entrance gates during the national 24-hour public sector strike on Wednesday 14 October 2026, an event outside NBF's control (reported nationally by RTE, The Irish Times and TheJournal.ie)",
     x_co: "JJ Rhatigan", x_effect: "First floor screed pour (Section 2) stopped at 09:30 and unable to resume until 13:00 at the earliest; 5 concrete operatives standing idle (17.5 man-hours lost to 13:00). NBF reserves its entitlement to an extension of time and to recover any associated costs"},
-}, {
-  // Mon 2 Nov (ongoing): first floor pour of Wall 111 (grid 10) held from grid G up to Wall 66, waiting on OCSC details for the Phase 2 connection bars and the cast-in bolts (SE-30101 Detail E)
-  key: "dlSeed20261102w111", id: "dw-dl-2026-11-02-wall111", date: "2026-11-02", start: "07:00", end: "17:00", copyFrom: "-", photos: [],
-  location: "First floor, Zone 2: Wall 111 on grid 10, section from grid G up to Wall 66",
-  work: "The concrete pour to Wall 111, first floor, Zone 2, from grid G up to Wall 66, is on hold from Monday 2 November 2026. JJ Rhatigan advised that bars must be cast into this section for the future Phase 2 building that will join onto Wall 111, and the site engineer advised that cast-in bolts are needed, but the details for both have not been issued. The wall cannot be closed up and poured until the information is received. The wall as it stands is shown in the attached photographs.",
-  det: {x_zone: "Zone 2", x_cause: "Waiting on information or drawings",
-    x_causeInfo: "1) Phase 2 connection bars: no drawing issued. SE-26042 (Wall 111, grid G to grid I) shows no starter bars, couplers or future connection, and both ends close off with U-bars; SE-10030 marks the Phase 01 / Phase 02 line along grid 10. 2) Cast-in bolts: SE-30101 Rev 01 Detail E shows 3 no. M20 cast-in bolts at 150 centres, 400 deep, with 80 x 80 x 10 anchor plates, for the angle bracket carrying steel beam SB11, but gives no level and no setting out from the grids, and the bolts are not shown on the Wall 111 steel drawing SE-26042. RFI needed: number and position of bolt sets between G and H, level of the top bolt, Phase 2 bar details, and who supplies the bolts and plates",
-    x_co: "JJ Rhatigan", x_effect: "Pour of Wall 111 from grid G up to Wall 66 held from Monday 2 November 2026 until the details are issued; the delay is ongoing. NBF reserves its entitlement to an extension of time and to recover any associated costs"},
 }];
 async function seedCraneDelays(){
   try{ if (S.dlSeeding || !RS("dayworks") || !RS("dayworks").list) return; }catch(e){ return; }
@@ -3507,6 +3499,15 @@ async function patchBoxOutsW13(){
     rec.description = composeDet(v.work(v.days[0][3]), {...rec, ...kept, ...v.det, x_days: ""});
     await queueRecordSave("dayworks", rec, [], []);
     await kvSet("fixBoxOutsW13d", true);
+    if (S.view === "dayworks") render();
+  }catch(e){}
+}
+async function dropWall111Delay(){
+  // Jack, 3 Nov: the Wall 111 hold is recorded in the daily records only, not as a delay
+  try{
+    if (!RS("dayworks") || !RS("dayworks").list || await kvGet("dropWall111Delay")) return;
+    if (mergedRecords("dayworks").some(r => r.id === "dw-dl-2026-11-02-wall111")) await queueRecordDelete("dayworks", "dw-dl-2026-11-02-wall111");
+    await kvSet("dropWall111Delay", true);
     if (S.view === "dayworks") render();
   }catch(e){}
 }
