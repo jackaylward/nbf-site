@@ -3454,10 +3454,13 @@ const WD_SEEDS = [{
     x_need: "Drawings for the beam at Wall 17, Zone 3 (received 16:56, 4 November 2026)", x_claim: "Yes",
     x_notes: "Drawings detailing the cast-in bolts for Wall 111, Zone 2, first floor, were received on 4 November 2026, releasing the hold on Wall 111. No photographs have been added to this entry yet."},
 }, {
-  key: "wdSeed20261105", rev: "wdSeed20261105r2", id: "wd-seed-2026-11-05", date: "2026-11-05",
-  location: "Zone 3 first floor",
-  work: "Revised structural drawings for the beams at Wall 17, Zone 3, first floor, were received from the engineer at 16:56 on 4 November 2026 (OCSC SE-26005 Rev 01, SE-16101 Rev 03 and SE-16211 Rev 00). The beams were on hold until then, as recorded in the previous daily records and as shown in the email received.",
-  det: {x_notes: "No photographs have been added to this entry yet."},
+  key: "wdSeed20261105", rev: "wdSeed20261105r3", id: "wd-seed-2026-11-05", date: "2026-11-05",
+  location: "Zone 3 first floor; Zone 2 first floor; Zone 1 first floor",
+  work: "Revised structural drawings for the beams at Wall 17, Zone 3, first floor, were received from the engineer at 16:56 on 4 November 2026 (OCSC SE-26005 Rev 01, SE-16101 Rev 03 and SE-16211 Rev 00). The beams were on hold until then, as recorded in the previous daily records and as shown in the email received. Works to Wall 111, Zone 2, first floor, resumed following receipt of the cast-in bolt drawings on 4 November 2026.",
+  det: {x_crane: "Not available: breakdown", x_cranen: "The tower crane is out of service due to a reported electrical fault. A mobile crane is in use, but its reach is restricted by the position of the tower crane",
+    x_delay: "With the tower crane out of service, the mobile crane cannot reach the corbel to Wall 33, Zone 1, first floor, or Wall 111, Zone 2, first floor, as its reach is restricted by the position of the tower crane",
+    x_need: "Tower crane returned to service", x_claim: "Yes",
+    x_notes: "No photographs have been added to this entry yet."},
 }];
 async function seedDailyRecords(){
   try{ if (S.wdSeeding || !RS("works") || !RS("works").list) return; }catch(e){ return; }
