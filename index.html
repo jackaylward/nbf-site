@@ -1047,10 +1047,15 @@ async function makeTimesheetPdfApp(o){
   const font = (style, size, color) => { doc.setFont("helvetica", style); doc.setFontSize(size); doc.setTextColor(color); };
   const YELLOW = "#FFE600";
   // columns: No, Name, Trade, Mon..Sat, Total, Overtime, Notes (notes take the rest)
-  const cw = [8, 50, 13, 13, 13, 13, 13, 13, 13, 19, 19];
+  // JB Structures (paid overtime, like UK PAYE): its own PDF shows Normal Hours and Overtime apart, then the Total
+  const split = !!o.agency && isJB({agency: o.agency});
+  const cw = [8, 50, 13, 13, 13, 13, 13, 13, 13, 19, 19, ...(split ? [19] : [])];
+  const NC = cw.length;   // the notes column
   cw.push(W - 2 * M - cw.reduce((a, b) => a + b, 0));
   const cx = cw.map((_, i) => M + cw.slice(0, i).reduce((a, b) => a + b, 0));
-  const NOTE_W = cw[11] - 3, LINE = 3.6, RH = 6.4;
+  const NOTE_W = cw[NC] - 3, LINE = 3.6, RH = 6.4;
+  // the hours columns: [what goes in col 9, 10 (, 11)] from a {sum, ot} total
+  const sumCols = t => split ? [t.sum - t.ot, t.ot, t.sum] : [t.sum, t.ot];
 
   let y = 0, page = 0;
   const header = () => {
@@ -1064,10 +1069,10 @@ async function makeTimesheetPdfApp(o){
     txt(`Total lads: ${lads.length}`, M + 70, 26);
     doc.setDrawColor(HC_NAVY); doc.setLineWidth(0.42); doc.line(M, 29, W - M, 29);
     y = 32;
-    const heads = ["No.", "Name", "Trade", ...DAY_LABEL, "Total Hours", "Overtime", "Notes"];
+    const heads = ["No.", "Name", "Trade", ...DAY_LABEL, ...(split ? ["Normal Hours", "Overtime", "Total Hours"] : ["Total Hours", "Overtime"]), "Notes"];
     heads.forEach((h, i) => {
       doc.setFillColor(HC_NAVY); doc.setDrawColor(HC_NAVY); doc.rect(cx[i], y, cw[i], 7, "FD");
-      font("bold", 8.6, "#FFFFFF"); txt(h, i === 1 || i === 11 ? cx[i] + 1.5 : cx[i] + cw[i] / 2, y + 4.7, i === 1 || i === 11 ? {} : {align: "center"});
+      font("bold", split ? 8 : 8.6, "#FFFFFF"); txt(h, i === 1 || i === NC ? cx[i] + 1.5 : cx[i] + cw[i] / 2, y + 4.7, i === 1 || i === NC ? {} : {align: "center"});
     });
     y += 7;
   };
@@ -1092,8 +1097,7 @@ async function makeTimesheetPdfApp(o){
     doc.setFillColor(color); doc.rect(M, y, 1.6, RH, "F");
     font("bold", 9.5, color); txt(ag, cx[0] + 3, y + RH / 2 + 1.2);
     font("bold", 9, HC_NAVY); txt(`${rows.length} ${rows.length === 1 ? "lad" : "lads"}`, cx[2] + 1.5, y + RH / 2 + 1.2);
-    txt(fmtH(aT.sum), cx[9] + cw[9] / 2, y + RH / 2 + 1.2, {align: "center"});
-    if (aT.ot > 0) txt(fmtH(aT.ot), cx[10] + cw[10] / 2, y + RH / 2 + 1.2, {align: "center"});
+    sumCols(aT).forEach((v, k) => { if (v > 0) txt(fmtH(v), cx[9 + k] + cw[9 + k] / 2, y + RH / 2 + 1.2, {align: "center"}); });
     y += RH;
     rows.forEach((l, n) => {
       font("normal", 8.6, "#000000");
@@ -1109,9 +1113,8 @@ async function makeTimesheetPdfApp(o){
         if (has) dayTot[i] += v;
         cell(3 + i, h, has ? fmtH(v) : "", has && v > paidOf(l, i) ? {fill: YELLOW, bold: true, color: HC_NAVY} : {});
       });
-      cell(9, h, t.sum > 0 ? fmtH(t.sum) : "", {bold: true, color: HC_NAVY});
-      cell(10, h, t.ot > 0 ? fmtH(t.ot) : "", t.ot > 0 ? {fill: YELLOW, bold: true, color: HC_NAVY} : {});
-      cell(11, h, notes, {size: 8.6});
+      sumCols(t).forEach((v, k) => cell(9 + k, h, v > 0 ? fmtH(v) : "", k === 1 && v > 0 ? {fill: YELLOW, bold: true, color: HC_NAVY} : {bold: true, color: HC_NAVY}));
+      cell(NC, h, notes, {size: 8.6});
       y += h;
     });
     gSum += aT.sum; gOt += aT.ot;
@@ -1122,8 +1125,7 @@ async function makeTimesheetPdfApp(o){
   font("bold", 9.5, "#FFFFFF");
   txt("TOTAL", cx[0] + 1.5, y + RH / 2 + 1.5); txt(`${lads.length} lads`, cx[1] + 30, y + RH / 2 + 1.5);
   DAYS.forEach((_, i) => txt(fmtH(dayTot[i]), cx[3 + i] + cw[3 + i] / 2, y + RH / 2 + 1.5, {align: "center"}));
-  txt(fmtH(gSum), cx[9] + cw[9] / 2, y + RH / 2 + 1.5, {align: "center"});
-  txt(fmtH(gOt), cx[10] + cw[10] / 2, y + RH / 2 + 1.5, {align: "center"});
+  sumCols({sum: gSum, ot: gOt}).forEach((v, k) => txt(fmtH(v), cx[9 + k] + cw[9 + k] / 2, y + RH / 2 + 1.5, {align: "center"}));
   y += RH + 4;
   font("normal", 8, HC_GREY);
   if (y < BOTTOM) txt(`Yellow = overtime: hours over ${fmtH(o.paid)} a day, or over ${fmtH(JB_PAID)} for JB Structures (no break deducted), and every JB Structures hour on a Saturday.`, M, y + 2);
