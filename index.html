@@ -3353,6 +3353,14 @@ const DL_SEEDS = [{
   det: {x_zone: "Zone 2", x_cause: "Waiting on concrete",
     x_causeInfo: "Concrete delivery vehicles unable to enter the site: picket at the front entrance gates during the national 24-hour public sector strike on Wednesday 14 October 2026, an event outside NBF's control (reported nationally by RTE, The Irish Times and TheJournal.ie)",
     x_co: "JJ Rhatigan", x_effect: "First floor screed pour (Section 2) stopped at 09:30 and unable to resume until 13:00 at the earliest; 5 concrete operatives standing idle (17.5 man-hours lost to 13:00). NBF reserves its entitlement to an extension of time and to recover any associated costs"},
+}, {
+  // Thu 5 Nov, 07:00 to 12:00: tower crane out of service (electrical fault); mobile crane could not reach the Wall 33 corbel or Wall 111
+  key: "dlSeed20261105crane", id: "dw-dl-2026-11-05-crane", date: "2026-11-05", start: "07:00", end: "12:00", copyFrom: "-", photos: [],
+  location: "First floor: corbel to Wall 33 (Zone 1) and Wall 111 (Zone 2)",
+  work: "The tower crane was out of service from 07:00 to 12:00 on Thursday 5 November 2026 because of a reported electrical fault. A mobile crane was in use, but its reach was restricted by the position of the tower crane, so it could not reach the corbel to Wall 33 (Zone 1, first floor) or Wall 111 (Zone 2, first floor). No crane work could be carried out to either until the tower crane was back in service at 12:00. As a result, Wall 56 (Zone 2) was the only wall poured that day. As shown in the attached photographs.",
+  det: {x_zone: "Zone 1 and Zone 2", x_cause: "Crane breakdown",
+    x_causeInfo: "Tower crane out of service 07:00 to 12:00, reported electrical fault. Mobile crane on site, but its reach restricted by the position of the tower crane, so it could not serve the Wall 33 corbel or Wall 111",
+    x_co: "JJ Rhatigan", x_effect: "No crane lifts to the corbel to Wall 33 (Zone 1, first floor) or to Wall 111 (Zone 2, first floor) from 07:00 to 12:00; Wall 56 (Zone 2) was the only wall poured that day. NBF reserves its entitlement to an extension of time and to recover any associated costs"},
 }];
 async function seedCraneDelays(){
   try{ if (S.dlSeeding || !RS("dayworks") || !RS("dayworks").list) return; }catch(e){ return; }
