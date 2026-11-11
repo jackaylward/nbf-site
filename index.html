@@ -4981,7 +4981,8 @@ function readPour(){
   const rec = {...cur, status};
   if (!status) return {status: ""};
   if ($("pDate")) rec.date = $("pDate").value; 
-  if (!rec.date || (status === "today" && cur.status !== "today")) rec.date = todayIso();
+  // a "today" record from an earlier day shows as Poured, so picking "Being poured today" again must move its date to today
+  if (!rec.date || (status === "today" && pourState(cur) !== "today")) rec.date = todayIso();
   if ($("pVar")) rec.variation = $("pVar").value;
   if ($("pNotes")) rec.notes = $("pNotes").value.trim();
   if ($("pHeight")) rec.height = num($("pHeight").value) ? String(num($("pHeight").value)) : "";
