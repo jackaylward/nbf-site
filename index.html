@@ -3221,6 +3221,33 @@ const VO_SEEDS = [{
     x_co: "JJ Rhatigan",
     x_qty: "4x2 timber drilled and fixed along the top of the Wall 33 upstands, first floor Zone 1, to make up the edge to at least 950 mm",
     x_plant: "Drill"},
+}, {
+  // Mon 9 and Tue 10 Nov, 5 hours each: Vitalie filling the gaps (infills) between the Ducon precast slabs, first floor Zone 3, ahead of the screed pour
+  key: "voSeedInfillsFFZ3", ids: ["dw-vo-infills-ff-z3"], photos: [], whoName: "Vitalie Nicoara",
+  days: [["2026-11-09", "07:00", "12:00", "Time: 5 hours on Monday 9 November 2026 and 5 hours on Tuesday 10 November 2026, 1 general operative (Vitalie Nicoara), 10 man-hours in total"]],
+  who: "vitalie", location: "First floor slab, Zone 3: gaps (infills) between the Ducon precast hollowcore slabs",
+  work: d => `Filling the gaps (infills) between the precast hollowcore slabs on the first floor, Zone 3, with mortar, ahead of the structural screed pour. The mortar was mixed at the site mortar bin and barrowed to the slab. As shown in the attached photographs and on the marked-up Ducon precast layout. ${d}.`,
+  det: {x_zone: "Zone 3",
+    x_why: "The Ducon precast layout puts the in-situ infill and the mortar with the Main Contractor: mortar if required is supplied and placed by the Main Contractor, and the cross-hatching represents in-situ infill by the Main Contractor. It is outside NBF's agreed scope and price",
+    x_drg: "Ducon precast layout SC-10001 Rev 03 (first floor, Zone 3), notes 5 and 9; gaps highlighted by NBF",
+    x_co: "JJ Rhatigan",
+    x_qty: "Rough estimate: about 78 m of gaps between the precast slabs, first floor Zone 3 (taken off the Ducon layout SC-10001 Rev 03, as highlighted)",
+    x_mats: "Mortar from the site mortar bin",
+    x_plant: "Hand tools, barrow",
+    x_days: "10/11/2026 07:00 to 12:00"},
+}, {
+  // Wed 11 Nov, 5 hours: Vitalie filling the gaps (infills) between the Ducon precast slabs, second floor Zone 1, ahead of the screed pour
+  key: "voSeedInfillsSFZ1", ids: ["dw-vo-infills-sf-z1"], photos: [], whoName: "Vitalie Nicoara",
+  days: [["2026-11-11", "07:00", "12:00", "Time: Wednesday 11 November 2026, 5 hours, 1 general operative (Vitalie Nicoara), 5 man-hours"]],
+  who: "vitalie", location: "Second floor slab, Zone 1: gaps (infills) between the Ducon precast hollowcore slabs",
+  work: d => `Filling the gaps (infills) between the precast hollowcore slabs on the second floor, Zone 1, with mortar, ahead of the structural screed pour. The mortar was mixed at the site mortar bin and barrowed to the slab. As shown in the attached photographs and on the marked-up Ducon precast layout. ${d}.`,
+  det: {x_zone: "Zone 1",
+    x_why: "The Ducon precast layout puts the in-situ infill and the mortar with the Main Contractor: mortar if required is supplied and placed by the Main Contractor, and the cross-hatching represents in-situ infill by the Main Contractor. It is outside NBF's agreed scope and price",
+    x_drg: "Ducon precast layout SC-10021 Rev 01 (second floor, Zone 1), notes 5 and 9; gaps highlighted by NBF",
+    x_co: "JJ Rhatigan",
+    x_qty: "Rough estimate: about 46 m of gaps between the precast slabs, second floor Zone 1 (taken off the Ducon layout SC-10021 Rev 01, as highlighted)",
+    x_mats: "Mortar from the site mortar bin",
+    x_plant: "Hand tools, barrow"},
 }];
 async function seedVariations(){
   try{ if (S.voSeeding || !RS("dayworks") || !RS("dayworks").list || !(S.lads || []).length) return; }catch(e){ return; }
