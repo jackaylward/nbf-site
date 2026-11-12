@@ -2651,7 +2651,7 @@ async function loadRecords(kind, quiet){
     cacheSet("records:" + kind, st.list);
     // moveSiteRecords() was a one-off and is switched off
     if (kind === "works") seedDailyRecords();
-    if (kind === "dayworks"){ unmoveLadderRecord(); seedVariations().then(patchWall70).then(patchFrameW33).then(oneOffFixes14Oct).then(seedCraneDelays).then(patchProtestDelay).then(rewordSeeded).then(rewordR115).then(patchInfill150).then(dropStaleRewords).then(stripValuingAll).then(kangoAll).then(patchB3bSteel).then(patchBoxOutsW13).then(patchKGuardLen).then(patchKGuardZ1).then(patchCorbelVictor).then(dropWall111Delay).then(patchShutterBeforeAfter); }
+    if (kind === "dayworks"){ unmoveLadderRecord(); seedVariations().then(patchWall70).then(patchFrameW33).then(oneOffFixes14Oct).then(seedCraneDelays).then(patchProtestDelay).then(rewordSeeded).then(rewordR115).then(patchInfill150).then(dropStaleRewords).then(stripValuingAll).then(kangoAll).then(patchB3bSteel).then(patchBoxOutsW13).then(patchKGuardLen).then(patchKGuardZ1).then(patchCorbelVictor).then(dropWall111Delay).then(patchShutterBeforeAfter).then(patchShutterDates); }
   }catch(e){
     st.loadFailed = !st.list;
     if (!quiet) connectionTrouble();
@@ -3249,9 +3249,9 @@ const VO_SEEDS = [{
     x_mats: "Mortar from the site mortar bin",
     x_plant: "Hand tools, barrow"},
 }, {
-  // Sun 18 Oct (5 h) and Mon 19 Oct (10 h): Peti Sandu and Petrus Marius Radu shuttering the underside of the gaps between the Ducon precast slabs, first floor Zone 3, with plywood and props from MEWPs
+  // Thu 5 Nov (5 h) and Fri 6 Nov (10 h): Peti Sandu and Petrus Marius Radu shuttering the underside of the gaps between the Ducon precast slabs, first floor Zone 3, with plywood and props from MEWPs
   key: "voSeedInfillShutterFFZ3", ids: ["dw-vo-infill-shutter-ff-z3"], photos: [], whoName: "Peti Sandu, Petrus Marius Radu", crew: {chippies: 2},
-  days: [["2026-10-18", "07:00", "12:00", "Time: 5 hours on Sunday 18 October 2026 and 10 hours on Monday 19 October 2026, 2 carpenters (Peti Sandu and Petrus Marius Radu), 15 hours each, 30 man-hours in total"]],
+  days: [["2026-11-05", "07:00", "12:00", "Time: 5 hours on Thursday 5 November 2026 and 10 hours on Friday 6 November 2026, 2 carpenters (Peti Sandu and Petrus Marius Radu), 15 hours each, 30 man-hours in total"]],
   who: "", location: "First floor slab, Zone 3: underside of the gaps (infills) between the Ducon precast hollowcore slabs",
   work: d => `Shuttering the underside of the gaps (infills) between the precast hollowcore slabs on the first floor, Zone 3, so the gaps could be filled. Plywood was cut to suit, fixed up tight to the underside of the slabs and held with props, working from MEWPs. An SDS drill was used for the fixings. As shown in the attached before and after photographs and on the marked-up Ducon precast layout. ${d}.`,
   det: {x_zone: "Zone 3",
@@ -3261,7 +3261,7 @@ const VO_SEEDS = [{
     x_qty: "Underside of the gaps between the precast slabs, first floor Zone 3 (about 78 m of gaps, rough take-off from the Ducon layout SC-10001 Rev 03, as highlighted)",
     x_mats: "Plywood and props",
     x_plant: "MEWPs, SDS drill, hand tools",
-    x_days: "19/10/2026 07:00 to 17:00"},
+    x_days: "06/11/2026 07:00 to 17:00"},
 }];
 async function seedVariations(){
   try{ if (S.voSeeding || !RS("dayworks") || !RS("dayworks").list || !(S.lads || []).length) return; }catch(e){ return; }
@@ -3594,6 +3594,25 @@ async function dropWall111Delay(){
     if (!RS("dayworks") || !RS("dayworks").list || await kvGet("dropWall111Delay")) return;
     if (mergedRecords("dayworks").some(r => r.id === "dw-dl-2026-11-02-wall111")) await queueRecordDelete("dayworks", "dw-dl-2026-11-02-wall111");
     await kvSet("dropWall111Delay", true);
+    if (S.view === "dayworks") render();
+  }catch(e){}
+}
+async function patchShutterDates(){
+  try{
+    if (!RS("dayworks") || !RS("dayworks").list || await kvGet("fixShutterDates")) return;
+    const K = KINDS.dayworks, v = VO_SEEDS.find(x => x.key === "voSeedInfillShutterFFZ3");
+    const r = mergedRecords("dayworks").find(x => x.id === v.ids[0]);
+    if (!r) return;
+    if (r.date === v.days[0][0] && /5 November 2026/.test(String(r.description || ""))){ await kvSet("fixShutterDates", true); return; }
+    const rec = {};
+    K.textFields.forEach(k => rec[k] = r[k] == null ? "" : r[k]);
+    ["chippies", "fixers", "operatives"].forEach(k => rec[k] = +r[k] || 0);
+    Object.assign(rec, {date: v.days[0][0], start: v.days[0][1], end: v.days[0][2]});
+    const kept = {};
+    Object.entries(parseDet(r.description).det).forEach(([k, val]) => { if (val) kept["x_" + k] = val; });
+    rec.description = composeDet(v.work(v.days[0][3]), {...rec, ...kept, x_days: v.det.x_days});
+    await queueRecordSave("dayworks", rec, [], []);
+    await kvSet("fixShutterDates", true);
     if (S.view === "dayworks") render();
   }catch(e){}
 }
