@@ -425,7 +425,7 @@ const paidFor = (l, i, base = S.paidHours) => isJB(l) ? (i === 5 ? 0 : JB_PAID) 
 const AG_COLORS = {"DCOR Construction":"#012060","Talcon Group":"#1F6FB2","Adebura":"#2E7D4F","Dragos":"#7B3FA0","Petru Pirtac":"#B03A5B","Aitken":"#2F6F7A"};
 const AG_ORDER = Object.keys(AG_COLORS);
 // trades: these are the defaults; the real list comes from the Settings tab of the timesheet
-let TRADES = [["SM","Site Manager"],["SR","Safety Rep"],["FFM","Fixing Foreman"],["C","Chippy"],["SF","Steel Fixer"],["CF","Concrete Finisher"],["GO","General Operative"],["BM","Banksman"]];
+let TRADES = [["SM","Site Manager"],["OF","Office"],["FFM","Fixing Foreman"],["C","Chippy"],["SF","Steel Fixer"],["CF","Concrete Finisher"],["GO","General Operative"],["BM","Banksman"]];
 let TRADE_LABEL = Object.fromEntries(TRADES);
 let TRADE_RANK = Object.fromEntries(TRADES.map(([c],i)=>[c,i]));
 function setTrades(list){
@@ -986,7 +986,7 @@ async function loadHome(){
 // ================= headcount PDF (same layout as the morning headcount, with the lads' faces) =================
 // Made here on the phone so the faces can go on it. Extras.gs then saves it to Drive for a share link.
 const HC_NAVY = "#012060", HC_TINT = "#DCE6F2", HC_LINE = "#B8C4D6", HC_GREY = "#5A6478", HC_GREEN = "#1E7A3C", HC_RED = "#B3261E";
-const HC_TRADE_ORDER = ["Carpenter", "Steel Fixer", "Chippy Labourer", "General Operative", "Fixing Foreman", "Site Manager", "Safety Rep"];
+const HC_TRADE_ORDER = ["Carpenter", "Steel Fixer", "Chippy Labourer", "General Operative", "Fixing Foreman", "Site Manager", "Office"];
 const HC_SITE = "Patrician Secondary School, Newbridge";
 // jsPDF and the navy logo come from loadJsPdf() and navyLogo(), further down (shared with the pour PDF)
 function hcTrade(l){
