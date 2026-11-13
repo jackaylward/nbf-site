@@ -3404,6 +3404,13 @@ const DL_SEEDS = [{
   det: {x_zone: "Zone 1 and Zone 2", x_cause: "Crane breakdown",
     x_causeInfo: "Tower crane out of service 07:00 to 12:00, reported electrical fault. Mobile crane on site, but its reach restricted by the position of the tower crane, so it could not serve the Wall 33 corbel or Wall 111",
     x_co: "JJ Rhatigan", x_effect: "No crane lifts to the corbel to Wall 33 (Zone 1, first floor) or to Wall 111 (Zone 2, first floor) from 07:00 to 12:00; Wall 56 (Zone 2) was the only wall poured that day. NBF reserves its entitlement to an extension of time and to recover any associated costs"},
+}, {
+  key: "dlSeed20261113concrete", id: "dw-dl-2026-11-13-concrete", date: "2026-11-13", start: "06:00", end: "06:45", copyFrom: "-", photos: [],
+  location: "Second floor slab, Zone 1: structural screed pour on the precast hollowcore slabs",
+  work: "The second floor structural screed pour in Zone 1 (409.62 m2 to the drawings) was planned to start at 06:00 on Friday 13 November 2026. The first load of ready-mix concrete did not arrive until 06:45, so the pour gang stood waiting from 06:00 to 06:45. The concrete supply was interrupted again from 08:30 to 09:15, when no concrete was available and the pour stopped. Total time lost waiting on concrete: 1 hour 30 minutes (06:00 to 06:45 and 08:30 to 09:15). As shown in the attached photographs.",
+  det: {x_zone: "Zone 1", x_cause: "Waiting on concrete",
+    x_causeInfo: "Late arrival of the ready-mix concrete: first load on site at 06:45 against a 06:00 start, then a further break in supply from 08:30 to 09:15",
+    x_co: "JJ Rhatigan", x_effect: "Second floor Zone 1 structural screed pour held up for 1 hour 30 minutes in total (06:00 to 06:45 and 08:30 to 09:15), with the pour gang standing waiting. NBF reserves its entitlement to an extension of time and to recover any associated costs"},
 }];
 async function seedCraneDelays(){
   try{ if (S.dlSeeding || !RS("dayworks") || !RS("dayworks").list) return; }catch(e){ return; }
