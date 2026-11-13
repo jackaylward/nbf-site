@@ -2651,7 +2651,7 @@ async function loadRecords(kind, quiet){
     cacheSet("records:" + kind, st.list);
     // moveSiteRecords() was a one-off and is switched off
     if (kind === "works") seedDailyRecords();
-    if (kind === "dayworks"){ unmoveLadderRecord(); seedVariations().then(patchWall70).then(patchFrameW33).then(oneOffFixes14Oct).then(seedCraneDelays).then(patchProtestDelay).then(rewordSeeded).then(rewordR115).then(patchInfill150).then(dropStaleRewords).then(stripValuingAll).then(kangoAll).then(patchB3bSteel).then(patchBoxOutsW13).then(patchKGuardLen).then(patchKGuardZ1).then(patchCorbelVictor).then(dropWall111Delay).then(patchShutterBeforeAfter).then(patchShutterDates).then(patchShutterQty); }
+    if (kind === "dayworks"){ unmoveLadderRecord(); seedVariations().then(patchWall70).then(patchFrameW33).then(oneOffFixes14Oct).then(seedCraneDelays).then(patchProtestDelay).then(rewordSeeded).then(rewordR115).then(patchInfill150).then(dropStaleRewords).then(stripValuingAll).then(kangoAll).then(patchB3bSteel).then(patchBoxOutsW13).then(patchKGuardLen).then(patchKGuardZ1).then(patchCorbelVictor).then(dropWall111Delay).then(patchShutterBeforeAfter).then(patchShutterDates).then(patchShutterQty).then(patchConcrete13Crew); }
   }catch(e){
     st.loadFailed = !st.list;
     if (!quiet) connectionTrouble();
@@ -3340,6 +3340,24 @@ async function oneOffFixes14Oct(){
   }catch(e){}
 }
 // one-off fix (Jack, 14 Oct): protest delay is 09:30 to 13:00 with 5 concrete operatives standing
+async function patchConcrete13Crew(){
+  try{
+    if (!RS("dayworks") || !RS("dayworks").list || await kvGet("fixConcrete13Crew")) return;
+    const K = KINDS.dayworks, v = DL_SEEDS.find(x => x.key === "dlSeed20261113concrete");
+    const r = mergedRecords("dayworks").find(x => x.id === v.id);
+    if (!r) return;
+    if (+r.operatives === 5){ await kvSet("fixConcrete13Crew", true); return; }
+    const rec = {};
+    K.textFields.forEach(k => rec[k] = r[k] == null ? "" : r[k]);
+    Object.assign(rec, {other: v.whoNames, chippies: 0, fixers: 0, operatives: 0}, v.crew);
+    const kept = {};
+    Object.entries(parseDet(r.description).det).forEach(([k, val]) => { if (val) kept["x_" + k] = val; });
+    rec.description = composeDet(v.work, {...rec, ...kept, x_effect: v.det.x_effect});
+    await queueRecordSave("dayworks", rec, [], []);
+    await kvSet("fixConcrete13Crew", true);
+    if (S.view === "dayworks") render();
+  }catch(e){}
+}
 async function patchProtestDelay(){
   try{
     if (!RS("dayworks") || !RS("dayworks").list || await kvGet("fixProtest1")) return;
@@ -3405,12 +3423,12 @@ const DL_SEEDS = [{
     x_causeInfo: "Tower crane out of service 07:00 to 12:00, reported electrical fault. Mobile crane on site, but its reach restricted by the position of the tower crane, so it could not serve the Wall 33 corbel or Wall 111",
     x_co: "JJ Rhatigan", x_effect: "No crane lifts to the corbel to Wall 33 (Zone 1, first floor) or to Wall 111 (Zone 2, first floor) from 07:00 to 12:00; Wall 56 (Zone 2) was the only wall poured that day. NBF reserves its entitlement to an extension of time and to recover any associated costs"},
 }, {
-  key: "dlSeed20261113concrete", id: "dw-dl-2026-11-13-concrete", date: "2026-11-13", start: "06:00", end: "06:45", copyFrom: "-", photos: [],
+  key: "dlSeed20261113concrete", id: "dw-dl-2026-11-13-concrete", date: "2026-11-13", start: "06:00", end: "06:45", copyFrom: "-", photos: [], crew: {operatives: 5}, whoNames: "5 concrete operatives (Dragos agency, in for the pour)",
   location: "Second floor slab, Zone 1: structural screed pour on the precast hollowcore slabs",
-  work: "The second floor structural screed pour in Zone 1 (409.62 m2 to the drawings) was planned to start at 06:00 on Friday 13 November 2026. The first load of ready-mix concrete did not arrive until 06:45, so the pour gang stood waiting from 06:00 to 06:45. The concrete supply was interrupted again from 08:30 to 09:15, when no concrete was available and the pour stopped. Total time lost waiting on concrete: 1 hour 30 minutes (06:00 to 06:45 and 08:30 to 09:15). As shown in the attached photographs.",
+  work: "The second floor structural screed pour in Zone 1 (409.62 m2 to the drawings) was planned to start at 06:00 on Friday 13 November 2026. The first load of ready-mix concrete did not arrive until 06:45, so the pour gang of 5 concrete operatives stood waiting from 06:00 to 06:45. The concrete supply was interrupted again from 08:30 to 09:15, when no concrete was available and the pour stopped. Total time lost waiting on concrete: 1 hour 30 minutes (06:00 to 06:45 and 08:30 to 09:15). As shown in the attached photographs.",
   det: {x_zone: "Zone 1", x_cause: "Waiting on concrete",
     x_causeInfo: "Late arrival of the ready-mix concrete: first load on site at 06:45 against a 06:00 start, then a further break in supply from 08:30 to 09:15",
-    x_co: "JJ Rhatigan", x_effect: "Second floor Zone 1 structural screed pour held up for 1 hour 30 minutes in total (06:00 to 06:45 and 08:30 to 09:15), with the pour gang standing waiting. NBF reserves its entitlement to an extension of time and to recover any associated costs"},
+    x_co: "JJ Rhatigan", x_effect: "Second floor Zone 1 structural screed pour held up for 1 hour 30 minutes in total (06:00 to 06:45 and 08:30 to 09:15), with the pour gang of 5 concrete operatives standing waiting (7 hours 30 minutes in total). NBF reserves its entitlement to an extension of time and to recover any associated costs"},
 }];
 async function seedCraneDelays(){
   try{ if (S.dlSeeding || !RS("dayworks") || !RS("dayworks").list) return; }catch(e){ return; }
