@@ -1506,7 +1506,7 @@ function hiddenHtml(){
   if (!list.length) return "";
   return `<div class="panel" id="hidPanel"><h2>Hidden lads (${list.length})</h2>
     <p class="muted small" style="margin:0 0 10px">Hidden from attendance and the timesheet from the day they were hidden, not deleted. Earlier days still show them.</p>
-    <div class="lads week">${list.map(l => `<div class="lad">${avatar(l)}<div class="who"><strong>${esc(l.name)}</strong><em>${esc(l.agency)}${l.hiddenFrom ? " · from " + esc(l.hiddenFrom.split("-").reverse().join("/")) : ""}</em></div><button class="btn ghost rm" data-unhide="${esc(l.id)}">Unhide</button></div>`).join("")}</div></div>`;
+    <div class="lads week">${list.map(l => `<div class="lad">${avatar(l)}<div class="who"><strong>${esc(l.name)}</strong><em>${esc(l.agency)}${l.hiddenFrom ? " · from " + esc(l.hiddenFrom.split("-").reverse().join("/")) : ""}</em></div><button class="btn ghost rm" data-unhide="${esc(l.id)}">Unhide</button><button class="btn ghost rm" data-delhid="${esc(l.id)}">Remove</button></div>`).join("")}</div></div>`;
 }
 // hiding is saved on the timesheet (trade "C (hidden)") so it shows the same on every device;
 // until Google confirms, it is held on this device
@@ -1560,6 +1560,22 @@ async function syncHidden(){
   kvSet("hiddenLads2", S.hidden).catch(() => {});
   render();
 }
+// remove a hidden lad for good (Jack 18/11/2026): only once he has no hours on the timesheet
+$("view").addEventListener("click", async ev => {
+  const b = ev.target.closest("[data-delhid]");
+  if (!b) return;
+  if (!(await canEdit())) return;
+  const l = (S.allLads || []).find(x => x.id === b.dataset.delhid);
+  if (!l) return;
+  if (DAYS.some((_, i) => hasH(l, i))) return tell(`${l.name} still has hours on this timesheet, so he stays hidden until the next week is started. Then you can remove him.`);
+  if (!(await ask(`Remove ${l.name} for good? He comes off the list completely. Past timesheets and attendance are kept.`, "Remove", true))) return;
+  setStatus("Removing…");
+  try{
+    setLadData(await server("removeLad", l.name));
+    S.hidden = (S.hidden || []).filter(x => x !== l.id); kvSet("hiddenLads2", S.hidden).catch(() => {});
+    render(); setStatus(`${l.name} removed`, true);
+  }catch(err){ setStatus(errText(err, "Couldn't remove him. Try again")); }
+});
 $("view").addEventListener("click", ev => {
   const b = ev.target.closest("[data-unhide]");
   if (!b) return;
