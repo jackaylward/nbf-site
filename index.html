@@ -3291,6 +3291,19 @@ const VO_SEEDS = [{
     x_qty: "Beam steel added on SE-26005 Rev 01 (bar schedule marks 58 to 61): 84 no. H10 links (mark 58, 62.19 kg), 24 no. H10 bars each face (mark 59, 56.27 kg), 4 no. H20 (mark 60, 14.33 kg) and 4 no. H20 x 7500 mm (mark 61, 74.10 kg), 206.89 kg in total; beam about 7.5 m long",
     x_mats: "Reinforcement as scheduled",
     x_plant: "Hand tools"},
+}, {
+  // Thu 19 Nov: Wall 34 upstand (both sides of Wall 24) moved from 230 mm to 200 mm after the site engineer re-measured; pins removed, redrilled, shutters reset
+  key: "voSeedUpstandW34Reset", ids: ["dw-vo-upstand-w34-reset"], photos: [], whoName: "Cornel Ionut Calin, Ion Gusatu, Dritan Permargjeta", crew: {chippies: 3},
+  days: [["2026-11-19", "07:00", "08:00", "Time: Thursday 19 November 2026, 1 hour each for Cornel Ionut Calin and Ion Gusatu (upstand to the left of Wall 24) and Dritan Permargjeta (upstand to the right of Wall 24), 3 man-hours in total"]],
+  who: "", location: "First floor, Zone 3: upstand to Wall 34, both sides of Wall 24",
+  work: d => `Resetting the upstand shutters on Wall 34, first floor, Zone 3, after the site engineer changed the set-out. On Wednesday 18 November 2026 the site engineer marked the upstand at 230 mm, and the pins were drilled and the shutters set to that line. The site engineer then came back and re-measured it at 200 mm. On Thursday 19 November 2026 the pins were pulled out, redrilled at 200 mm and the shutters reset: Cornel Ionut Calin and Ion Gusatu on the upstand to the left of Wall 24, and Dritan Permargjeta on the upstand to the right of Wall 24, where the shutter pins had also been set at 230 mm instead of 200 mm. As shown in the attached photographs. ${d}.`,
+  det: {x_zone: "Zone 3",
+    x_why: "Rework caused by the site engineer's set-out: the upstand was marked at 230 mm and later re-measured at 200 mm, so the pins and shutters set to the original marking had to be removed and reset. It is outside NBF's agreed scope and price",
+    x_drg: "Site engineer's set-out marking on Wall 34 (230 mm marked on 18 November 2026, re-measured at 200 mm)",
+    x_co: "JJ Rhatigan",
+    x_qty: "Upstand shutters to Wall 34 on both sides of Wall 24 moved from 230 mm to 200 mm; pins removed and redrilled",
+    x_mats: "Pins",
+    x_plant: "Drill, hand tools"},
 }];
 async function seedVariations(){
   try{ if (S.voSeeding || !RS("dayworks") || !RS("dayworks").list || !(S.lads || []).length) return; }catch(e){ return; }
@@ -3458,6 +3471,13 @@ const DL_SEEDS = [{
   det: {x_zone: "Zone 1", x_cause: "Waiting on concrete",
     x_causeInfo: "Late arrival of the ready-mix concrete: first load on site at 06:45 against a 06:00 start, then a further break in supply from 08:30 to 09:15",
     x_co: "JJ Rhatigan", x_effect: "Second floor Zone 1 structural screed pour held up for 1 hour 30 minutes in total (06:00 to 06:45 and 08:30 to 09:15), with the pour gang of 5 concrete operatives standing waiting (7 hours 30 minutes in total). NBF reserves its entitlement to an extension of time and to recover any associated costs"},
+}, {
+  key: "dlSeed20261116expjoint", id: "dw-dl-2026-11-16-expjoint", date: "2026-11-16", start: "07:00", end: "17:00", copyFrom: "-", photos: [],
+  location: "First floor: Wall 33 (Zone 2), at the boundary with Zone 3",
+  work: "From Monday 16 November 2026, Wall 33 (Zone 2) has been fully boarded and ready to pour along its boundary with Zone 3, but it could not be poured because JJ Rhatigan has not supplied the expansion joint (movement joint filler) needed at this joint. The pour remains on hold, still waiting on the material as of Friday 20 November 2026. As shown in the attached photographs.",
+  det: {x_zone: "Zone 2 and Zone 3", x_cause: "Waiting on materials or steel",
+    x_causeInfo: "Expansion joint (movement joint filler) for Wall 33 at the Zone 2 / Zone 3 boundary not supplied by JJ Rhatigan; wall boarded and ready to pour since Monday 16 November 2026",
+    x_co: "JJ Rhatigan", x_effect: "Pour to Wall 33 held up from Monday 16 November 2026 and still waiting as of Friday 20 November 2026, with the boarded wall standing idle. NBF reserves its entitlement to an extension of time and to recover any associated costs"},
 }];
 async function seedCraneDelays(){
   try{ if (S.dlSeeding || !RS("dayworks") || !RS("dayworks").list) return; }catch(e){ return; }
