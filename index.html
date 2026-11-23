@@ -3304,6 +3304,18 @@ const VO_SEEDS = [{
     x_qty: "Upstand shutters to Wall 34 on both sides of Wall 24 moved from 230 mm to 200 mm; pins removed and redrilled",
     x_mats: "Pins",
     x_plant: "Drill, hand tools"},
+}, {
+  // Sat 21 Nov, 3 h: Vitalie breaking out 200 mm of concrete on both sides of Wall 50 (first floor, Zone 2) for the corbel
+  key: "voSeedCorbelW50BreakOut", ids: ["dw-vo-corbel-w50-breakout"], photos: [], whoName: "Vitalie Nicoara",
+  days: [["2026-11-21", "07:00", "10:00", "Time: Saturday 21 November 2026, 3 hours, 1 general operative (Vitalie Nicoara), 3 man-hours"]],
+  who: "vitalie", location: "First floor, Zone 2: Wall 50 (gridline 7), at the corbel, both sides of the wall",
+  work: d => `Breaking out 200 mm of hardened concrete on both sides of Wall 50, first floor, Zone 2, to form the corbel, using a Kango. As shown in the attached photographs. ${d}.`,
+  det: {x_zone: "Zone 2",
+    x_why: "Breaking out hardened concrete to form the corbel is additional formwork work, outside NBF's agreed scope and price",
+    x_drg: "SE-26023 (Wall 50 corbel, gridline 7)",
+    x_co: "JJ Rhatigan",
+    x_qty: "Concrete broken out 200 mm deep on both sides of Wall 50 at the corbel",
+    x_plant: "Kango"},
 }];
 async function seedVariations(){
   try{ if (S.voSeeding || !RS("dayworks") || !RS("dayworks").list || !(S.lads || []).length) return; }catch(e){ return; }
