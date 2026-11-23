@@ -3490,6 +3490,13 @@ const DL_SEEDS = [{
   det: {x_zone: "Zone 2 and Zone 3", x_cause: "Waiting on materials or steel",
     x_causeInfo: "Expansion joint (movement joint filler) for Wall 33 at the Zone 2 / Zone 3 boundary not supplied by JJ Rhatigan; wall boarded and ready to pour since Monday 16 November 2026",
     x_co: "JJ Rhatigan", x_effect: "Pour to Wall 33 held up from Monday 16 November 2026 and still waiting as of Friday 20 November 2026, with the boarded wall standing idle. NBF reserves its entitlement to an extension of time and to recover any associated costs"},
+}, {
+  key: "dlSeed20261123crane", id: "dw-dl-2026-11-23-crane", date: "2026-11-23", start: "09:00", end: "17:00", copyFrom: "-", photos: [],
+  location: "Ground floor: Walls 58 and 59; first floor: Wall 33",
+  work: "From 09:00 on Monday 23 November 2026 the tower crane was out of service while it was being repaired, and it was still out of service when this was recorded at 11:30. A new mobile crane had been set up on site, but it was being used to lift the steel beams for Zone 2, first floor, so it was not available to NBF. With no crane available, NBF could not carry out any lifts in preparation for pouring Walls 58 and 59 (ground floor) and Wall 33 (first floor). As shown in the attached photographs.",
+  det: {x_zone: "Zone 2", x_cause: "Crane breakdown",
+    x_causeInfo: "Tower crane out of service from 09:00 while being repaired; new mobile crane on site but in use lifting the steel beams for Zone 2, first floor, and not available to NBF",
+    x_co: "JJ Rhatigan", x_effect: "No crane lifts available to NBF from 09:00, holding up the preparation for the pours to Walls 58 and 59 (ground floor) and Wall 33 (first floor). NBF reserves its entitlement to an extension of time and to recover any associated costs"},
 }];
 async function seedCraneDelays(){
   try{ if (S.dlSeeding || !RS("dayworks") || !RS("dayworks").list) return; }catch(e){ return; }
