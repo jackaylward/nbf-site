@@ -2667,7 +2667,7 @@ async function loadRecords(kind, quiet){
     cacheSet("records:" + kind, st.list);
     // moveSiteRecords() was a one-off and is switched off
     if (kind === "works") seedDailyRecords();
-    if (kind === "dayworks"){ unmoveLadderRecord(); seedVariations().then(patchWall70).then(patchFrameW33).then(oneOffFixes14Oct).then(seedCraneDelays).then(patchProtestDelay).then(rewordSeeded).then(rewordR115).then(patchInfill150).then(dropStaleRewords).then(stripValuingAll).then(kangoAll).then(patchB3bSteel).then(patchBoxOutsW13).then(patchKGuardLen).then(patchKGuardZ1).then(patchCorbelVictor).then(dropWall111Delay).then(patchShutterBeforeAfter).then(patchShutterDates).then(patchShutterQty).then(patchConcrete13Crew).then(patchCrane23End).then(patchCrane23AllDay); }
+    if (kind === "dayworks"){ unmoveLadderRecord(); seedVariations().then(patchWall70).then(patchFrameW33).then(oneOffFixes14Oct).then(seedCraneDelays).then(patchProtestDelay).then(rewordSeeded).then(rewordR115).then(patchInfill150).then(dropStaleRewords).then(stripValuingAll).then(kangoAll).then(patchB3bSteel).then(patchBoxOutsW13).then(patchKGuardLen).then(patchKGuardZ1).then(patchCorbelVictor).then(dropWall111Delay).then(patchShutterBeforeAfter).then(patchShutterDates).then(patchShutterQty).then(patchConcrete13Crew).then(patchCrane23End).then(patchCrane23AllDay).then(patchExpJoint24); }
   }catch(e){
     st.loadFailed = !st.list;
     if (!quiet) connectionTrouble();
@@ -3412,6 +3412,25 @@ async function patchConcrete13Crew(){
     if (S.view === "dayworks") render();
   }catch(e){}
 }
+async function patchExpJoint24(){
+  try{
+    if (!RS("dayworks") || !RS("dayworks").list || await kvGet("fixExpJoint24")) return;
+    const K = KINDS.dayworks, v = DL_SEEDS.find(x => x.key === "dlSeed20261116expjoint");
+    const r = mergedRecords("dayworks").find(x => x.id === v.id);
+    if (!r) return;
+    if (/24 November 2026/.test(String(r.description || ""))){ await kvSet("fixExpJoint24", true); return; }
+    const rec = {};
+    K.textFields.forEach(k => rec[k] = r[k] == null ? "" : r[k]);
+    ["chippies", "fixers", "operatives"].forEach(k => rec[k] = +r[k] || 0);
+    rec.location = v.location;
+    const kept = {};
+    Object.entries(parseDet(r.description).det).forEach(([k, val]) => { if (val) kept["x_" + k] = val; });
+    rec.description = composeDet(v.work, {...rec, ...kept, x_causeInfo: v.det.x_causeInfo, x_effect: v.det.x_effect});
+    await queueRecordSave("dayworks", rec, [], []);
+    await kvSet("fixExpJoint24", true);
+    if (S.view === "dayworks") render();
+  }catch(e){}
+}
 async function patchCrane23AllDay(){
   try{
     if (!RS("dayworks") || !RS("dayworks").list || await kvGet("fixCrane23AllDay")) return;
@@ -3523,11 +3542,11 @@ const DL_SEEDS = [{
     x_co: "JJ Rhatigan", x_effect: "Second floor Zone 1 structural screed pour held up for 1 hour 30 minutes in total (06:00 to 06:45 and 08:30 to 09:15), with the pour gang of 5 concrete operatives standing waiting (7 hours 30 minutes in total). NBF reserves its entitlement to an extension of time and to recover any associated costs"},
 }, {
   key: "dlSeed20261116expjoint", id: "dw-dl-2026-11-16-expjoint", date: "2026-11-16", start: "07:00", end: "17:00", copyFrom: "-", photos: [],
-  location: "First floor: Wall 33 (Zone 2), at the boundary with Zone 3",
-  work: "From Monday 16 November 2026, Wall 33 (Zone 2) has been fully boarded and ready to pour along its boundary with Zone 3, but it could not be poured because JJ Rhatigan has not supplied the expansion joint (movement joint filler) needed at this joint. The pour remains on hold, still waiting on the material as of Friday 20 November 2026. As shown in the attached photographs.",
+  location: "First floor: Wall 33 (Zone 2), at the boundary with Zone 3; ground floor: Walls 58 and 59 (Zone 2)",
+  work: "From Monday 16 November 2026, Wall 33 (Zone 2, first floor) was fully shuttered and closed up, ready to pour along its boundary with Zone 3, but it could not be poured because JJ Rhatigan had not supplied the expansion joint (movement joint filler) needed at this joint. The wall stood shuttered and waiting until Tuesday 24 November 2026, when it was poured from 07:00. Walls 58 and 59 (Zone 2, ground floor) were also ready to pour from Friday 20 November 2026 and were not poured until Tuesday 24 November 2026. As shown in the attached photographs.",
   det: {x_zone: "Zone 2 and Zone 3", x_cause: "Waiting on materials or steel",
-    x_causeInfo: "Expansion joint (movement joint filler) for Wall 33 at the Zone 2 / Zone 3 boundary not supplied by JJ Rhatigan; wall boarded and ready to pour since Monday 16 November 2026",
-    x_co: "JJ Rhatigan", x_effect: "Pour to Wall 33 held up from Monday 16 November 2026 and still waiting as of Friday 20 November 2026, with the boarded wall standing idle. NBF reserves its entitlement to an extension of time and to recover any associated costs"},
+    x_causeInfo: "Expansion joint (movement joint filler) for Wall 33 at the Zone 2 / Zone 3 boundary not supplied by JJ Rhatigan; wall shuttered and closed up, ready to pour, from Monday 16 November 2026",
+    x_co: "JJ Rhatigan", x_effect: "Pour to Wall 33 (first floor) held up from Monday 16 November 2026 until Tuesday 24 November 2026 (poured from 07:00), with the shuttered wall standing idle for 6 working days. Walls 58 and 59 (ground floor), ready to pour from Friday 20 November 2026, also not poured until Tuesday 24 November 2026. NBF reserves its entitlement to an extension of time and to recover any associated costs"},
 }, {
   key: "dlSeed20261123crane", id: "dw-dl-2026-11-23-crane", date: "2026-11-23", start: "09:00", end: "15:00", copyFrom: "-", photos: [],
   location: "Ground floor: Walls 58 and 59; first floor: Wall 33",
