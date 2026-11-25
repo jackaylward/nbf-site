@@ -2667,7 +2667,7 @@ async function loadRecords(kind, quiet){
     cacheSet("records:" + kind, st.list);
     // moveSiteRecords() was a one-off and is switched off
     if (kind === "works") seedDailyRecords();
-    if (kind === "dayworks"){ unmoveLadderRecord(); seedVariations().then(patchWall70).then(patchFrameW33).then(oneOffFixes14Oct).then(seedCraneDelays).then(patchProtestDelay).then(rewordSeeded).then(rewordR115).then(patchInfill150).then(dropStaleRewords).then(stripValuingAll).then(kangoAll).then(patchB3bSteel).then(patchBoxOutsW13).then(patchKGuardLen).then(patchKGuardZ1).then(patchCorbelVictor).then(dropWall111Delay).then(patchShutterBeforeAfter).then(patchShutterDates).then(patchShutterQty).then(patchConcrete13Crew).then(patchCrane23End).then(patchCrane23AllDay).then(patchExpJoint24).then(patchCrane23Mobile).then(patchCrane23BlackHat).then(patchCrane23Day2); }
+    if (kind === "dayworks"){ unmoveLadderRecord(); seedVariations().then(patchWall70).then(patchFrameW33).then(oneOffFixes14Oct).then(seedCraneDelays).then(patchProtestDelay).then(rewordSeeded).then(rewordR115).then(patchInfill150).then(dropStaleRewords).then(stripValuingAll).then(kangoAll).then(patchB3bSteel).then(patchBoxOutsW13).then(patchKGuardLen).then(patchKGuardZ1).then(patchCorbelVictor).then(dropWall111Delay).then(patchShutterBeforeAfter).then(patchShutterDates).then(patchShutterQty).then(patchConcrete13Crew).then(patchCrane23End).then(patchCrane23AllDay).then(patchExpJoint24).then(patchCrane23Mobile).then(patchCrane23BlackHat).then(patchCrane23Day2).then(patchCrane23Wall51); }
   }catch(e){
     st.loadFailed = !st.list;
     if (!quiet) connectionTrouble();
@@ -3412,6 +3412,26 @@ async function patchConcrete13Crew(){
     if (S.view === "dayworks") render();
   }catch(e){}
 }
+async function patchCrane23Wall51(){
+  try{
+    if (!RS("dayworks") || !RS("dayworks").list || await kvGet("fixCrane23Wall51")) return;
+    const K = KINDS.dayworks, v = DL_SEEDS.find(x => x.key === "dlSeed20261123crane");
+    const r = mergedRecords("dayworks").find(x => x.id === v.id);
+    if (!r) return;
+    if (/reach Wall 51/.test(String(r.description || ""))){ await kvSet("fixCrane23Wall51", true); return; }
+    const rec = {};
+    K.textFields.forEach(k => rec[k] = r[k] == null ? "" : r[k]);
+    ["chippies", "fixers", "operatives"].forEach(k => rec[k] = +r[k] || 0);
+    rec.end = v.end;
+    rec.location = v.location;
+    const kept = {};
+    Object.entries(parseDet(r.description).det).forEach(([k, val]) => { if (val) kept["x_" + k] = val; });
+    rec.description = composeDet(v.work, {...rec, ...kept, x_days: v.det.x_days, x_causeInfo: v.det.x_causeInfo, x_effect: v.det.x_effect});
+    await queueRecordSave("dayworks", rec, [], []);
+    await kvSet("fixCrane23Wall51", true);
+    if (S.view === "dayworks") render();
+  }catch(e){}
+}
 async function patchCrane23Day2(){
   try{
     if (!RS("dayworks") || !RS("dayworks").list || await kvGet("fixCrane23Day2")) return;
@@ -3606,11 +3626,11 @@ const DL_SEEDS = [{
     x_co: "JJ Rhatigan", x_effect: "Pour to Wall 33 (first floor) held up from Monday 16 November 2026 until Tuesday 24 November 2026 (poured from 07:00), with the shuttered wall standing idle for 6 working days. Walls 58 and 59 (ground floor), ready to pour from Friday 20 November 2026, also not poured until Tuesday 24 November 2026. NBF reserves its entitlement to an extension of time and to recover any associated costs"},
 }, {
   key: "dlSeed20261123crane", id: "dw-dl-2026-11-23-crane", date: "2026-11-23", start: "09:00", end: "15:00", copyFrom: "-", photos: [],
-  location: "Ground floor: Walls 58 and 59; first floor: Wall 33",
-  work: "From 09:00 on Monday 23 November 2026 the tower crane was out of service while it was being repaired, and it stayed out of service for the rest of the day. A new 100 tonne mobile crane had been brought in and set up on site for the sole purpose of NBF's work, but because the tower crane was out of operation the steel erectors had to use the mobile crane to lift the steel beams for Zone 2, first floor, so it was not available to NBF. With no crane available, NBF could not carry out any lifts in preparation for pouring Walls 58 and 59 (ground floor) and Wall 33 (first floor) from 09:00 to 15:00. The steel erectors' supervisor (black hat) said they needed the mobile crane until 17:00, but the steel erectors left at 15:00; this lack of communication caused further hold-ups, as NBF had not been told the crane would come free earlier. The mobile crane only became available to NBF when the steel erectors left at 15:00, and the crane driver left at 17:00, so NBF had only 2 hours of lifts that day, all with the mobile crane. On Tuesday 24 November 2026 NBF was again without the tower crane for the whole working day, from 06:00 to 17:00. As shown in the attached photographs.",
+  location: "Ground floor: Walls 58 and 59; first floor: Walls 33 and 51",
+  work: "From 09:00 on Monday 23 November 2026 the tower crane was out of service while it was being repaired, and it stayed out of service for the rest of the day. A new 100 tonne mobile crane had been brought in and set up on site for the sole purpose of NBF's work, but because the tower crane was out of operation the steel erectors had to use the mobile crane to lift the steel beams for Zone 2, first floor, so it was not available to NBF. With no crane available, NBF could not carry out any lifts in preparation for pouring Walls 58 and 59 (ground floor) and Wall 33 (first floor) from 09:00 to 15:00. The steel erectors' supervisor (black hat) said they needed the mobile crane until 17:00, but the steel erectors left at 15:00; this lack of communication caused further hold-ups, as NBF had not been told the crane would come free earlier. The mobile crane only became available to NBF when the steel erectors left at 15:00, and the crane driver left at 17:00, so NBF had only 2 hours of lifts that day, all with the mobile crane. On Tuesday 24 November 2026 NBF was again without the tower crane for the whole working day, from 06:00 to 17:00. On Wednesday 25 November 2026 the 100 tonne mobile crane could not reach Wall 51 (first floor) to make the lifts for the beam and the corbel beam, which must be poured before the precast slabs go in on Friday 27 November 2026. As shown in the attached photographs.",
   det: {x_zone: "Zone 2", x_cause: "Crane breakdown",
     x_causeInfo: "Tower crane out of service from 09:00 for the rest of the day while being repaired; new 100 tonne mobile crane brought in solely for NBF's work, but taken over by the steel erectors to lift the steel beams for Zone 2, first floor, until 15:00 because the tower crane was out of operation, so not available to NBF",
-    x_days: "24/11/2026 06:00 to 17:00", x_co: "JJ Rhatigan", x_effect: "No crane lifts available to NBF from 09:00 to 15:00 (6 hours), holding up the preparation for the pours to Walls 58 and 59 (ground floor) and Wall 33 (first floor). NBF had only 2 hours of lifts, with the mobile crane (15:00 to 17:00, crane driver left at 17:00), and the steel erectors' supervisor's statement that the crane was needed until 17:00, when they left at 15:00, caused further hold-ups; the tower crane was out of service all day from 09:00. On Tuesday 24 November 2026 NBF was without the tower crane all day, 06:00 to 17:00 (11 hours). NBF reserves its entitlement to an extension of time and to recover any associated costs"},
+    x_days: "24/11/2026 06:00 to 17:00", x_co: "JJ Rhatigan", x_effect: "No crane lifts available to NBF from 09:00 to 15:00 (6 hours), holding up the preparation for the pours to Walls 58 and 59 (ground floor) and Wall 33 (first floor). NBF had only 2 hours of lifts, with the mobile crane (15:00 to 17:00, crane driver left at 17:00), and the steel erectors' supervisor's statement that the crane was needed until 17:00, when they left at 15:00, caused further hold-ups; the tower crane was out of service all day from 09:00. On Tuesday 24 November 2026 NBF was without the tower crane all day, 06:00 to 17:00 (11 hours). On Wednesday 25 November 2026 the 100 tonne mobile crane could not reach Wall 51 (first floor) for the beam and corbel beam lifts, putting at risk the pour that must be done before the precast slabs go in on Friday 27 November 2026. NBF reserves its entitlement to an extension of time and to recover any associated costs"},
 }];
 async function seedCraneDelays(){
   try{ if (S.dlSeeding || !RS("dayworks") || !RS("dayworks").list) return; }catch(e){ return; }
