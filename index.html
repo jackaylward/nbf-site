@@ -3327,6 +3327,16 @@ const VO_SEEDS = [{
     x_co: "JJ Rhatigan",
     x_qty: "1 no. temporary support frame (props and timber beams) under the steel beams",
     x_mats: "Props and timber beams"},
+}, {
+  // Fri 20 Nov (time assumed 07:00-08:00): Alan McKenna and Cornel Ionut Calin drilled and set 8 bolts for the steel beams on the columns, FF Zone 2
+  key: "voSeedSteelBoltsColsZ2", ids: ["dw-vo-steel-bolts-cols-z2"], photos: [], whoName: "Alan McKenna, Cornel Ionut Calin", crew: {chippies: 2},
+  days: [["2026-11-20", "07:00", "08:00", "Time: Friday 20 November 2026, 1 hour each for Alan McKenna and Cornel Ionut Calin, 2 man-hours in total"]],
+  who: "", location: "First floor, Zone 2: tops of the columns carrying the steel beams",
+  work: d => `Drilling and setting 8 no. holding-down bolts in total into the tops of the concrete columns, first floor, Zone 2, for the steel beams to bolt down to, as shown in the attached photographs. Fixing bolts for the structural steel is not NBF's work. ${d}.`,
+  det: {x_zone: "Zone 2",
+    x_why: "Drilling and setting bolts for the structural steel beams is not formwork and is outside NBF's agreed scope and price",
+    x_co: "JJ Rhatigan",
+    x_qty: "8 no. bolts drilled and set into the tops of the columns for the steel beams"},
 }];
 async function seedVariations(){
   try{ if (S.voSeeding || !RS("dayworks") || !RS("dayworks").list || !(S.lads || []).length) return; }catch(e){ return; }
