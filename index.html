@@ -2667,7 +2667,7 @@ async function loadRecords(kind, quiet){
     cacheSet("records:" + kind, st.list);
     // moveSiteRecords() was a one-off and is switched off
     if (kind === "works") seedDailyRecords();
-    if (kind === "dayworks"){ unmoveLadderRecord(); seedVariations().then(patchWall70).then(patchFrameW33).then(oneOffFixes14Oct).then(seedCraneDelays).then(patchProtestDelay).then(rewordSeeded).then(rewordR115).then(patchInfill150).then(dropStaleRewords).then(stripValuingAll).then(kangoAll).then(patchB3bSteel).then(patchBoxOutsW13).then(patchKGuardLen).then(patchKGuardZ1).then(patchCorbelVictor).then(dropWall111Delay).then(patchShutterBeforeAfter).then(patchShutterDates).then(patchShutterQty).then(patchConcrete13Crew).then(patchCrane23End).then(patchCrane23AllDay).then(patchExpJoint24).then(patchCrane23Mobile).then(patchCrane23BlackHat).then(patchCrane23Day2).then(patchCrane23Wall51).then(patchCrane23Cages); }
+    if (kind === "dayworks"){ unmoveLadderRecord(); seedVariations().then(patchWall70).then(patchFrameW33).then(oneOffFixes14Oct).then(seedCraneDelays).then(patchProtestDelay).then(rewordSeeded).then(rewordR115).then(patchInfill150).then(dropStaleRewords).then(stripValuingAll).then(kangoAll).then(patchB3bSteel).then(patchBoxOutsW13).then(patchKGuardLen).then(patchKGuardZ1).then(patchCorbelVictor).then(dropWall111Delay).then(patchShutterBeforeAfter).then(patchShutterDates).then(patchShutterQty).then(patchConcrete13Crew).then(patchCrane23End).then(patchCrane23AllDay).then(patchExpJoint24).then(patchCrane23Mobile).then(patchCrane23BlackHat).then(patchCrane23Day2).then(patchCrane23Wall51).then(patchCrane23Cages).then(patchBoltsCornel); }
   }catch(e){
     st.loadFailed = !st.list;
     if (!quiet) connectionTrouble();
@@ -3328,15 +3328,26 @@ const VO_SEEDS = [{
     x_qty: "1 no. temporary support frame (props and timber beams) under the steel beams",
     x_mats: "Props and timber beams"},
 }, {
-  // Fri 20 Nov (time assumed 07:00-08:00): Alan McKenna and Cornel Ionut Calin drilled and set 8 bolts for the steel beams on the columns, FF Zone 2
-  key: "voSeedSteelBoltsColsZ2", ids: ["dw-vo-steel-bolts-cols-z2"], photos: [], whoName: "Alan McKenna, Cornel Ionut Calin", crew: {chippies: 2},
-  days: [["2026-11-20", "07:00", "08:00", "Time: Friday 20 November 2026, 1 hour each for Alan McKenna and Cornel Ionut Calin, 2 man-hours in total"]],
+  // Fri 20 Nov (time assumed 07:00-08:00): Cornel Ionut Calin drilled and set 8 bolts for the steel beams on the columns, FF Zone 2
+  key: "voSeedSteelBoltsColsZ2", ids: ["dw-vo-steel-bolts-cols-z2"], photos: [], whoName: "Cornel Ionut Calin", crew: {chippies: 1},
+  days: [["2026-11-20", "07:00", "08:00", "Time: Friday 20 November 2026, 1 hour, 1 carpenter (Cornel Ionut Calin), 1 man-hour"]],
   who: "", location: "First floor, Zone 2: tops of the columns carrying the steel beams",
   work: d => `Drilling and setting 8 no. bolts in total into the tops of the concrete columns, first floor, Zone 2, for the steel beams to bolt down to, as shown in the attached photographs. Fixing bolts for the structural steel is not NBF's work. ${d}.`,
   det: {x_zone: "Zone 2",
     x_why: "Drilling and setting bolts for the structural steel beams is not formwork and is outside NBF's agreed scope and price",
     x_co: "JJ Rhatigan",
     x_qty: "8 no. bolts drilled and set into the tops of the columns for the steel beams"},
+}, {
+  // Mon 23 Nov (time assumed 07:00-10:00): Oleg Sochirca broke out bearing pockets for the steel beams, Wall 66 at Wall 56, and Wall 57, FF Zone 2
+  key: "voSeedPocketsW66W57", ids: ["dw-vo-pockets-w66-w57"], photos: [], whoName: "Oleg Sochirca",
+  days: [["2026-11-23", "07:00", "10:00", "Time: Monday 23 November 2026, 3 hours, 1 operative (Oleg Sochirca), 3 man-hours"]],
+  who: "oleg", location: "First floor, Zone 2: top of Wall 66 at its junction with Wall 56, and top of Wall 57",
+  work: d => `Breaking out bearing pockets in the hardened concrete with a Kango for the steel beams to sit into: one at the top of Wall 66 where it meets Wall 56, and one at the top of Wall 57, first floor, Zone 2, as shown in the attached photographs. ${d}.`,
+  det: {x_zone: "Zone 2",
+    x_why: "Breaking out hardened concrete to form bearing pockets for the structural steel beams is outside NBF's agreed scope and price",
+    x_co: "JJ Rhatigan",
+    x_qty: "2 no. bearing pockets broken out: top of Wall 66 at Wall 56, and top of Wall 57",
+    x_plant: "Kango"},
 }];
 async function seedVariations(){
   try{ if (S.voSeeding || !RS("dayworks") || !RS("dayworks").list || !(S.lads || []).length) return; }catch(e){ return; }
@@ -3470,6 +3481,25 @@ async function patchCrane23Wall51(){
     rec.description = composeDet(v.work, {...rec, ...kept, x_days: v.det.x_days, x_causeInfo: v.det.x_causeInfo, x_effect: v.det.x_effect});
     await queueRecordSave("dayworks", rec, [], []);
     await kvSet("fixCrane23Wall51", true);
+    if (S.view === "dayworks") render();
+  }catch(e){}
+}
+async function patchBoltsCornel(){
+  try{
+    if (!RS("dayworks") || !RS("dayworks").list || await kvGet("fixBoltsCornel")) return;
+    const K = KINDS.dayworks, v = VO_SEEDS.find(x => x.key === "voSeedSteelBoltsColsZ2");
+    const r = mergedRecords("dayworks").find(x => x.id === v.ids[0]);
+    if (!r) return;
+    if (!/Alan/.test(String(r.other || "") + String(r.description || ""))){ await kvSet("fixBoltsCornel", true); return; }
+    const rec = {};
+    K.textFields.forEach(k => rec[k] = r[k] == null ? "" : r[k]);
+    Object.assign(rec, {chippies: 0, fixers: 0, operatives: 0}, v.crew);
+    rec.other = v.whoName;
+    const kept = {};
+    Object.entries(parseDet(r.description).det).forEach(([k, val]) => { if (val) kept["x_" + k] = val; });
+    rec.description = composeDet(v.work(v.days[0][3]), {...rec, ...kept});
+    await queueRecordSave("dayworks", rec, [], []);
+    await kvSet("fixBoltsCornel", true);
     if (S.view === "dayworks") render();
   }catch(e){}
 }
