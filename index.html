@@ -3729,6 +3729,13 @@ const DL_SEEDS = [{
   det: {x_zone: "", x_cause: "Crane in use by another trade",
     x_causeInfo: "Mobile crane driver is Ducon's and serves Ducon only; no lifts carried out for NBF on Friday 27 November 2026",
     x_co: "JJ Rhatigan", x_effect: "No mobile crane lifts available to NBF for the whole working day, 07:00 to 17:00. NBF reserves its entitlement to an extension of time and to recover any associated costs"},
+}, {
+  key: "dlSeed20261127tower", id: "dw-dl-2026-11-27-tower", date: "2026-11-27", start: "12:15", end: "17:00", copyFrom: "-", photos: [],
+  location: "Site: tower crane",
+  work: "From 12:15 on Friday 27 November 2026 the tower crane was out of service, and NBF could not carry out any lifts with it. As shown in the attached photographs.",
+  det: {x_zone: "", x_cause: "Crane breakdown",
+    x_causeInfo: "Tower crane out of service from 12:15 on Friday 27 November 2026",
+    x_co: "JJ Rhatigan", x_effect: "No tower crane lifts available to NBF from 12:15. NBF reserves its entitlement to an extension of time and to recover any associated costs"},
 }];
 async function seedCraneDelays(){
   try{ if (S.dlSeeding || !RS("dayworks") || !RS("dayworks").list) return; }catch(e){ return; }
